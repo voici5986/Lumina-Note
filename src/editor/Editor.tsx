@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useCallback } from "react";
+import { useEffect, useMemo, useCallback, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -12,7 +12,7 @@ import { WikiLink } from "./extensions/WikiLink";
 import { debounce, getFileName } from "@/lib/utils";
 import { parseMarkdown, editorToMarkdown } from "@/lib/markdown";
 import { ReadingView } from "./ReadingView";
-import { LivePreview } from "./LivePreview";
+import { CodeMirrorEditor, CodeMirrorEditorRef } from "./CodeMirrorEditor";
 import { 
   Sidebar, 
   MessageSquare, 
@@ -62,6 +62,94 @@ export function Editor() {
     toggleSplitView,
   } = useUIStore();
 
+  // 滚动位置保持（基于行号）
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const codeMirrorRef = useRef<CodeMirrorEditorRef>(null);
+  const scrollLineRef = useRef<number>(1);
+  const prevModeRef = useRef<EditorMode>(editorMode);
+  const pendingScrollRef = useRef<number | null>(null);
+
+  // 从滚动位置计算行号（用于阅读/源码模式）
+  const getLineFromScrollPosition = useCallback((container: HTMLElement): number => {
+    const scrollTop = container.scrollTop;
+    // 估算每行高度（约 28px）
+    const lineHeight = 28;
+    const estimatedLine = Math.floor(scrollTop / lineHeight) + 1;
+    const lines = currentContent.split('\n').length;
+    return Math.min(Math.max(1, estimatedLine), lines);
+  }, [currentContent]);
+
+  // 滚动到指定行号
+  const scrollToLine = useCallback((container: HTMLElement, line: number) => {
+    const lineHeight = 28;
+    container.scrollTop = (line - 1) * lineHeight;
+  }, []);
+
+  // 保存当前滚动位置（行号）- 在切换前同步调用
+  const saveScrollPosition = useCallback(() => {
+    // 优先从 CodeMirror 获取（更精确）
+    if (codeMirrorRef.current) {
+      const line = codeMirrorRef.current.getScrollLine();
+      if (line > 0) {
+        scrollLineRef.current = line;
+        return;
+      }
+    }
+    // 否则从外层容器获取
+    if (scrollContainerRef.current) {
+      scrollLineRef.current = getLineFromScrollPosition(scrollContainerRef.current);
+    }
+  }, [getLineFromScrollPosition]);
+
+  // 尝试恢复滚动位置（带重试逻辑）
+  const tryRestoreScroll = useCallback((targetLine: number, retries: number = 0) => {
+    const maxRetries = 5;
+    const delay = 50;
+
+    if (editorMode === 'live') {
+      if (codeMirrorRef.current) {
+        codeMirrorRef.current.scrollToLine(targetLine);
+        pendingScrollRef.current = null;
+      } else if (retries < maxRetries) {
+        // CodeMirror 还没初始化，稍后重试
+        setTimeout(() => tryRestoreScroll(targetLine, retries + 1), delay);
+      }
+    } else {
+      if (scrollContainerRef.current) {
+        scrollToLine(scrollContainerRef.current, targetLine);
+        pendingScrollRef.current = null;
+      } else if (retries < maxRetries) {
+        setTimeout(() => tryRestoreScroll(targetLine, retries + 1), delay);
+      }
+    }
+  }, [editorMode, scrollToLine]);
+
+  // 模式切换时恢复滚动位置
+  useEffect(() => {
+    if (prevModeRef.current !== editorMode && scrollLineRef.current > 1) {
+      pendingScrollRef.current = scrollLineRef.current;
+      // 等待组件渲染后尝试恢复
+      requestAnimationFrame(() => {
+        tryRestoreScroll(scrollLineRef.current);
+      });
+    }
+    prevModeRef.current = editorMode;
+  }, [editorMode, tryRestoreScroll]);
+
+  // CodeMirror 初始化后检查是否有待处理的滚动
+  useEffect(() => {
+    if (editorMode === 'live' && pendingScrollRef.current && codeMirrorRef.current) {
+      codeMirrorRef.current.scrollToLine(pendingScrollRef.current);
+      pendingScrollRef.current = null;
+    }
+  });
+
+  // 带保存滚动位置的模式切换
+  const handleModeChange = useCallback((mode: EditorMode) => {
+    saveScrollPosition();
+    setEditorMode(mode);
+  }, [saveScrollPosition, setEditorMode]);
+
   // 全局键盘快捷键
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     // Alt + 左/右箭头: 导航历史
@@ -76,18 +164,9 @@ export function Editor() {
       return;
     }
     
-    // 只在 live 模式下拦截默认的撤销/重做
-    if (editorMode !== "live") return;
-    
-    if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
-      e.preventDefault();
-      undo();
-    }
-    if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
-      e.preventDefault();
-      redo();
-    }
-  }, [undo, redo, editorMode, goBack, goForward]);
+    // live 模式使用 CodeMirror 自带的撤销/重做，不拦截
+    // 其他模式不需要拦截
+  }, [goBack, goForward]);
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
@@ -215,44 +294,14 @@ export function Editor() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* Undo/Redo buttons */}
-          {editorMode === "live" && (
-            <div className="flex items-center gap-0.5 mr-1">
-              <button
-                onClick={undo}
-                disabled={!canUndo()}
-                className={cn(
-                  "p-1.5 rounded transition-colors",
-                  canUndo() 
-                    ? "hover:bg-accent text-muted-foreground hover:text-foreground" 
-                    : "text-muted-foreground/30 cursor-not-allowed"
-                )}
-                title={`撤销 (Ctrl+Z)${undoStack.length > 0 ? ` - ${undoStack[undoStack.length - 1]?.type === 'ai' ? 'AI修改' : '编辑'}` : ''}`}
-              >
-                <Undo2 size={14} />
-              </button>
-              <button
-                onClick={redo}
-                disabled={!canRedo()}
-                className={cn(
-                  "p-1.5 rounded transition-colors",
-                  canRedo() 
-                    ? "hover:bg-accent text-muted-foreground hover:text-foreground" 
-                    : "text-muted-foreground/30 cursor-not-allowed"
-                )}
-                title="重做 (Ctrl+Y)"
-              >
-                <Redo2 size={14} />
-              </button>
-            </div>
-          )}
+          {/* Undo/Redo: live 模式由 CodeMirror 处理 (Ctrl+Z/Y)，不显示按钮 */}
 
           {/* Mode Switcher */}
           <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
             {(Object.keys(modeConfig) as EditorMode[]).map((mode) => (
               <button
                 key={mode}
-                onClick={() => setEditorMode(mode)}
+                onClick={() => handleModeChange(mode)}
                 className={cn(
                   "mode-switcher-btn flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium",
                   editorMode === mode
@@ -288,7 +337,7 @@ export function Editor() {
       </div>
 
       {/* Editor area - different modes */}
-      <div className="flex-1 overflow-auto">
+      <div ref={scrollContainerRef} className="flex-1 overflow-auto">
         <div className="max-w-3xl mx-auto px-6 py-4 editor-mode-container">
           {editorMode === "reading" && (
             <div key="reading" className="editor-mode-content">
@@ -297,8 +346,9 @@ export function Editor() {
           )}
           
           {editorMode === "live" && (
-            <div key="live" className="editor-mode-content">
-              <LivePreview 
+            <div key="live" className="editor-mode-content h-full">
+              <CodeMirrorEditor 
+                ref={codeMirrorRef}
                 content={currentContent} 
                 onChange={(newContent) => {
                   updateContent(newContent);

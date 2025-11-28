@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { useFileStore } from "@/stores/useFileStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { useSplitStore } from "@/stores/useSplitStore";
-import { LivePreview } from "@/editor/LivePreview";
+import { CodeMirrorEditor } from "@/editor/CodeMirrorEditor";
 import { ReadingView } from "@/editor/ReadingView";
 import { getFileName, cn } from "@/lib/utils";
 import {
@@ -81,7 +81,7 @@ function EditorPane({
           {editorMode === "reading" ? (
             <ReadingView content={content} />
           ) : (
-            <LivePreview content={content} onChange={onContentChange} />
+            <CodeMirrorEditor content={content} onChange={onContentChange} />
           )}
         </div>
       </div>
