@@ -11,7 +11,15 @@ interface HistoryEntry {
 }
 
 // 标签页类型
-export type TabType = "file" | "graph";
+export type TabType = "file" | "graph" | "isolated-graph";
+
+// 孤立视图节点信息
+export interface IsolatedNodeInfo {
+  id: string;
+  label: string;
+  path: string;
+  isFolder: boolean;
+}
 
 // 标签页
 export interface Tab {
@@ -23,6 +31,7 @@ export interface Tab {
   isDirty: boolean;
   undoStack: HistoryEntry[];
   redoStack: HistoryEntry[];
+  isolatedNode?: IsolatedNodeInfo; // 孤立视图的目标节点
 }
 
 interface FileState {
@@ -73,6 +82,7 @@ interface FileState {
   
   // Open special tabs
   openGraphTab: () => void;
+  openIsolatedGraphTab: (node: IsolatedNodeInfo) => void;
   
   // Undo/Redo actions
   undo: () => void;
@@ -465,6 +475,49 @@ export const useFileStore = create<FileState>()(
     };
     
     updatedTabs.push(graphTab);
+    
+    set({
+      tabs: updatedTabs,
+      activeTabIndex: updatedTabs.length - 1,
+      currentFile: null,
+      currentContent: "",
+      isDirty: false,
+    });
+  },
+
+  // 打开孤立图谱标签页
+  openIsolatedGraphTab: (node: IsolatedNodeInfo) => {
+    const { tabs, activeTabIndex, currentContent, isDirty, undoStack, redoStack } = get();
+    
+    // 每次都创建新标签页（允许多个孤立视图）
+    const tabId = `__isolated_${node.id}_${Date.now()}__`;
+    
+    // 保存当前标签页状态
+    let updatedTabs = [...tabs];
+    if (activeTabIndex >= 0 && tabs[activeTabIndex]) {
+      updatedTabs[activeTabIndex] = {
+        ...updatedTabs[activeTabIndex],
+        content: currentContent,
+        isDirty,
+        undoStack,
+        redoStack,
+      };
+    }
+    
+    // 创建孤立图谱标签页
+    const isolatedTab: Tab = {
+      id: tabId,
+      type: "isolated-graph",
+      path: node.path,
+      name: `孤立: ${node.label}`,
+      content: "",
+      isDirty: false,
+      undoStack: [],
+      redoStack: [],
+      isolatedNode: node,
+    };
+    
+    updatedTabs.push(isolatedTab);
     
     set({
       tabs: updatedTabs,

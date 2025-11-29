@@ -30,6 +30,8 @@ function EditorWithGraph() {
       <TabBar />
       {activeTab?.type === "graph" ? (
         <KnowledgeGraph className="flex-1" />
+      ) : activeTab?.type === "isolated-graph" && activeTab.isolatedNode ? (
+        <KnowledgeGraph className="flex-1" isolatedNode={activeTab.isolatedNode} />
       ) : (
         <div className="flex-1 flex items-center justify-center text-muted-foreground">
           <div className="text-center space-y-2">
@@ -294,19 +296,15 @@ function App() {
         ) : splitView && currentFile ? (
           // Show split editor when enabled
           <SplitEditor />
-        ) : activeTab?.type === "graph" ? (
+        ) : activeTab?.type === "graph" || activeTab?.type === "isolated-graph" ? (
+          // 图谱标签页
           <EditorWithGraph />
         ) : currentFile ? (
+          // 文件编辑
           <Editor />
-        ) : tabs.length > 0 ? (
-          <EditorWithGraph />
         ) : (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground">
-            <div className="text-center space-y-2">
-              <p className="text-lg">从侧边栏选择一个笔记开始编辑</p>
-              <p className="text-sm opacity-70">或按 Ctrl+N 创建新笔记</p>
-            </div>
-          </div>
+          // 空状态或其他标签页类型 - 统一使用 EditorWithGraph 保持 TabBar 一致
+          <EditorWithGraph />
         )}
       </main>
 

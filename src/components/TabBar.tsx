@@ -42,7 +42,7 @@ function TabItem({
       onDragOver={onDragOver}
       onDrop={(e) => onDrop(e, index)}
     >
-      {tab.type === "graph" ? (
+      {tab.type === "graph" || tab.type === "isolated-graph" ? (
         <Network size={12} className="shrink-0 text-primary" />
       ) : (
         <FileText size={12} className="shrink-0 opacity-60" />
@@ -125,18 +125,17 @@ export function TabBar() {
     setContextMenu(null);
   }, []);
 
-  if (tabs.length === 0) return null;
-
+  // 即使没有标签页也显示空的标签栏（保持 UI 一致性）
   return (
     <>
       <div
         ref={containerRef}
-        className="flex items-stretch bg-muted/30 border-b border-border overflow-x-auto scrollbar-hide"
+        className="flex items-stretch bg-muted/30 border-b border-border overflow-x-auto scrollbar-hide min-h-[32px]"
         onDragEnd={handleDragEnd}
       >
         {tabs.map((tab, index) => (
           <TabItem
-            key={tab.path}
+            key={tab.id}
             tab={tab}
             index={index}
             isActive={index === activeTabIndex}

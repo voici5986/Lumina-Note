@@ -160,22 +160,52 @@ const PhysicsEngine = {
 
 interface KnowledgeGraphProps {
   className?: string;
+  isolatedNode?: {
+    id: string;
+    label: string;
+    path: string;
+    isFolder: boolean;
+  };
 }
 
-export function KnowledgeGraph({ className = "" }: KnowledgeGraphProps) {
+// 右键菜单状态
+interface ContextMenuState {
+  x: number;
+  y: number;
+  node: GraphNode;
+}
+
+// ==================== 全局图数据缓存 ====================
+// 避免每个 KnowledgeGraph 实例重复读取文件
+interface GraphCache {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  fileTreeHash: string; // 用于检测文件树是否变化
+  timestamp: number;
+}
+
+let graphCache: GraphCache | null = null;
+
+// 计算文件树的简单哈希（用于检测变化）
+function computeFileTreeHash(fileTree: any[]): string {
+  return JSON.stringify(fileTree.map(f => f.path)).slice(0, 100);
+}
+
+export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<number | null>(null);
   const nodesRef = useRef<GraphNode[]>([]);
   const edgesRef = useRef<GraphEdge[]>([]);
 
-  const { fileTree, currentFile, openFile } = useFileStore();
+  const { fileTree, currentFile, openFile, openIsolatedGraphTab } = useFileStore();
 
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [hoverNode, setHoverNode] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1.0);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dimensions, setDimensions] = useState({ width: 400, height: 400 });
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
   const isDraggingCanvas = useRef(false);
   const isDraggingNode = useRef(false);
@@ -196,6 +226,40 @@ export function KnowledgeGraph({ className = "" }: KnowledgeGraphProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [nodeSize, setNodeSize] = useState(1.0);
   const [showLabels, setShowLabels] = useState(true);
+
+  // 应用图数据（支持孤立视图过滤）- 必须在 buildGraph 之前定义
+  const applyGraphData = useCallback((nodes: GraphNode[], edges: GraphEdge[]) => {
+    let displayNodes = nodes;
+    let displayEdges = edges;
+    
+    if (isolatedNode) {
+      // 找到目标节点的所有直接相连节点
+      const connectedIds = new Set<string>();
+      connectedIds.add(isolatedNode.id);
+      
+      for (const edge of edges) {
+        if (edge.source === isolatedNode.id) {
+          connectedIds.add(edge.target);
+        }
+        if (edge.target === isolatedNode.id) {
+          connectedIds.add(edge.source);
+        }
+      }
+      
+      displayNodes = nodes.filter(n => connectedIds.has(n.id));
+      displayEdges = edges.filter(e => 
+        connectedIds.has(e.source) && connectedIds.has(e.target)
+      );
+    }
+
+    // Initialize positions
+    const width = containerRef.current?.offsetWidth || 400;
+    const height = containerRef.current?.offsetHeight || 400;
+    nodesRef.current = PhysicsEngine.init(displayNodes, width, height);
+    edgesRef.current = displayEdges;
+    
+    setDimensions({ width, height });
+  }, [isolatedNode]);
 
   // Build graph from file tree
   const buildGraph = useCallback(async () => {
@@ -321,21 +385,39 @@ export function KnowledgeGraph({ className = "" }: KnowledgeGraphProps) {
       }
     }
 
-    // Initialize positions
-    const width = containerRef.current?.offsetWidth || 400;
-    const height = containerRef.current?.offsetHeight || 400;
-    nodesRef.current = PhysicsEngine.init(nodes, width, height);
-    edgesRef.current = edges;
+    // 保存到全局缓存
+    graphCache = {
+      nodes,
+      edges,
+      fileTreeHash: computeFileTreeHash(fileTree),
+      timestamp: Date.now(),
+    };
+
+    applyGraphData(nodes, edges);
+  }, [fileTree, applyGraphData]);
+
+  // 使用缓存或构建新图
+  const loadGraph = useCallback(async () => {
+    const currentHash = computeFileTreeHash(fileTree);
     
-    setDimensions({ width, height });
-  }, [fileTree]);
+    // 如果有缓存且文件树没变，直接使用缓存
+    if (graphCache && graphCache.fileTreeHash === currentHash) {
+      console.log("[Graph] Using cached data");
+      applyGraphData(graphCache.nodes, graphCache.edges);
+      return;
+    }
+    
+    // 否则重新构建
+    console.log("[Graph] Building new graph...");
+    await buildGraph();
+  }, [fileTree, buildGraph, applyGraphData]);
 
   // Build graph on mount and when file tree changes
   useEffect(() => {
     if (fileTree.length > 0) {
-      buildGraph();
+      loadGraph();
     }
-  }, [fileTree, buildGraph]);
+  }, [fileTree, loadGraph]);
 
   // Handle resize
   useEffect(() => {
@@ -657,6 +739,49 @@ export function KnowledgeGraph({ className = "" }: KnowledgeGraphProps) {
     clickedNodeRef.current = null;
   };
 
+  // 右键菜单处理
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    
+    // 如果已经是孤立视图，不显示右键菜单
+    if (isolatedNode) return;
+    
+    const { x, y } = getScreenPos(e);
+    const worldPos = getWorldPos(x, y);
+    
+    // 查找右键点击的节点
+    const clickedNode = nodesRef.current.find((n) => {
+      const baseR = Math.max(4, 5 + Math.log(n.connections + 1) * 4);
+      const r = Math.min(baseR * nodeSize, 25) + 8;
+      return Math.hypot(n.x - worldPos.x, n.y - worldPos.y) < r;
+    });
+    
+    if (clickedNode) {
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        node: clickedNode,
+      });
+    } else {
+      setContextMenu(null);
+    }
+  };
+
+  // 处理孤立查看
+  const handleIsolateView = () => {
+    if (!contextMenu) return;
+    
+    const node = contextMenu.node;
+    openIsolatedGraphTab({
+      id: node.id,
+      label: node.label,
+      path: node.path,
+      isFolder: node.isFolder || false,
+    });
+    
+    setContextMenu(null);
+  };
+
   // 使用原生事件监听器处理 wheel 事件（需要 passive: false 才能 preventDefault）
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -845,10 +970,14 @@ export function KnowledgeGraph({ className = "" }: KnowledgeGraphProps) {
           ref={canvasRef}
           width={dimensions.width}
           height={dimensions.height}
-          onMouseDown={handleMouseDown}
+          onMouseDown={(e) => {
+            setContextMenu(null); // 点击时关闭右键菜单
+            handleMouseDown(e);
+          }}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          onContextMenu={handleContextMenu}
           onDoubleClick={() => {
             if (selectedNode) {
               handleNodeClick(selectedNode);
@@ -856,6 +985,40 @@ export function KnowledgeGraph({ className = "" }: KnowledgeGraphProps) {
           }}
           className="block w-full h-full cursor-grab active:cursor-grabbing"
         />
+        
+        {/* 右键菜单 */}
+        {contextMenu && (
+          <div
+            className="fixed z-50 bg-background border border-border rounded-md shadow-lg py-1 min-w-[140px]"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+          >
+            <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border mb-1">
+              {contextMenu.node.label}
+            </div>
+            <button
+              onClick={handleIsolateView}
+              className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 2v4m0 12v4m10-10h-4M6 12H2" />
+              </svg>
+              孤立查看
+            </button>
+            {!contextMenu.node.isFolder && (
+              <button
+                onClick={() => {
+                  openFile(contextMenu.node.path);
+                  setContextMenu(null);
+                }}
+                className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent flex items-center gap-2"
+              >
+                <FileText className="w-4 h-4" />
+                打开笔记
+              </button>
+            )}
+          </div>
+        )}
         </div>
 
         {/* Node details */}
