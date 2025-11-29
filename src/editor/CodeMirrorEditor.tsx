@@ -20,6 +20,8 @@ interface CodeMirrorEditorProps {
   onChange: (content: string) => void;
   className?: string;
   isDark?: boolean;
+  /** 是否启用实时预览（隐藏语法标记、渲染数学公式），默认 true */
+  livePreview?: boolean;
 }
 
 // 暴露给父组件的方法
@@ -389,7 +391,7 @@ const markdownStylePlugin = ViewPlugin.fromClass(
 );
 
 export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditorProps>(
-  function CodeMirrorEditor({ content, onChange, className = "", isDark = false }, ref) {
+  function CodeMirrorEditor({ content, onChange, className = "", isDark = false, livePreview = true }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const isExternalChange = useRef(false);
@@ -438,9 +440,10 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
         markdown({ base: markdownLanguage }),
         lightTheme,
         isDark ? oneDark : [],
-        livePreviewPlugin,
+        // 实时预览模式：隐藏语法标记、渲染数学公式
+        // 源码模式：显示原始 Markdown
+        ...(livePreview ? [livePreviewPlugin, mathPlugin] : []),
         markdownStylePlugin,
-        mathPlugin,
         updateListener,
         EditorView.lineWrapping,
       ],
@@ -457,7 +460,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
       view.destroy();
       viewRef.current = null;
     };
-  }, [isDark]);
+  }, [isDark, livePreview]);
   
   // 同步外部内容变化（只处理真正的外部变更，例如切换文件、撤销等）
   useEffect(() => {

@@ -1,1 +1,0 @@
-export { WikiLink } from "./WikiLink";

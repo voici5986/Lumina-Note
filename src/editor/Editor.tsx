@@ -1,16 +1,7 @@
 import { useEffect, useMemo, useCallback, useRef } from "react";
-import { useEditor, EditorContent } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import Placeholder from "@tiptap/extension-placeholder";
-import Link from "@tiptap/extension-link";
-import TaskList from "@tiptap/extension-task-list";
-import TaskItem from "@tiptap/extension-task-item";
-import Typography from "@tiptap/extension-typography";
 import { useFileStore } from "@/stores/useFileStore";
 import { useUIStore, EditorMode } from "@/stores/useUIStore";
-import { WikiLink } from "./extensions/WikiLink";
 import { debounce, getFileName } from "@/lib/utils";
-import { parseMarkdown, editorToMarkdown } from "@/lib/markdown";
 import { ReadingView } from "./ReadingView";
 import { CodeMirrorEditor, CodeMirrorEditorRef } from "./CodeMirrorEditor";
 import { 
@@ -172,58 +163,6 @@ export function Editor() {
     [save]
   );
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: {
-          levels: [1, 2, 3, 4, 5, 6],
-        },
-        codeBlock: {
-          HTMLAttributes: {
-            class: "code-block",
-          },
-        },
-      }),
-      Placeholder.configure({
-        placeholder: "开始写作...",
-      }),
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: {
-          class: "editor-link",
-        },
-      }),
-      TaskList,
-      TaskItem.configure({
-        nested: true,
-      }),
-      Typography,
-      WikiLink,
-    ],
-    content: "",
-    editorProps: {
-      attributes: {
-        class: "tiptap",
-      },
-    },
-    onUpdate: ({ editor }) => {
-      // Convert editor HTML to Markdown for saving
-      const html = editor.getHTML();
-      const markdown = editorToMarkdown(html);
-      updateContent(markdown);
-      debouncedSave();
-    },
-  });
-
-  // Update editor content when file changes
-  useEffect(() => {
-    if (editor && currentContent !== undefined && currentFile) {
-      // Parse Markdown to HTML and set content
-      const html = parseMarkdown(currentContent);
-      editor.commands.setContent(html);
-    }
-  }, [editor, currentFile]); // Intentionally not including currentContent to avoid loops
-
   if (isLoadingFile) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -352,8 +291,16 @@ export function Editor() {
           )}
           
           {editorMode === "source" && (
-            <div key="source" className="editor-mode-content">
-              <EditorContent editor={editor} className="h-full" />
+            <div key="source" className="editor-mode-content h-full">
+              <CodeMirrorEditor 
+                ref={codeMirrorRef}
+                content={currentContent} 
+                onChange={(newContent) => {
+                  updateContent(newContent);
+                  debouncedSave();
+                }}
+                livePreview={false}
+              />
             </div>
           )}
         </div>
