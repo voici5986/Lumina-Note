@@ -72,6 +72,15 @@ export interface ToolContext {
   activeNotePath?: string;
 }
 
+// ============ RAG 搜索结果 ============
+
+export interface RAGSearchResult {
+  filePath: string;
+  content: string;
+  score: number;
+  heading?: string;
+}
+
 // ============ 任务上下文 ============
 
 export interface TaskContext {
@@ -81,6 +90,7 @@ export interface TaskContext {
   fileTree?: string;
   recentNotes?: string[];
   mode?: AgentMode;
+  ragResults?: RAGSearchResult[];  // RAG 自动注入的搜索结果
 }
 
 // ============ Agent 模式 ============

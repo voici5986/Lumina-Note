@@ -112,6 +112,7 @@ interface AIState {
   sendMessageStream: (content: string, currentFile?: { path: string; name: string; content: string }) => Promise<void>;
   stopStreaming: () => void;
   clearChat: () => void;
+  retry: (currentFile?: { path: string; name: string; content: string }) => Promise<void>;  // 重新生成
 }
 
 export const useAIStore = create<AIState>()(
@@ -542,6 +543,35 @@ export const useAIStore = create<AIState>()(
               : s
           ),
         }));
+      },
+
+      // 重新生成最后一条 AI 回复
+      retry: async (currentFile) => {
+        const { messages } = get();
+        
+        // 找到最后一条用户消息
+        const lastUserIndex = [...messages].reverse().findIndex(m => m.role === "user");
+        if (lastUserIndex === -1) return;
+        
+        const actualIndex = messages.length - 1 - lastUserIndex;
+        const lastUserMessage = messages[actualIndex];
+        const userContent = lastUserMessage.content;
+        
+        // 删除最后一条用户消息及之后的所有消息
+        const newMessages = messages.slice(0, actualIndex);
+        
+        // 更新状态
+        set((state) => ({
+          messages: newMessages,
+          sessions: state.sessions.map((s) =>
+            s.id === state.currentSessionId
+              ? { ...s, messages: newMessages, updatedAt: Date.now() }
+              : s
+          ),
+        }));
+        
+        // 重新发送（使用流式）
+        await get().sendMessageStream(userContent, currentFile);
       },
     }),
     {

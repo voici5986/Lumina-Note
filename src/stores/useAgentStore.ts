@@ -81,6 +81,7 @@ interface AgentState {
   approve: () => void;
   reject: () => void;
   clearChat: () => void;
+  retry: (context: TaskContext) => Promise<void>;  // 重新生成最后一条 AI 回复
 
   // 内部更新
   _updateFromLoop: () => void;
@@ -390,6 +391,55 @@ export const useAgentStore = create<AgentState>()(
                 : s
             ),
           }));
+        },
+
+        // 重新生成最后一条 AI 回复
+        retry: async (context) => {
+          const { messages, currentSessionId, sessions } = get();
+          
+          // 找到最后一条用户消息
+          const lastUserIndex = [...messages].reverse().findIndex(m => m.role === "user");
+          if (lastUserIndex === -1) return;
+          
+          const actualIndex = messages.length - 1 - lastUserIndex;
+          const lastUserMessage = messages[actualIndex];
+          
+          // 提取用户消息内容（从 <task> 标签中提取）
+          let userContent = lastUserMessage.content;
+          const taskMatch = userContent.match(/<task>([\s\S]*?)<\/task>/);
+          if (taskMatch) {
+            userContent = taskMatch[1].trim();
+          }
+          
+          // 删除最后一条用户消息及之后的所有消息
+          const newMessages = messages.slice(0, actualIndex);
+          
+          // 重置 AgentLoop
+          resetAgentLoop();
+          (globalThis as any).__agentSetupListeners?.();
+          
+          // 如果有历史消息，恢复到 AgentLoop
+          const loop = getAgentLoop();
+          if (newMessages.length > 0) {
+            // 需要加回 system 消息
+            const currentSession = sessions.find(s => s.id === currentSessionId);
+            const fullMessages = currentSession?.messages.slice(0, actualIndex) ?? newMessages;
+            loop.setMessages(fullMessages);
+          }
+          
+          // 更新状态
+          set((state) => ({
+            messages: newMessages,
+            status: "idle",
+            sessions: state.sessions.map((s) =>
+              s.id === state.currentSessionId
+                ? { ...s, messages: newMessages, updatedAt: Date.now() }
+                : s
+            ),
+          }));
+          
+          // 重新发送
+          await get().startTask(userContent, context);
         },
 
         // 从 Loop 更新状态

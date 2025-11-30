@@ -47,7 +47,7 @@ function TabItem({
       ) : tab.type === "video-note" ? (
         <Video size={12} className="shrink-0 text-red-500" />
       ) : tab.type === "database" ? (
-        <Database size={12} className="shrink-0 text-blue-500" />
+        <Database size={12} className="shrink-0 text-slate-500" />
       ) : (
         <FileText size={12} className="shrink-0 opacity-60" />
       )}

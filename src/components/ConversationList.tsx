@@ -170,7 +170,7 @@ export function ConversationList({ className }: ConversationListProps) {
                 <Icon
                   size={16}
                   className={cn(
-                    session.type === "agent" ? "text-purple-500" : "text-blue-500",
+                    session.type === "agent" ? "text-purple-500" : "text-slate-500",
                     isActive && "text-primary"
                   )}
                 />

@@ -14,27 +14,27 @@ body.resizing * {
 }
 
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222.2 47.4% 11.2%;
-  --primary: 221.2 83.2% 53.3%;
-  --primary-foreground: 210 40% 98%;
-  --border: 214.3 31.8% 91.4%;
+  --background: 45 10% 98%;  /* 微暖白：一点点黄调 */
+  --foreground: 40 10% 10%;  /* 暖黑 */
+  --muted: 45 10% 94%;  /* 暖灰 */
+  --muted-foreground: 40 5% 45%;  /* 暖灰文字 */
+  --accent: 45 10% 93%;  /* 暖灰强调 */
+  --accent-foreground: 40 10% 15%;
+  --primary: 215 25% 50%;  /* 柔和灰蓝 */
+  --primary-foreground: 45 10% 98%;
+  --border: 40 8% 88%;  /* 暖边框 */
 }
 
 .dark {
-  --background: 0 0% 12%;
-  --foreground: 0 0% 83%;
-  --muted: 0 0% 15%;
-  --muted-foreground: 0 0% 60%;
-  --accent: 0 0% 18%;
-  --accent-foreground: 0 0% 95%;
-  --primary: 217.2 91.2% 59.8%;
-  --primary-foreground: 222.2 47.4% 11.2%;
-  --border: 0 0% 20%;
+  --background: 40 5% 11%;  /* 暖深灰背景 */
+  --foreground: 45 8% 85%;  /* 暖浅灰文字 */
+  --muted: 40 5% 15%;  /* 暖深灰 */
+  --muted-foreground: 40 5% 55%;
+  --accent: 40 5% 18%;
+  --accent-foreground: 45 8% 92%;
+  --primary: 215 20% 55%;  /* 柔和灰蓝 */
+  --primary-foreground: 40 5% 12%;
+  --border: 40 5% 22%;  /* 暖边框 */
 }
 
 * {

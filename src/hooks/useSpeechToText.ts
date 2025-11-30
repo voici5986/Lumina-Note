@@ -24,7 +24,7 @@ export function useSpeechToText(appendText: (text: string) => void) {
     }
   }, []);
 
-  // 重置静音计时器（2秒无声音自动停止）
+  // 重置静音计时器（6秒无声音自动停止）
   const resetSilenceTimer = useCallback(() => {
     clearSilenceTimer();
     silenceTimerRef.current = setTimeout(() => {
@@ -32,7 +32,7 @@ export function useSpeechToText(appendText: (text: string) => void) {
       if (recognition) {
         recognition.stop();
       }
-    }, 2000);
+    }, 6000);
   }, [clearSilenceTimer]);
 
   useEffect(() => {

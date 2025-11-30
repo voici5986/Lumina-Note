@@ -22,7 +22,17 @@ export const CreateNoteTool: ToolExecutor = {
       return {
         success: false,
         content: "",
-        error: "参数错误: 缺少 path 参数",
+        error: `参数错误: 缺少 path 参数。
+
+正确用法:
+<create_note>
+<path>笔记路径.md</path>
+<content># 笔记标题
+
+笔记内容...</content>
+</create_note>
+
+注意: create_note 用于创建新文件。如果要修改现有文件，请使用 edit_note。`,
       };
     }
 
@@ -30,7 +40,15 @@ export const CreateNoteTool: ToolExecutor = {
       return {
         success: false,
         content: "",
-        error: "参数错误: 缺少 content 参数",
+        error: `参数错误: 缺少 content 参数。
+
+正确用法:
+<create_note>
+<path>${path}</path>
+<content># 笔记标题
+
+笔记内容...</content>
+</create_note>`,
       };
     }
 

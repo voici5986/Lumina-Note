@@ -21,6 +21,7 @@ import { VideoNoteView } from "@/components/VideoNoteView";
 import { DatabaseView, CreateDatabaseDialog, DatabaseSplitView } from "@/components/database";
 import { useAIStore } from "@/stores/useAIStore";
 import { saveFile } from "@/lib/tauri";
+import { TitleBar } from "@/components/TitleBar";
 
 // Component that shows tabs + graph/editor content
 function EditorWithGraph() {
@@ -286,7 +287,9 @@ function App() {
   // Welcome screen when no vault is open
   if (!vaultPath) {
     return (
-      <div className="h-full flex items-center justify-center bg-background">
+      <div className="h-full flex flex-col bg-background">
+        <TitleBar />
+        <div className="flex-1 flex items-center justify-center">
         <div className="text-center space-y-8">
           {/* Logo */}
           <div className="flex items-center justify-center gap-3">
@@ -314,15 +317,17 @@ function App() {
             选择一个包含 Markdown 笔记的文件夹
           </p>
         </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <>
-    <div className="h-full flex bg-background transition-colors duration-300">
-      {/* Left Ribbon (Icon Bar) */}
-      <Ribbon />
+    <div className="h-full flex flex-col bg-background">
+      <TitleBar />
+      <div className="flex-1 flex overflow-hidden transition-colors duration-300">
+        {/* Left Ribbon (Icon Bar) */}
+        <Ribbon />
 
       {/* Left Sidebar (File Tree) */}
       <div
@@ -458,7 +463,8 @@ function App() {
     
     {/* AI Floating Ball */}
     <AIFloatingBall />
-  </>);
+    </div>
+  );
 }
 
 export default App;

@@ -14,13 +14,15 @@ import {
   ToolResult,
   AgentEventHandler,
   AgentEventType,
-  LLMResponse
+  LLMResponse,
+  RAGSearchResult
 } from "../types";
 import { StateManager } from "./StateManager";
 import { parseResponse, formatToolResult, getNoToolUsedPrompt } from "./MessageParser";
 import { PromptBuilder } from "../prompts/PromptBuilder";
 import { ToolRegistry } from "../tools/ToolRegistry";
 import { callLLM } from "../providers";
+import { useRAGStore } from "@/stores/useRAGStore";
 
 const MAX_CONSECUTIVE_ERRORS = 3;
 
@@ -60,9 +62,12 @@ export class AgentLoop {
     this.stateManager.resetErrors();
     this.abortController = new AbortController();
 
+    // RAG 自动注入：搜索相关笔记
+    const enrichedContext = await this.enrichContextWithRAG(userMessage, context);
+
     // 构建消息
-    const systemPrompt = this.promptBuilder.build(context);
-    const userContent = this.buildUserContent(userMessage, context);
+    const systemPrompt = this.promptBuilder.build(enrichedContext);
+    const userContent = this.buildUserContent(userMessage, enrichedContext);
 
     if (hasHistory) {
       // 保留历史，更新 system prompt，添加新用户消息
@@ -288,6 +293,54 @@ export class AgentLoop {
   }
 
   /**
+   * RAG 自动注入：搜索相关笔记并增强上下文
+   */
+  private async enrichContextWithRAG(userMessage: string, context: TaskContext): Promise<TaskContext> {
+    // 如果消息太短（少于 5 个字符），不进行搜索
+    if (userMessage.length < 5) {
+      return context;
+    }
+
+    try {
+      const ragStore = useRAGStore.getState();
+      const ragManager = ragStore.ragManager;
+      const ragConfig = ragStore.config;
+
+      // 检查 RAG 是否启用和初始化
+      if (!ragConfig.enabled || !ragManager?.isInitialized()) {
+        return context;
+      }
+
+      // 执行语义搜索
+      const results = await ragManager.search(userMessage, { limit: 10 });
+
+      if (results.length === 0) {
+        return context;
+      }
+
+      // 转换为 RAGSearchResult 格式，确保字段有效
+      const ragResults: RAGSearchResult[] = results
+        .filter(r => r.filePath && r.content) // 过滤无效结果
+        .map(r => ({
+          filePath: r.filePath || "未知文件",
+          content: r.content || "",
+          score: typeof r.score === "number" && !isNaN(r.score) ? r.score : 0,
+          heading: r.heading || undefined,
+        }));
+
+      console.log(`[Agent] RAG 自动注入: 找到 ${ragResults.length} 个相关笔记`);
+
+      return {
+        ...context,
+        ragResults,
+      };
+    } catch (error) {
+      console.error("[Agent] RAG 搜索失败:", error);
+      return context;
+    }
+  }
+
+  /**
    * 构建用户消息内容
    */
   private buildUserContent(message: string, context: TaskContext): string {
@@ -296,6 +349,17 @@ export class AgentLoop {
     // 如果有当前打开的笔记，添加其内容
     if (context.activeNote && context.activeNoteContent) {
       content += `\n\n<current_note path="${context.activeNote}">\n${context.activeNoteContent}\n</current_note>`;
+    }
+
+    // RAG 自动注入：添加 top 3 相关笔记的详细内容
+    if (context.ragResults && context.ragResults.length > 0) {
+      const topResults = context.ragResults.slice(0, 3);
+      content += `\n\n<related_notes hint="以下是与任务相关的笔记内容，可供参考">`;
+      topResults.forEach((r, i) => {
+        const preview = r.content.length > 600 ? r.content.slice(0, 600) + "..." : r.content;
+        content += `\n\n### ${i + 1}. ${r.filePath} (相关度: ${(r.score * 100).toFixed(0)}%)${r.heading ? ` - ${r.heading}` : ""}\n${preview}`;
+      });
+      content += `\n</related_notes>`;
     }
 
     return content;

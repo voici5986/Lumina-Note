@@ -785,7 +785,7 @@ function FileTreeItem({
   const getFileIcon = () => {
     const name = entry.name.toLowerCase();
     if (name.endsWith('.db.json')) {
-      return <Database className="w-4 h-4 text-blue-500 shrink-0" />;
+      return <Database className="w-4 h-4 text-slate-500 shrink-0" />;
     }
     if (name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.gif') || name.endsWith('.webp')) {
       return <Image className="w-4 h-4 text-green-500 shrink-0" />;

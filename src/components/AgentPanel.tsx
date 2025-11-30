@@ -27,6 +27,7 @@ import {
   Mic,
   MicOff,
   Send,
+  RefreshCw,
 } from "lucide-react";
 
 export function AgentPanel() {
@@ -47,6 +48,7 @@ export function AgentPanel() {
     approve,
     reject,
     clearChat,
+    retry,
   } = useAgentStore();
 
   const { vaultPath, currentFile, currentContent } = useFileStore();
@@ -144,6 +146,27 @@ export function AgentPanel() {
           {status === "error" && (
             <div className="text-sm text-red-500 p-2 bg-red-500/10 rounded">
               发生错误，请重试
+            </div>
+          )}
+
+          {/* Retry 按钮 - 只在有消息且不在运行时显示 */}
+          {messages.length > 0 && messages.some(m => m.role === "assistant") && status !== "running" && (
+            <div className="flex justify-end">
+              <button
+                onClick={() => {
+                  if (!vaultPath) return;
+                  retry({
+                    workspacePath: vaultPath,
+                    activeNote: currentFile || undefined,
+                    activeNoteContent: currentContent || undefined,
+                  });
+                }}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors"
+                title="重新生成"
+              >
+                <RefreshCw size={12} />
+                重新生成
+              </button>
             </div>
           )}
 
@@ -274,6 +297,7 @@ function renderMessages(messages: Message[]) {
       let displayContent = content;
       displayContent = displayContent.replace(/<task>([\s\S]*?)<\/task>/g, "$1");
       displayContent = displayContent.replace(/<current_note[^>]*>[\s\S]*?<\/current_note>/g, "");
+      displayContent = displayContent.replace(/<related_notes[^>]*>[\s\S]*?<\/related_notes>/g, ""); // 过滤 RAG 注入内容
       displayContent = displayContent.trim();
       
       if (displayContent) {

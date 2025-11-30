@@ -17,19 +17,19 @@ export const MoveNoteTool: ToolExecutor = {
     const from = params.from as string;
     const to = params.to as string;
 
-    if (!from) {
+    if (!from || !to) {
       return {
         success: false,
         content: "",
-        error: "参数错误: 缺少 from 参数",
-      };
-    }
+        error: `参数错误: 缺少 ${!from ? "from" : "to"} 参数。
 
-    if (!to) {
-      return {
-        success: false,
-        content: "",
-        error: "参数错误: 缺少 to 参数",
+正确用法:
+<move_note>
+<from>原路径/笔记.md</from>
+<to>新路径/笔记.md</to>
+</move_note>
+
+提示: 也可用于重命名文件（在同一目录内移动）。`,
       };
     }
 

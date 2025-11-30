@@ -39,7 +39,19 @@ export const ReadNoteTool: ToolExecutor = {
       return {
         success: false,
         content: "",
-        error: "参数错误: 请提供 path 或 paths 参数",
+        error: `参数错误: 缺少 path 参数。
+
+正确用法:
+<read_note>
+<path>笔记路径.md</path>
+</read_note>
+
+读取多个文件:
+<read_note>
+<paths>["文件1.md", "文件2.md"]</paths>
+</read_note>
+
+提示: 路径相对于笔记库根目录。`,
       };
     }
 

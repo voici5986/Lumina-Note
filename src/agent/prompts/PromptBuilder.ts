@@ -101,12 +101,20 @@ TOOL USE
 4. 每次工具调用后等待结果，再决定下一步
 5. 完成任务后必须使用 attempt_completion 工具
 
-# 常见错误工具名（禁止使用）
+# 严重警告：工具名必须严格匹配
 
-- append_to_note → 使用 edit_note
+❌ 以下是**绝对禁止**的工具名（会导致失败）：
+- append_note, append_to_note → 使用 edit_note
+- write_note, write_file → 使用 create_note 或 edit_note  
+- replace_in_note → 使用 edit_note
+- read_file, get_note → 使用 read_note
 - create_file → 使用 create_note
-- read_file → 使用 read_note
-- write_file → 使用 create_note 或 edit_note`;
+- delete_file → 使用 delete_note
+
+✅ **唯一合法的工具名**（只能使用这些）：
+read_note, edit_note, create_note, delete_note, list_notes, move_note, search_notes, grep_search, semantic_search, query_database, add_database_row, get_backlinks, ask_user, attempt_completion
+
+使用任何不在上述列表中的工具名都会导致失败！`;
   }
 
   private getToolsCatalog(): string {
@@ -187,6 +195,14 @@ ${context.fileTree}`;
 
 最近编辑的笔记:
 ${context.recentNotes.map((n) => `- ${n}`).join("\n")}`;
+    }
+
+    // RAG 自动注入：相关笔记路径列表（轻量导航）
+    if (context.ragResults && context.ragResults.length > 0) {
+      section += `
+
+与任务相关的笔记（按相关度排序，详细内容见用户消息）:
+${context.ragResults.map((r, i) => `${i + 1}. ${r.filePath} (${(r.score * 100).toFixed(0)}%)${r.heading ? ` - ${r.heading}` : ""}`).join("\n")}`;
     }
 
     return section;

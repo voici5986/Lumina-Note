@@ -714,7 +714,7 @@ export function VideoNoteView({ onClose, onMinimize, initialUrl, isActive = true
               />
               <button
                 onClick={() => invoke('fill_danmaku_prefix', { prefix: danmakuPrefix })}
-                className="px-2 py-1 bg-blue-500/20 text-blue-600 hover:bg-blue-500/30 rounded transition-colors"
+                className="px-2 py-1 bg-slate-500/20 text-slate-600 hover:bg-slate-500/30 rounded transition-colors"
                 title="自动填充前缀到弹幕输入框"
               >
                 📝 填充

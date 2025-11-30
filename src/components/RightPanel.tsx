@@ -26,6 +26,7 @@ import {
   Bot,
   Mic,
   MicOff,
+  RefreshCw,
 } from "lucide-react";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { AgentPanel } from "./AgentPanel";
@@ -397,6 +398,7 @@ export function RightPanel() {
     config,
     sendMessage,
     clearChat,
+    retry,
     addFileReference,
     removeFileReference,
     clearPendingEdits,
@@ -1170,6 +1172,26 @@ export function RightPanel() {
             {error && (
               <div className="text-sm text-red-500 p-2 bg-red-500/10 rounded">
                 {error}
+              </div>
+            )}
+
+            {/* Retry 按钮 - 只在有 AI 回复且不在加载时显示 */}
+            {messages.length > 0 && messages.some(m => m.role === "assistant") && !isLoading && (
+              <div className="flex justify-end">
+                <button
+                  onClick={() => {
+                    retry(currentFile ? {
+                      path: currentFile,
+                      name: currentFile.split(/[/\\]/).pop() || currentFile,
+                      content: currentContent || "",
+                    } : undefined);
+                  }}
+                  className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors"
+                  title="重新生成"
+                >
+                  <RefreshCw size={12} />
+                  重新生成
+                </button>
               </div>
             )}
 

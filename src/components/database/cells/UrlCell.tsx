@@ -73,7 +73,7 @@ export function UrlCell({ value, onChange, isEditing, onBlur }: UrlCellProps) {
   
   return (
     <div className="h-9 px-2 flex items-center gap-1 text-sm group">
-      <span className="truncate text-blue-500 hover:underline cursor-pointer" onClick={handleOpenUrl}>
+      <span className="truncate text-slate-500 hover:underline cursor-pointer" onClick={handleOpenUrl}>
         {value.replace(/^https?:\/\//, '')}
       </span>
       <button

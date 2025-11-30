@@ -274,7 +274,7 @@ export function ChatInput({
                       {file.isFolder ? (
                         <Folder size={14} className="text-yellow-500 shrink-0" />
                       ) : (
-                        <FileText size={14} className="text-blue-500 shrink-0" />
+                        <FileText size={14} className="text-slate-500 shrink-0" />
                       )}
                       <span className="truncate">{file.name}</span>
                     </button>
@@ -332,7 +332,7 @@ export function ChatInput({
                 {file.isFolder ? (
                   <Folder size={14} className="text-yellow-500 shrink-0" />
                 ) : (
-                  <FileText size={14} className="text-blue-500 shrink-0" />
+                  <FileText size={14} className="text-slate-500 shrink-0" />
                 )}
                 <span className="truncate">{file.name}</span>
               </button>

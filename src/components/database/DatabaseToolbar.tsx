@@ -155,14 +155,14 @@ export function DatabaseToolbar({ dbId }: DatabaseToolbarProps) {
         onClick={() => setShowFilterMenu(!showFilterMenu)}
         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm transition-colors ${
           activeView?.filters?.rules?.length
-            ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+            ? 'bg-slate-500/10 text-slate-600 dark:text-slate-400'
             : 'hover:bg-accent text-muted-foreground'
         }`}
       >
         <Filter className="w-4 h-4" />
         筛选
         {activeView?.filters?.rules?.length ? (
-          <span className="bg-blue-500 text-white text-xs px-1.5 rounded-full">
+          <span className="bg-slate-500 text-white text-xs px-1.5 rounded-full">
             {activeView.filters.rules.length}
           </span>
         ) : null}
