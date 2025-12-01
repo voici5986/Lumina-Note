@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { diffLines } from "diff";
 import { useUIStore } from "@/stores/useUIStore";
 import { useAIStore } from "@/stores/useAIStore";
 import { useAgentStore } from "@/stores/useAgentStore";
@@ -42,6 +43,10 @@ function EditCard({
   onApply: () => void; 
   onReject: () => void;
 }) {
+  const diff = useMemo(() => {
+    return diffLines(edit.originalContent, edit.newContent);
+  }, [edit.originalContent, edit.newContent]);
+
   return (
     <div className="border border-border rounded-lg p-3 bg-muted/30 space-y-2">
       <div className="flex items-center justify-between">
@@ -67,13 +72,30 @@ function EditCard({
         </div>
       </div>
       <p className="text-xs text-muted-foreground">{edit.description}</p>
-      <div className="text-xs space-y-1">
-        <div className="bg-red-500/10 text-red-600 p-2 rounded font-mono line-through">
-          {edit.originalContent.slice(0, 100)}...
-        </div>
-        <div className="bg-green-500/10 text-green-600 p-2 rounded font-mono">
-          {edit.newContent.slice(0, 100)}...
-        </div>
+      
+      <div className="text-xs font-mono bg-background/50 rounded border border-border overflow-hidden max-h-[200px] overflow-y-auto">
+        {diff.map((part, index) => {
+          if (part.added) {
+            return (
+              <div key={index} className="bg-green-500/10 text-green-600 px-2 py-0.5 whitespace-pre-wrap border-l-2 border-green-500">
+                {part.value}
+              </div>
+            );
+          }
+          if (part.removed) {
+            return (
+              <div key={index} className="bg-red-500/10 text-red-600 px-2 py-0.5 whitespace-pre-wrap line-through opacity-70 border-l-2 border-red-500">
+                {part.value}
+              </div>
+            );
+          }
+          // Context
+          return (
+            <div key={index} className="text-muted-foreground px-2 py-0.5 whitespace-pre-wrap opacity-50">
+              {part.value}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -174,16 +174,22 @@ export function applyEdit(content: string, suggestion: EditSuggestion): string {
     return content.replace(originalContent, newContent);
   }
   
-  // Try normalized match (normalize whitespace)
-  const normalizeWhitespace = (s: string) => s.replace(/\r\n/g, "\n").replace(/\t/g, "  ");
-  const normalizedContent = normalizeWhitespace(content);
-  const normalizedOriginal = normalizeWhitespace(originalContent);
-  
-  if (normalizedContent.includes(normalizedOriginal)) {
-    console.log("[applyEdit] Normalized match found");
-    // Find the position and replace
-    const idx = normalizedContent.indexOf(normalizedOriginal);
-    return content.substring(0, idx) + newContent + content.substring(idx + originalContent.length);
+  // Try flexible whitespace match (Regex)
+  // This handles CRLF vs LF, and different indentation styles
+  try {
+    const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Split by whitespace and join with \s+ to allow any whitespace sequence
+    // We trim the ends to avoid matching leading/trailing whitespace issues
+    const pattern = escapeRegExp(originalContent).replace(/\s+/g, '\\s+');
+    const regex = new RegExp(pattern);
+    const match = content.match(regex);
+    
+    if (match && match.index !== undefined) {
+      console.log("[applyEdit] Flexible whitespace match found");
+      return content.substring(0, match.index) + newContent + content.substring(match.index + match[0].length);
+    }
+  } catch (e) {
+    console.warn("[applyEdit] Regex match failed", e);
   }
   
   // Try line-by-line fuzzy match
