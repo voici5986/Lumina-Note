@@ -6,6 +6,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { diffLines } from "diff";
 import { useAIStore } from "@/stores/useAIStore";
+import { parseMarkdown } from "@/lib/markdown";
 import { useFileStore } from "@/stores/useFileStore";
 import { EditSuggestion, applyEdit } from "@/lib/ai";
 import {
@@ -236,9 +237,10 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
                 {msg.content}
               </div>
             ) : (
-              <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                {msg.content}
-              </div>
+              <div 
+                className="text-foreground leading-relaxed prose prose-sm dark:prose-invert max-w-none [&_*]:!text-xs [&_h1]:!text-base [&_h2]:!text-sm [&_h3]:!text-xs"
+                dangerouslySetInnerHTML={{ __html: parseMarkdown(msg.content) }}
+              />
             )}
           </div>
         ))}

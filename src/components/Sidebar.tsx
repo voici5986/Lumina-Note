@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useFileStore } from "@/stores/useFileStore";
 import { useRAGStore } from "@/stores/useRAGStore";
-import { FileEntry, deleteFile, renameFile, createFile, createDir, exists, openNewWindow } from "@/lib/tauri";
+import { FileEntry, deleteFile, renameFile, createFile, createDir, exists, openNewWindow, saveFile } from "@/lib/tauri";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { cn, getFileName } from "@/lib/utils";
@@ -21,7 +21,10 @@ import {
   Database,
   Image,
   FileText,
+  Mic,
+  Loader2,
 } from "lucide-react";
+import { useVoiceNote } from "@/hooks/useVoiceNote";
 
 interface ContextMenuState {
   x: number;
@@ -40,6 +43,50 @@ export function Sidebar() {
   const { vaultPath, fileTree, currentFile, openFile, refreshFileTree, isLoadingTree, closeFile, openDatabaseTab, openPDFTab } =
     useFileStore();
   const { config: ragConfig, isIndexing: ragIsIndexing, indexStatus } = useRAGStore();
+  const { 
+    isRecording, 
+    status: voiceStatus, 
+    currentTranscript,
+    startRecording, 
+    stopRecording, 
+    cancelRecording 
+  } = useVoiceNote();
+
+  // 今日速记：创建带时间戳的快速笔记
+  const handleQuickNote = useCallback(async () => {
+    if (!vaultPath) return;
+    
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    
+    const fileName = `速记_${year}-${month}-${day}_${hours}-${minutes}`;
+    const sep = vaultPath.includes("\\") ? "\\" : "/";
+    let filePath = `${vaultPath}${sep}${fileName}.md`;
+    
+    // 检查文件是否已存在，如果存在则添加序号
+    let counter = 1;
+    while (await exists(filePath)) {
+      filePath = `${vaultPath}${sep}${fileName}_${counter}.md`;
+      counter++;
+    }
+    
+    // 创建文件内容
+    const dateStr = `${year}年${month}月${day}日 ${hours}:${minutes}`;
+    const content = `# ${fileName}\n\n> 📅 ${dateStr}\n\n`;
+    
+    try {
+      await saveFile(filePath, content);
+      await refreshFileTree();
+      openFile(filePath);
+    } catch (error) {
+      console.error("Failed to create quick note:", error);
+      alert("创建速记失败");
+    }
+  }, [vaultPath, refreshFileTree, openFile]);
   
   // Context menu state
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -423,12 +470,72 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Daily Note Quick Action */}
-      <div className="px-2 mb-2">
-        <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground bg-background hover:bg-accent border border-border rounded-md transition-colors shadow-sm">
+      {/* Quick Actions */}
+      <div className="px-2 mb-2 space-y-2">
+        <button 
+          onClick={handleQuickNote}
+          disabled={!vaultPath}
+          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground bg-background hover:bg-accent border border-border rounded-md transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          title="创建带时间戳的快速笔记"
+        >
           <Calendar size={14} />
           <span>今日速记</span>
         </button>
+        
+        {/* 语音笔记按钮 */}
+        {isRecording ? (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-md p-2 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-red-500">
+                <div className="relative">
+                  <Mic size={14} />
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                </div>
+                <span className="text-xs font-medium">
+                  {voiceStatus === "saving" ? "保存中..." : 
+                   voiceStatus === "summarizing" ? "生成总结..." : "录音中..."}
+                </span>
+              </div>
+              {voiceStatus === "recording" && (
+                <div className="flex gap-1">
+                  <button
+                    onClick={stopRecording}
+                    className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                    title="停止并保存"
+                  >
+                    完成
+                  </button>
+                  <button
+                    onClick={cancelRecording}
+                    className="px-2 py-1 text-xs bg-muted text-muted-foreground rounded hover:bg-accent transition-colors"
+                    title="取消录音"
+                  >
+                    取消
+                  </button>
+                </div>
+              )}
+              {(voiceStatus === "saving" || voiceStatus === "summarizing") && (
+                <Loader2 size={14} className="animate-spin text-muted-foreground" />
+              )}
+            </div>
+            {/* 实时转录预览 */}
+            {currentTranscript && (
+              <div className="text-xs text-muted-foreground bg-background/50 rounded p-2 max-h-20 overflow-y-auto">
+                {currentTranscript.slice(-100)}{currentTranscript.length > 100 ? "..." : ""}
+              </div>
+            )}
+          </div>
+        ) : (
+          <button 
+            onClick={startRecording}
+            disabled={!vaultPath}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground bg-background hover:bg-accent border border-border rounded-md transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            title="开始语音录制，结束后自动保存并生成总结"
+          >
+            <Mic size={14} />
+            <span>语音笔记</span>
+          </button>
+        )}
       </div>
 
       {/* Vault Name */}

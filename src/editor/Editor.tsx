@@ -37,6 +37,10 @@ export function Editor() {
     goForward,
     canGoBack,
     canGoForward,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
   } = useFileStore();
   const { openVideoNoteFromContent } = useFileStore();
 
@@ -138,6 +142,45 @@ export function Editor() {
 
   // 全局键盘快捷键
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    const isMod = e.ctrlKey || e.metaKey;
+    const key = e.key.toLowerCase();
+    const active = document.activeElement as HTMLElement | null;
+    const inCodeMirror = !!active?.closest('.cm-editor');
+    const inTextInput =
+      active &&
+      (active.tagName === 'INPUT' ||
+        active.tagName === 'TEXTAREA' ||
+        active.isContentEditable);
+
+    // Ctrl+Z: 撤销（仅当不在其他输入框中时生效）
+    if (isMod && key === 'z') {
+      // 让 CodeMirror 自己处理：live 模式且焦点在编辑器内
+      if (editorMode === 'live' && inCodeMirror) return;
+      // 其他输入框（如 Chat 文本框）使用浏览器/组件自己的撤销
+      if (!inCodeMirror && inTextInput) return;
+
+      if (canUndo()) {
+        e.preventDefault();
+        undo();
+      }
+      return;
+    }
+
+    // Ctrl+Y 或 Ctrl+Shift+Z: 重做
+    if (
+      isMod &&
+      (key === 'y' || (key === 'z' && e.shiftKey))
+    ) {
+      if (editorMode === 'live' && inCodeMirror) return;
+      if (!inCodeMirror && inTextInput) return;
+
+      if (canRedo()) {
+        e.preventDefault();
+        redo();
+      }
+      return;
+    }
+
     // Alt + 左/右箭头: 导航历史
     if (e.altKey && e.key === "ArrowLeft") {
       e.preventDefault();
@@ -152,7 +195,7 @@ export function Editor() {
     
     // live 模式使用 CodeMirror 自带的撤销/重做，不拦截
     // 其他模式不需要拦截
-  }, [goBack, goForward]);
+  }, [editorMode, undo, redo, canUndo, canRedo, goBack, goForward]);
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);

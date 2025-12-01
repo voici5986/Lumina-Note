@@ -372,6 +372,19 @@ body {
 }
 .dark .callout-gray .callout-title { color: hsl(0 0% 70%); }
 
+/* Callouts inside CodeMirror live editor - 更紧凑的行样式 */
+.codemirror-wrapper .callout {
+  margin: 0;
+  padding: 0.15rem 0.75rem;
+  border-radius: 0;
+  border-left-width: 3px;
+}
+
+/* 相邻的 callout 行之间不增加额外间距，看起来像一个整体块 */
+.codemirror-wrapper .callout + .callout {
+  margin-top: 0;
+}
+
 /* ===== Prose Styles (for reading/live view) ===== */
 .prose {
   font-size: 1rem;

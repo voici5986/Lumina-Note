@@ -4,9 +4,10 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import { MessageSquarePlus, Video } from "lucide-react";
+import { MessageSquarePlus, Video, Sparkles } from "lucide-react";
 import { useAIStore } from "@/stores/useAIStore";
 import { useFileStore } from "@/stores/useFileStore";
+import { callLLM, type Message } from "@/services/llm";
 
 interface SelectionToolbarProps {
   containerRef: React.RefObject<HTMLElement>;
@@ -15,6 +16,10 @@ interface SelectionToolbarProps {
 export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
   const [selectedText, setSelectedText] = useState("");
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [isPolishing, setIsPolishing] = useState(false);
+  const [isTodoing, setIsTodoing] = useState(false);
   const { addTextSelection } = useAIStore();
   const { currentFile, openVideoNoteFromContent } = useFileStore();
 
@@ -123,6 +128,214 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
     setSelectedText("");
   };
 
+  const handleTranslate = async () => {
+    const text = selectedText.trim();
+    if (!text || isTranslating) return;
+
+    setIsTranslating(true);
+    try {
+      const messages: Message[] = [
+        {
+          role: "system",
+          content:
+            "你是一个翻译助手。请根据原文主要语言，在中英文之间互译：如果原文主要是中文则翻译成自然流畅的英文；如果主要是英文则翻译成自然流畅的中文。只返回译文本身，使用合适的分行，不要解释。",
+        },
+        {
+          role: "user",
+          content: text,
+        },
+      ];
+
+      const response = await callLLM(messages, { temperature: 0.3 });
+      const raw = (response.content || "").trim();
+      if (!raw) return;
+
+      const lines = raw.split("\n");
+      const calloutBody = lines
+        .map((line) => {
+          const trimmed = line.trim();
+          return trimmed ? `> ${trimmed}` : ">";
+        })
+        .join("\n");
+
+      const calloutBlock = `\n\n> [!info] 翻译\n${calloutBody}\n\n`;
+
+      window.dispatchEvent(
+        new CustomEvent("selection-ai-edit", {
+          detail: {
+            mode: "append_callout",
+            text: calloutBlock,
+            description: "选区翻译",
+          },
+        })
+      );
+
+      window.getSelection()?.removeAllRanges();
+      setPosition(null);
+      setSelectedText("");
+    } catch (error) {
+      console.error("Failed to translate selection:", error);
+      alert("翻译失败，请检查 AI 设置或稍后再试。");
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  const handlePolish = async () => {
+    const text = selectedText.trim();
+    if (!text || isPolishing) return;
+
+    setIsPolishing(true);
+    try {
+      const messages: Message[] = [
+        {
+          role: "system",
+          content:
+            "你是一个写作润色助手。请在保持原意不变的前提下，优化用户的文本：提高表达清晰度和流畅度，修正语法和用词问题，语言保持与原文一致（中文就用中文，英文就用英文）。只返回润色后的文本，不要解释。",
+        },
+        {
+          role: "user",
+          content: text,
+        },
+      ];
+
+      const response = await callLLM(messages, { temperature: 0.4 });
+      const polished = (response.content || "").trim();
+      if (!polished) return;
+
+      window.dispatchEvent(
+        new CustomEvent("selection-ai-edit", {
+          detail: {
+            mode: "replace_selection",
+            text: polished,
+            description: "选区润色",
+          },
+        })
+      );
+
+      window.getSelection()?.removeAllRanges();
+      setPosition(null);
+      setSelectedText("");
+    } catch (error) {
+      console.error("Failed to polish selection:", error);
+      alert("润色失败，请检查 AI 设置或稍后再试。");
+    } finally {
+      setIsPolishing(false);
+    }
+  };
+
+  const handleTodo = async () => {
+    const text = selectedText.trim();
+    if (!text || isTodoing) return;
+
+    setIsTodoing(true);
+    try {
+      const messages: Message[] = [
+        {
+          role: "system",
+          content:
+            "你是一个任务提取助手。请从用户提供的文本中提取清晰、可执行的待办事项，输出 Markdown 任务列表，每一项使用 `- [ ]` 开头；如果没有合理的待办事项，请输出一条 `- [ ] 暂无明确待办`。只返回任务列表，不要解释。",
+        },
+        {
+          role: "user",
+          content: text,
+        },
+      ];
+
+      const response = await callLLM(messages, { temperature: 0.2 });
+      const raw = (response.content || "").trim();
+      if (!raw) return;
+
+      const lines = raw.split("\n");
+      const calloutBody = lines
+        .map((line) => {
+          const trimmed = line.trim();
+          return trimmed ? `> ${trimmed}` : ">";
+        })
+        .join("\n");
+
+      const calloutBlock = `\n\n> [!tip] 待办清单\n${calloutBody}\n\n`;
+
+      window.dispatchEvent(
+        new CustomEvent("selection-ai-edit", {
+          detail: {
+            mode: "append_callout",
+            text: calloutBlock,
+            description: "生成待办清单",
+          },
+        })
+      );
+
+      window.getSelection()?.removeAllRanges();
+      setPosition(null);
+      setSelectedText("");
+    } catch (error) {
+      console.error("Failed to generate todos from selection:", error);
+      alert("生成待办清单失败，请检查 AI 设置或稍后再试。");
+    } finally {
+      setIsTodoing(false);
+    }
+  };
+
+  const handleSummarize = async () => {
+    const text = selectedText.trim();
+    if (!text || isSummarizing) return;
+
+    setIsSummarizing(true);
+    try {
+      const messages: Message[] = [
+        {
+          role: "system",
+          content:
+            "你是一个笔记助手，请对用户选中的这段文本生成简洁的要点式总结，使用中文，输出为 Markdown 列表，不要额外解释。",
+        },
+        {
+          role: "user",
+          content: `请对以下文本进行总结，输出 Markdown 列表：\n\n${text}`,
+        },
+      ];
+
+      const response = await callLLM(messages, { temperature: 0.3 });
+      const raw = (response.content || "").trim();
+      if (!raw) {
+        setIsSummarizing(false);
+        return;
+      }
+
+      // 将总结内容包装为 Obsidian callout
+      const lines = raw.split("\n");
+      const calloutBody = lines
+        .map((line) => {
+          const trimmed = line.trim();
+          return trimmed ? `> ${trimmed}` : ">";
+        })
+        .join("\n");
+
+      const calloutBlock = `\n\n> [!summary] 总结\n${calloutBody}\n\n`;
+
+      // 通过事件交给编辑器，由编辑器构造 diff
+      window.dispatchEvent(
+        new CustomEvent("selection-ai-edit", {
+          detail: {
+            mode: "append_callout",
+            text: calloutBlock,
+            description: "选区总结",
+          },
+        })
+      );
+
+      // 清除选区并隐藏工具栏（编辑内容在 Diff 中预览）
+      window.getSelection()?.removeAllRanges();
+      setPosition(null);
+      setSelectedText("");
+    } catch (error) {
+      console.error("Failed to summarize selection:", error);
+      alert("生成总结失败，请检查 AI 设置或稍后再试。");
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+
   const handleOpenAsVideoNote = () => {
     if (!selectedText.trim()) return;
 
@@ -154,6 +367,42 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
         >
           <MessageSquarePlus size={14} />
           <span>Add to Chat</span>
+        </button>
+        <button
+          onClick={handleSummarize}
+          disabled={isSummarizing}
+          className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-foreground hover:bg-accent rounded transition-colors whitespace-nowrap disabled:opacity-60 disabled:cursor-wait"
+          title="对选中文本生成总结并插入到下方"
+        >
+          <Sparkles size={14} className={isSummarizing ? "animate-spin" : ""} />
+          <span>Summary</span>
+        </button>
+        <button
+          onClick={handleTranslate}
+          disabled={isTranslating}
+          className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-foreground hover:bg-accent rounded transition-colors whitespace-nowrap disabled:opacity-60 disabled:cursor-wait"
+          title="翻译选中的文本（中英互译）"
+        >
+          <span className={isTranslating ? "animate-spin" : ""}>译</span>
+          <span>Translate</span>
+        </button>
+        <button
+          onClick={handlePolish}
+          disabled={isPolishing}
+          className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-foreground hover:bg-accent rounded transition-colors whitespace-nowrap disabled:opacity-60 disabled:cursor-wait"
+          title="润色选中的文本"
+        >
+          <span className={isPolishing ? "animate-spin" : ""}>✎</span>
+          <span>Polish</span>
+        </button>
+        <button
+          onClick={handleTodo}
+          disabled={isTodoing}
+          className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-foreground hover:bg-accent rounded transition-colors whitespace-nowrap disabled:opacity-60 disabled:cursor-wait"
+          title="从选中文本生成待办清单 (- [ ] ...)"
+        >
+          <span className={isTodoing ? "animate-spin" : ""}>☑</span>
+          <span>Todos</span>
         </button>
         <button
           onClick={handleOpenAsVideoNote}

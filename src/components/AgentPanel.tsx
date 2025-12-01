@@ -345,7 +345,7 @@ function renderMessages(messages: Message[]) {
           ))}
           {text && (
             <div 
-              className="text-sm text-foreground leading-relaxed prose prose-sm dark:prose-invert max-w-none"
+              className="text-foreground leading-relaxed prose prose-sm dark:prose-invert max-w-none [&_*]:!text-xs [&_h1]:!text-base [&_h2]:!text-sm [&_h3]:!text-xs"
               dangerouslySetInnerHTML={{ __html: parseMarkdown(text) }}
             />
           )}

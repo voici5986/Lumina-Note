@@ -1,7 +1,8 @@
 import { parseMarkdown } from "@/lib/markdown";
 import { useEffect, useRef, useImperativeHandle, forwardRef, useCallback } from "react";
 import { useFileStore } from "@/stores/useFileStore";
-import { EditorState, StateField } from "@codemirror/state";
+import { useAIStore } from "@/stores/useAIStore";
+import { EditorState, StateField, StateEffect } from "@codemirror/state";
 import {
   EditorView,
   keymap,
@@ -637,6 +638,79 @@ const livePreviewPlugin = ViewPlugin.fromClass(
   }
 );
 
+// ============ Callout 高亮（Live 模式） ============
+
+const CALLOUT_COLORS: Record<string, string> = {
+  note: "blue",
+  abstract: "blue",
+  info: "blue",
+  tip: "green",
+  success: "green",
+  question: "yellow",
+  warning: "yellow",
+  danger: "red",
+  failure: "red",
+  bug: "red",
+  example: "purple",
+  quote: "gray",
+  summary: "blue",
+};
+
+const calloutStateField = StateField.define<DecorationSet>({
+  create(state) {
+    return buildCalloutDecorations(state);
+  },
+  update(decorations, tr) {
+    if (tr.docChanged || tr.selection) {
+      return buildCalloutDecorations(tr.state);
+    }
+    return decorations.map(tr.changes);
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
+
+function buildCalloutDecorations(state: EditorState): DecorationSet {
+  const decorations: any[] = [];
+  const doc = state.doc;
+  const lineCount = doc.lines;
+
+  let lineNo = 1;
+  while (lineNo <= lineCount) {
+    const line = doc.line(lineNo);
+    const match = line.text.match(/^>\s*\[!(\w+)\]/);
+    if (!match) {
+      lineNo++;
+      continue;
+    }
+
+    const type = match[1].toLowerCase();
+    const color = CALLOUT_COLORS[type] || "gray";
+
+    // 给当前行添加 callout 样式
+    decorations.push(
+      Decoration.line({ class: `callout callout-${color}` }).range(line.from)
+    );
+
+    // 后续连续以 '>' 开头的行视为同一个 callout 的内容行
+    let nextLineNo = lineNo + 1;
+    while (nextLineNo <= lineCount) {
+      const nextLine = doc.line(nextLineNo);
+      if (/^>\s*/.test(nextLine.text) || nextLine.text.trim() === "") {
+        decorations.push(
+          Decoration.line({ class: `callout callout-${color}` }).range(nextLine.from)
+        );
+        nextLineNo++;
+      } else {
+        break;
+      }
+    }
+
+    lineNo = nextLineNo;
+  }
+
+  return Decoration.set(decorations, true);
+}
+
 // Markdown 样式装饰
 const markdownStylePlugin = ViewPlugin.fromClass(
   class {
@@ -691,6 +765,79 @@ const markdownStylePlugin = ViewPlugin.fromClass(
     decorations: (v) => v.decorations,
   }
 );
+
+// ============ 语音输入流式预览 ============
+
+const setVoicePreview = StateEffect.define<{ from: number; text: string }>();
+const clearVoicePreview = StateEffect.define<null | void>();
+
+class VoicePreviewWidget extends WidgetType {
+  readonly text: string;
+
+  constructor(text: string) {
+    super();
+    this.text = text;
+  }
+
+  eq(other: VoicePreviewWidget) {
+    return other.text === this.text;
+  }
+
+  toDOM() {
+    const span = document.createElement("span");
+    span.className = "cm-voice-preview";
+    span.textContent = this.text;
+    return span;
+  }
+
+  ignoreEvent() {
+    return true;
+  }
+}
+
+const voicePreviewField = StateField.define<DecorationSet>({
+  create() {
+    return Decoration.none;
+  },
+  update(value, tr) {
+    let deco = value;
+
+    for (const effect of tr.effects) {
+      if (effect.is(setVoicePreview)) {
+        const { from, text } = effect.value;
+        if (!text) {
+          deco = Decoration.none;
+        } else {
+          deco = Decoration.set([
+            Decoration.widget({
+              widget: new VoicePreviewWidget(text),
+              side: 1,
+            }).range(from),
+          ]);
+        }
+      }
+
+      if (effect.is(clearVoicePreview)) {
+        deco = Decoration.none;
+      }
+    }
+
+    if (tr.docChanged && deco !== Decoration.none) {
+      deco = deco.map(tr.changes);
+    }
+
+    return deco;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
+
+const voicePreviewTheme = EditorView.baseTheme({
+  ".cm-voice-preview": {
+    color: "hsl(var(--muted-foreground))",
+    opacity: 0.8,
+    fontStyle: "italic",
+  },
+});
 
 export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditorProps>(
   function CodeMirrorEditor({ content, onChange, className = "", isDark = false, livePreview = true }, ref) {
@@ -750,9 +897,19 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
         keymap.of([...defaultKeymap, ...historyKeymap]),
         markdown({ base: markdownLanguage }),
         editorTheme,  // 使用 CSS 变量，自动适应主题
+        voicePreviewField,
+        voicePreviewTheme,
         // 实时预览模式：隐藏语法标记、渲染数学公式、渲染表格、渲染代码块
         // 源码模式：显示原始 Markdown
-        ...(livePreview ? [livePreviewPlugin, mathStateField, tableStateField, codeBlockStateField] : []),
+        ...(livePreview
+          ? [
+              livePreviewPlugin,
+              mathStateField,
+              tableStateField,
+              codeBlockStateField,
+              calloutStateField,
+            ]
+          : []),
         markdownStylePlugin,
         updateListener,
         EditorView.lineWrapping,
@@ -884,6 +1041,129 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
       if (currentCleanup) currentCleanup();
     };
   }, [handleBilibiliLinkClick, isDark, livePreview]);
+  
+  // 监听语音输入事件：灰色流式预览 + 在光标处插入文本
+  useEffect(() => {
+    const handleInterim = (e: Event) => {
+      const view = viewRef.current;
+      if (!view) return;
+
+      const detail = (e as CustomEvent<{ text: string }>).detail;
+      const text = detail?.text ?? "";
+
+      if (!text) {
+        view.dispatch({ effects: clearVoicePreview.of(null) });
+        return;
+      }
+
+      const pos = view.state.selection.main.head;
+      view.dispatch({
+        effects: setVoicePreview.of({ from: pos, text }),
+      });
+    };
+
+    const handleFinal = (e: Event) => {
+      const view = viewRef.current;
+      if (!view) return;
+
+      const detail = (e as CustomEvent<{ text: string }>).detail;
+      const text = detail?.text ?? "";
+      if (!text) return;
+
+      const pos = view.state.selection.main.head;
+      view.dispatch({
+        changes: { from: pos, to: pos, insert: text },
+        selection: { anchor: pos + text.length },
+        effects: clearVoicePreview.of(null),
+      });
+    };
+
+    window.addEventListener("voice-input-interim", handleInterim as EventListener);
+    window.addEventListener("voice-input-final", handleFinal as EventListener);
+
+    return () => {
+      window.removeEventListener("voice-input-interim", handleInterim as EventListener);
+      window.removeEventListener("voice-input-final", handleFinal as EventListener);
+    };
+  }, []);
+
+  // 监听选区 AI 编辑事件：构造 diff 并交给 DiffView
+  useEffect(() => {
+    const handleSelectionAIEdit = (e: Event) => {
+      const view = viewRef.current;
+      if (!view) return;
+
+      const detail = (e as CustomEvent<{
+        mode: "append_callout" | "replace_selection";
+        text: string;
+        description?: string;
+      }>).detail;
+      if (!detail?.text) return;
+
+      const { mode, text, description } = detail;
+
+      const state = view.state;
+      const doc = state.doc;
+      const sel = state.selection.main;
+
+      const original = doc.toString();
+      let modified = original;
+
+      if (mode === "replace_selection") {
+        modified = original.slice(0, sel.from) + text + original.slice(sel.to);
+      } else if (mode === "append_callout") {
+        const insertPos = sel.to;
+        modified = original.slice(0, insertPos) + text + original.slice(insertPos);
+      }
+
+      if (modified === original) return;
+
+      const { currentFile } = useFileStore.getState();
+      if (!currentFile) return;
+
+      const filePath = currentFile;
+      const fileName = filePath.split(/[/\\]/).pop() || filePath;
+
+      const { setPendingDiff } = useAIStore.getState();
+      setPendingDiff({
+        fileName,
+        filePath,
+        original,
+        modified,
+        description: description || "选区 AI 编辑",
+      });
+    };
+
+    window.addEventListener("selection-ai-edit", handleSelectionAIEdit as EventListener);
+    return () => {
+      window.removeEventListener("selection-ai-edit", handleSelectionAIEdit as EventListener);
+    };
+  }, []);
+
+  // 监听选中文本总结插入事件：在当前选区后插入 callout 块
+  useEffect(() => {
+    const handleInsertCallout = (e: Event) => {
+      const view = viewRef.current;
+      if (!view) return;
+
+      const detail = (e as CustomEvent<{ callout: string }>).detail;
+      const callout = detail?.callout ?? "";
+      if (!callout) return;
+
+      const sel = view.state.selection.main;
+      const insertPos = sel.to;
+
+      view.dispatch({
+        changes: { from: insertPos, to: insertPos, insert: callout },
+        selection: { anchor: insertPos + callout.length },
+      });
+    };
+
+    window.addEventListener("insert-summary-callout", handleInsertCallout as EventListener);
+    return () => {
+      window.removeEventListener("insert-summary-callout", handleInsertCallout as EventListener);
+    };
+  }, []);
   
   return (
     <div 

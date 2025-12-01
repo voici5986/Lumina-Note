@@ -23,6 +23,7 @@ import { PDFViewer } from "@/components/pdf";
 import { useAIStore } from "@/stores/useAIStore";
 import { saveFile } from "@/lib/tauri";
 import { TitleBar } from "@/components/TitleBar";
+import { VoiceInputBall } from "@/components/VoiceInputBall";
 
 // Component that shows tabs + graph/editor content
 function EditorWithGraph() {
@@ -471,6 +472,9 @@ function App() {
     
     {/* AI Floating Ball */}
     <AIFloatingBall />
+
+    {/* Voice Input Floating Ball - 语音输入悬浮球 */}
+    <VoiceInputBall />
     </div>
   );
 }

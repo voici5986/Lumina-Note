@@ -1,15 +1,24 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 
+type SpeechToTextOptions = {
+  /** 静音自动停止时间（毫秒），默认 6000 */
+  silenceDurationMs?: number;
+};
+
 /**
  * 语音转文字 Hook，基于 Web Speech API。
  * 支持流式显示中间结果和最终结果追加。
  */
-export function useSpeechToText(appendText: (text: string) => void) {
+export function useSpeechToText(
+  appendText: (text: string) => void,
+  options?: SpeechToTextOptions
+) {
   const [isRecording, setIsRecording] = useState(false);
   const [interimText, setInterimText] = useState(""); // 中间结果（流式显示）
   const recognitionRef = useRef<any | null>(null);
   const appendTextRef = useRef(appendText);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const silenceMs = options?.silenceDurationMs ?? 6000;
 
   // 保持 appendText 最新引用
   useEffect(() => {
@@ -24,7 +33,7 @@ export function useSpeechToText(appendText: (text: string) => void) {
     }
   }, []);
 
-  // 重置静音计时器（6秒无声音自动停止）
+  // 重置静音计时器（静音一段时间后自动停止）
   const resetSilenceTimer = useCallback(() => {
     clearSilenceTimer();
     silenceTimerRef.current = setTimeout(() => {
@@ -32,8 +41,8 @@ export function useSpeechToText(appendText: (text: string) => void) {
       if (recognition) {
         recognition.stop();
       }
-    }, 6000);
-  }, [clearSilenceTimer]);
+    }, silenceMs);
+  }, [clearSilenceTimer, silenceMs]);
 
   useEffect(() => {
     const SpeechRecognitionImpl =
