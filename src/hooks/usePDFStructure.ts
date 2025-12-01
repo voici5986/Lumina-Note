@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import type { PDFStructure, PDFElement, ParseStatus, ParseBackend } from "@/types/pdf";
+import { parsePDF } from "@/services/pdf";
 
 /**
  * PDF 结构解析 Hook
@@ -11,23 +12,47 @@ export function usePDFStructure() {
   const [parseError, setParseError] = useState<string | null>(null);
   const [parseBackend, setParseBackend] = useState<ParseBackend>('none');
 
-  // 解析 PDF 结构（当前为模拟实现）
-  const parseStructure = useCallback(async (_pdfPath: string, backend: ParseBackend = 'none') => {
+  // 解析 PDF 结构
+  const parseStructure = useCallback(async (pdfPath: string, backend: ParseBackend = 'none') => {
     setParseStatus('parsing');
     setParseError(null);
     setParseBackend(backend);
 
     try {
-      // TODO: 实际的解析逻辑
-      // 目前返回空结构，后续接入 PP-Structure 或其他服务
+      let result;
       
-      await new Promise(resolve => setTimeout(resolve, 500)); // 模拟延迟
+      if (backend === 'none') {
+        // 使用模拟数据
+        await new Promise(resolve => setTimeout(resolve, 500));
+        result = {
+          success: true,
+          structure: generateMockStructure(),
+          fromCache: false,
+        };
+      } else {
+        // 使用真实的解析服务
+        result = await parsePDF({
+          pdfPath,
+          config: {
+            backend,
+            ppStructure: {
+              apiUrl: 'http://localhost:8080/parse',
+              layoutAnalysis: true,
+              tableRecognition: true,
+              ocrEngine: 'paddleocr',
+            },
+          },
+          useCache: true,
+        });
+      }
 
-      // 生成模拟数据用于测试
-      const mockStructure = generateMockStructure();
-      
-      setStructure(mockStructure);
-      setParseStatus('done');
+      if (result.success && result.structure) {
+        setStructure(result.structure);
+        setParseStatus('done');
+      } else {
+        setParseError(result.error || '解析失败');
+        setParseStatus('error');
+      }
     } catch (err) {
       console.error('Failed to parse PDF structure:', err);
       setParseError(err instanceof Error ? err.message : '解析失败');

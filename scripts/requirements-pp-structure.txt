@@ -1,0 +1,8 @@
+# PP-Structure PDF 解析服务依赖
+
+flask==3.0.0
+flask-cors==4.0.0
+paddleocr==2.7.3
+paddlepaddle==2.6.0
+pymupdf==1.23.8
+pillow==10.1.0
