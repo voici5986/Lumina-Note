@@ -1,6 +1,9 @@
 import { useMemo, useCallback } from "react";
 import { parseMarkdown } from "@/lib/markdown";
 import { useFileStore } from "@/stores/useFileStore";
+import { useSplitStore } from "@/stores/useSplitStore";
+import { useUIStore } from "@/stores/useUIStore";
+import { parseLuminaLink } from "@/lib/annotations";
 
 interface ReadingViewProps {
   content: string;
@@ -9,14 +12,38 @@ interface ReadingViewProps {
 
 export function ReadingView({ content, className = "" }: ReadingViewProps) {
   const { fileTree, openFile } = useFileStore();
+  const { openSecondaryPdf } = useSplitStore();
+  const { setSplitView } = useUIStore();
 
   const html = useMemo(() => {
     return parseMarkdown(content);
   }, [content]);
 
-  // Handle WikiLink and Tag clicks
+  // Handle WikiLink, Tag, and Lumina link clicks
   const handleClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
+    
+    // Handle lumina:// PDF links (Ctrl+Click to open in split view)
+    if (target.tagName === 'A') {
+      const href = target.getAttribute('href');
+      if (href && href.startsWith('lumina://pdf')) {
+        e.preventDefault();
+        const parsed = parseLuminaLink(href);
+        if (parsed && parsed.file) {
+          if (e.ctrlKey || e.metaKey) {
+            // Ctrl+Click: open in split view
+            setSplitView(true);
+            openSecondaryPdf(parsed.file, parsed.page || 1, parsed.id);
+          } else {
+            // Normal click: open in main view via fileStore
+            const { openPDFTab } = useFileStore.getState();
+            openPDFTab(parsed.file);
+            // TODO: navigate to page and highlight annotation
+          }
+        }
+        return;
+      }
+    }
     
     // Handle WikiLink clicks
     if (target.classList.contains("wikilink")) {
@@ -59,7 +86,7 @@ export function ReadingView({ content, className = "" }: ReadingViewProps) {
         );
       }
     }
-  }, [fileTree, openFile]);
+  }, [fileTree, openFile, openSecondaryPdf, setSplitView]);
 
   return (
     <div

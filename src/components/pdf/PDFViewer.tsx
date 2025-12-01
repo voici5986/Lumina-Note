@@ -4,6 +4,7 @@ import { PDFCanvas } from "./PDFCanvas";
 import { PDFOutline } from "./PDFOutline";
 import { PDFSearch } from "./PDFSearch";
 import { ElementPanel } from "./ElementPanel";
+import { AnnotationPopover } from "./AnnotationPopover";
 import { usePDFStore } from "@/stores/usePDFStore";
 import { useElementSelection } from "@/hooks/useElementSelection";
 import { usePDFStructure } from "@/hooks/usePDFStructure";
@@ -308,6 +309,9 @@ export function PDFViewer({ filePath, className }: PDFViewerProps) {
           />
         )}
       </div>
+      
+      {/* 批注弹窗 */}
+      <AnnotationPopover />
     </div>
   );
 }

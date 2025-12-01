@@ -61,6 +61,7 @@ interface UIState {
   splitView: boolean;
   splitDirection: "horizontal" | "vertical";
   toggleSplitView: () => void;
+  setSplitView: (open: boolean) => void;
   setSplitDirection: (dir: "horizontal" | "vertical") => void;
 
   // Video note view
@@ -150,6 +151,7 @@ export const useUIStore = create<UIState>()(
       splitView: false,
       splitDirection: "horizontal",
       toggleSplitView: () => set((state) => ({ splitView: !state.splitView })),
+      setSplitView: (open) => set({ splitView: open }),
       setSplitDirection: (dir) => set({ splitDirection: dir }),
 
       // Video note

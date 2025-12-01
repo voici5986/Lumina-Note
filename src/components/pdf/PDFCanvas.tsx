@@ -3,7 +3,10 @@ import { Document, Page, pdfjs } from "react-pdf";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { InteractiveLayer } from "./InteractiveLayer";
+import { AnnotationLayer } from "./AnnotationLayer";
+import { usePDFAnnotationStore } from "@/stores/usePDFAnnotationStore";
 import type { PDFElement } from "@/types/pdf";
+import type { TextPosition } from "@/types/annotation";
 
 // 配置 PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -27,6 +30,8 @@ interface PDFCanvasProps {
   hoveredElementId?: string | null;
   onElementHover?: (elementId: string | null) => void;
   onElementClick?: (element: PDFElement, isMultiSelect: boolean) => void;
+  // 批注相关
+  enableAnnotations?: boolean;
   className?: string;
 }
 
@@ -44,12 +49,23 @@ export function PDFCanvas({
   hoveredElementId = null,
   onElementHover,
   onElementClick,
+  enableAnnotations = true,
   className,
 }: PDFCanvasProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState<{ width: number; height: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  
+  const { openPopover, loadAnnotations } = usePDFAnnotationStore();
+  
+  // 加载批注
+  useEffect(() => {
+    if (enableAnnotations && filePath) {
+      loadAnnotations(filePath);
+    }
+  }, [enableAnnotations, filePath, loadAnnotations]);
 
   // 处理文档加载
   const handleDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
@@ -63,6 +79,58 @@ export function PDFCanvas({
     const viewport = page.getViewport({ scale: 1 });
     setPageSize({ width: viewport.width, height: viewport.height });
   }, []);
+  
+  // 处理文本选择
+  const handleMouseUp = useCallback((_e: React.MouseEvent) => {
+    if (!enableAnnotations || !pageSize) return;
+    
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || !selection.toString().trim()) return;
+    
+    const selectedText = selection.toString().trim();
+    if (!selectedText) return;
+    
+    // 获取选区的所有矩形
+    const range = selection.getRangeAt(0);
+    const rects = range.getClientRects();
+    
+    if (rects.length === 0) return;
+    
+    // 获取页面容器的位置
+    const pageElement = pageRef.current;
+    if (!pageElement) return;
+    
+    const pageRect = pageElement.getBoundingClientRect();
+    
+    // 转换为相对于页面的百分比坐标
+    const positionRects: TextPosition['rects'] = [];
+    for (let i = 0; i < rects.length; i++) {
+      const rect = rects[i];
+      // 只处理在页面范围内的矩形
+      if (rect.width > 0 && rect.height > 0) {
+        positionRects.push({
+          x: (rect.left - pageRect.left) / (pageSize.width * scale),
+          y: (rect.top - pageRect.top) / (pageSize.height * scale),
+          width: rect.width / (pageSize.width * scale),
+          height: rect.height / (pageSize.height * scale),
+        });
+      }
+    }
+    
+    if (positionRects.length === 0) return;
+    
+    // 打开批注弹窗
+    const lastRect = rects[rects.length - 1];
+    openPopover({
+      x: lastRect.right,
+      y: lastRect.bottom,
+      selectedText,
+      position: {
+        pageIndex: currentPage,
+        rects: positionRects,
+      },
+    });
+  }, [enableAnnotations, pageSize, scale, currentPage, openPopover]);
 
   // 处理加载错误
   const handleDocumentLoadError = useCallback((err: Error) => {
@@ -191,7 +259,11 @@ export function PDFCanvas({
         }
         className="flex flex-col items-center py-4"
       >
-        <div className="relative shadow-lg">
+        <div 
+          ref={pageRef}
+          className="relative shadow-lg"
+          onMouseUp={handleMouseUp}
+        >
           <Page
             pageNumber={currentPage}
             scale={scale}
@@ -203,6 +275,16 @@ export function PDFCanvas({
             }
             className="bg-white"
           />
+          
+          {/* 批注层 */}
+          {enableAnnotations && pageSize && (
+            <AnnotationLayer
+              pageIndex={currentPage}
+              pageWidth={pageSize.width}
+              pageHeight={pageSize.height}
+              scale={scale}
+            />
+          )}
           
           {/* 交互层 */}
           {showInteractiveLayer && pageSize && onElementHover && onElementClick && (

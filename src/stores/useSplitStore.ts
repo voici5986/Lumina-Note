@@ -2,16 +2,25 @@ import { create } from "zustand";
 import { readFile, saveFile } from "@/lib/tauri";
 import { parseFrontmatter } from "@/lib/frontmatter";
 
+// 分栏文件类型
+export type SplitFileType = 'markdown' | 'pdf';
+
 // Secondary editor state for split view
 interface SplitState {
   // Secondary file
   secondaryFile: string | null;
+  secondaryFileType: SplitFileType;
   secondaryContent: string;
   secondaryIsDirty: boolean;
   isLoadingSecondary: boolean;
   
+  // PDF 特有状态
+  secondaryPdfPage: number;
+  secondaryPdfAnnotationId: string | null;
+  
   // Actions
   openSecondaryFile: (path: string) => Promise<void>;
+  openSecondaryPdf: (path: string, page?: number, annotationId?: string) => void;
   updateSecondaryContent: (content: string) => void;
   saveSecondary: () => Promise<void>;
   closeSecondary: () => void;
@@ -21,9 +30,12 @@ interface SplitState {
 
 export const useSplitStore = create<SplitState>((set, get) => ({
   secondaryFile: null,
+  secondaryFileType: 'markdown',
   secondaryContent: "",
   secondaryIsDirty: false,
   isLoadingSecondary: false,
+  secondaryPdfPage: 1,
+  secondaryPdfAnnotationId: null,
 
   openSecondaryFile: async (path: string) => {
     set({ isLoadingSecondary: true });
@@ -31,6 +43,7 @@ export const useSplitStore = create<SplitState>((set, get) => ({
       const content = await readFile(path);
       set({
         secondaryFile: path,
+        secondaryFileType: 'markdown',
         secondaryContent: content,
         secondaryIsDirty: false,
         isLoadingSecondary: false,
@@ -39,6 +52,18 @@ export const useSplitStore = create<SplitState>((set, get) => ({
       console.error("Failed to open secondary file:", error);
       set({ isLoadingSecondary: false });
     }
+  },
+  
+  openSecondaryPdf: (path: string, page: number = 1, annotationId?: string) => {
+    set({
+      secondaryFile: path,
+      secondaryFileType: 'pdf',
+      secondaryContent: '',
+      secondaryIsDirty: false,
+      isLoadingSecondary: false,
+      secondaryPdfPage: page,
+      secondaryPdfAnnotationId: annotationId || null,
+    });
   },
 
   updateSecondaryContent: (content: string) => {
@@ -68,8 +93,11 @@ export const useSplitStore = create<SplitState>((set, get) => ({
   closeSecondary: () => {
     set({
       secondaryFile: null,
+      secondaryFileType: 'markdown',
       secondaryContent: "",
       secondaryIsDirty: false,
+      secondaryPdfPage: 1,
+      secondaryPdfAnnotationId: null,
     });
   },
 

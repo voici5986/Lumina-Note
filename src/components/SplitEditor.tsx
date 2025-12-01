@@ -1,9 +1,12 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useFileStore } from "@/stores/useFileStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { useSplitStore } from "@/stores/useSplitStore";
+import { usePDFAnnotationStore } from "@/stores/usePDFAnnotationStore";
+import { usePDFStore } from "@/stores/usePDFStore";
 import { CodeMirrorEditor } from "@/editor/CodeMirrorEditor";
 import { ReadingView } from "@/editor/ReadingView";
+import { PDFViewer } from "@/components/pdf/PDFViewer";
 import { getFileName, cn } from "@/lib/utils";
 import {
   X,
@@ -106,12 +109,32 @@ export function SplitEditor() {
 
   const {
     secondaryFile,
+    secondaryFileType,
     secondaryContent,
     secondaryIsDirty,
     isLoadingSecondary,
+    secondaryPdfPage,
+    secondaryPdfAnnotationId,
     updateSecondaryContent,
     closeSecondary,
   } = useSplitStore();
+  
+  const { setHighlightedAnnotation } = usePDFAnnotationStore();
+  const { setCurrentPage } = usePDFStore();
+  
+  // 当打开 PDF 时，设置初始页码
+  useEffect(() => {
+    if (secondaryFileType === 'pdf' && secondaryPdfPage > 0) {
+      setCurrentPage(secondaryPdfPage);
+    }
+  }, [secondaryFileType, secondaryPdfPage, setCurrentPage]);
+  
+  // 当有批注 ID 时，高亮该批注
+  useEffect(() => {
+    if (secondaryPdfAnnotationId) {
+      setHighlightedAnnotation(secondaryPdfAnnotationId);
+    }
+  }, [secondaryPdfAnnotationId, setHighlightedAnnotation]);
 
   const handlePrimaryChange = useCallback((content: string) => {
     updateContent(content);
@@ -122,6 +145,58 @@ export function SplitEditor() {
   }, [updateSecondaryContent]);
 
   const isHorizontal = splitDirection === "horizontal";
+  
+  // 拖拽调整分栏大小
+  const [primarySize, setPrimarySize] = useState(50); // 百分比
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+  
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+    document.body.style.cursor = isHorizontal ? 'col-resize' : 'row-resize';
+    document.body.style.userSelect = 'none';
+  }, [isHorizontal]);
+  
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current || !containerRef.current) return;
+      
+      const rect = containerRef.current.getBoundingClientRect();
+      let newSize: number;
+      
+      if (isHorizontal) {
+        newSize = ((e.clientX - rect.left) / rect.width) * 100;
+      } else {
+        newSize = ((e.clientY - rect.top) / rect.height) * 100;
+      }
+      
+      // 限制最小/最大尺寸 (10% - 90%)
+      newSize = Math.max(10, Math.min(90, newSize));
+      setPrimarySize(newSize);
+    };
+    
+    const handleMouseUp = () => {
+      if (isDragging.current) {
+        isDragging.current = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isHorizontal]);
+  
+  // 切换方向时重置大小
+  useEffect(() => {
+    setPrimarySize(50);
+  }, [splitDirection]);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -151,15 +226,22 @@ export function SplitEditor() {
       </div>
 
       {/* Split panes */}
-      <div className={cn(
-        "flex-1 flex overflow-hidden",
-        isHorizontal ? "flex-row" : "flex-col"
-      )}>
+      <div 
+        ref={containerRef}
+        className={cn(
+          "flex-1 flex overflow-hidden",
+          isHorizontal ? "flex-row" : "flex-col"
+        )}
+      >
         {/* Primary pane */}
-        <div className={cn(
-          "flex flex-col overflow-hidden",
-          isHorizontal ? "flex-1 min-w-[200px]" : "flex-1 min-h-[100px]"
-        )}>
+        <div 
+          className="flex flex-col overflow-hidden"
+          style={{
+            [isHorizontal ? 'width' : 'height']: `${primarySize}%`,
+            minWidth: isHorizontal ? '150px' : undefined,
+            minHeight: !isHorizontal ? '100px' : undefined,
+          }}
+        >
           <EditorPane
             file={currentFile}
             content={currentContent}
@@ -170,25 +252,63 @@ export function SplitEditor() {
           />
         </div>
 
-        {/* Divider */}
-        <div className={cn(
-          "bg-border shrink-0",
-          isHorizontal ? "w-px" : "h-px"
-        )} />
+        {/* Resizable Divider */}
+        <div 
+          className={cn(
+            "shrink-0 bg-border hover:bg-primary/50 transition-colors",
+            isHorizontal 
+              ? "w-1 cursor-col-resize hover:w-1" 
+              : "h-1 cursor-row-resize hover:h-1",
+            "group relative"
+          )}
+          onMouseDown={handleMouseDown}
+        >
+          {/* 拖拽手柄指示器 */}
+          <div className={cn(
+            "absolute bg-primary/30 opacity-0 group-hover:opacity-100 transition-opacity",
+            isHorizontal 
+              ? "w-1 h-8 top-1/2 left-0 -translate-y-1/2 rounded-full" 
+              : "h-1 w-8 left-1/2 top-0 -translate-x-1/2 rounded-full"
+          )} />
+        </div>
 
         {/* Secondary pane */}
-        <div className={cn(
-          "flex flex-col overflow-hidden border-l border-border",
-          isHorizontal ? "flex-1 min-w-[200px]" : "flex-1 min-h-[100px]"
-        )}>
-          <EditorPane
-            file={secondaryFile}
-            content={secondaryContent}
-            isDirty={secondaryIsDirty}
-            isLoading={isLoadingSecondary}
-            onContentChange={handleSecondaryChange}
-            onClose={closeSecondary}
-          />
+        <div 
+          className={cn(
+            "flex flex-col overflow-hidden",
+            isHorizontal ? "border-l border-border" : "border-t border-border"
+          )}
+          style={{
+            [isHorizontal ? 'width' : 'height']: `${100 - primarySize}%`,
+            minWidth: isHorizontal ? '150px' : undefined,
+            minHeight: !isHorizontal ? '100px' : undefined,
+          }}
+        >
+          {secondaryFileType === 'pdf' && secondaryFile ? (
+            <div className="flex-1 flex flex-col overflow-hidden relative">
+              {/* Close button for PDF */}
+              <button
+                onClick={closeSecondary}
+                className="absolute top-2 right-2 z-10 p-1 bg-background/80 hover:bg-accent rounded transition-colors text-muted-foreground hover:text-foreground"
+                title="关闭此面板"
+              >
+                <X size={14} />
+              </button>
+              <PDFViewer 
+                filePath={secondaryFile} 
+                className="flex-1"
+              />
+            </div>
+          ) : (
+            <EditorPane
+              file={secondaryFile}
+              content={secondaryContent}
+              isDirty={secondaryIsDirty}
+              isLoading={isLoadingSecondary}
+              onContentChange={handleSecondaryChange}
+              onClose={closeSecondary}
+            />
+          )}
         </div>
       </div>
     </div>
