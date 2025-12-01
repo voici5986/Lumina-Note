@@ -115,6 +115,8 @@ export function SplitEditor() {
     isLoadingSecondary,
     secondaryPdfPage,
     secondaryPdfAnnotationId,
+    activePane,
+    setActivePane,
     updateSecondaryContent,
     closeSecondary,
   } = useSplitStore();
@@ -235,12 +237,16 @@ export function SplitEditor() {
       >
         {/* Primary pane */}
         <div 
-          className="flex flex-col overflow-hidden"
+          className={cn(
+            "flex flex-col overflow-hidden",
+            activePane === 'primary' && "ring-2 ring-primary/30 ring-inset"
+          )}
           style={{
             [isHorizontal ? 'width' : 'height']: `${primarySize}%`,
             minWidth: isHorizontal ? '150px' : undefined,
             minHeight: !isHorizontal ? '100px' : undefined,
           }}
+          onClick={() => setActivePane('primary')}
         >
           <EditorPane
             file={currentFile}
@@ -276,13 +282,15 @@ export function SplitEditor() {
         <div 
           className={cn(
             "flex flex-col overflow-hidden",
-            isHorizontal ? "border-l border-border" : "border-t border-border"
+            isHorizontal ? "border-l border-border" : "border-t border-border",
+            activePane === 'secondary' && "ring-2 ring-primary/30 ring-inset"
           )}
           style={{
             [isHorizontal ? 'width' : 'height']: `${100 - primarySize}%`,
             minWidth: isHorizontal ? '150px' : undefined,
             minHeight: !isHorizontal ? '100px' : undefined,
           }}
+          onClick={() => setActivePane('secondary')}
         >
           {secondaryFileType === 'pdf' && secondaryFile ? (
             <div className="flex-1 flex flex-col overflow-hidden relative">

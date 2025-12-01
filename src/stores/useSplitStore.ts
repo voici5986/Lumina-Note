@@ -5,8 +5,15 @@ import { parseFrontmatter } from "@/lib/frontmatter";
 // 分栏文件类型
 export type SplitFileType = 'markdown' | 'pdf';
 
+// 活动面板
+export type ActivePane = 'primary' | 'secondary';
+
 // Secondary editor state for split view
 interface SplitState {
+  // 活动面板（最后点击的面板）
+  activePane: ActivePane;
+  setActivePane: (pane: ActivePane) => void;
+  
   // Secondary file
   secondaryFile: string | null;
   secondaryFileType: SplitFileType;
@@ -29,6 +36,9 @@ interface SplitState {
 }
 
 export const useSplitStore = create<SplitState>((set, get) => ({
+  activePane: 'primary',
+  setActivePane: (pane) => set({ activePane: pane }),
+  
   secondaryFile: null,
   secondaryFileType: 'markdown',
   secondaryContent: "",
@@ -98,6 +108,7 @@ export const useSplitStore = create<SplitState>((set, get) => ({
       secondaryIsDirty: false,
       secondaryPdfPage: 1,
       secondaryPdfAnnotationId: null,
+      activePane: 'primary', // 关闭分栏后重置为主面板
     });
   },
 

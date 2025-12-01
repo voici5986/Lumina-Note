@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useVoiceNote } from "@/hooks/useVoiceNote";
 import { useUIStore } from "@/stores/useUIStore";
+import { useSplitStore } from "@/stores/useSplitStore";
 
 interface ContextMenuState {
   x: number;
@@ -45,7 +46,8 @@ export function Sidebar() {
   const { vaultPath, fileTree, currentFile, openFile, refreshFileTree, isLoadingTree, closeFile, openDatabaseTab, openPDFTab } =
     useFileStore();
   const { config: ragConfig, isIndexing: ragIsIndexing, indexStatus, rebuildIndex, cancelIndex } = useRAGStore();
-  const { setRightPanelTab } = useUIStore();
+  const { setRightPanelTab, splitView } = useUIStore();
+  const { activePane, openSecondaryFile, openSecondaryPdf } = useSplitStore();
   const { 
     isRecording, 
     status: voiceStatus, 
@@ -422,13 +424,22 @@ export function Sidebar() {
         const dbName = dbId; // 可以后续从文件内容读取真实名称
         openDatabaseTab(dbId, dbName);
       } else if (name.endsWith('.pdf')) {
-        // PDF 文件
-        openPDFTab(entry.path);
+        // PDF 文件 - 根据活动面板打开
+        if (splitView && activePane === 'secondary') {
+          openSecondaryPdf(entry.path);
+        } else {
+          openPDFTab(entry.path);
+        }
       } else {
-        openFile(entry.path);
+        // Markdown 文件 - 根据活动面板打开
+        if (splitView && activePane === 'secondary') {
+          openSecondaryFile(entry.path);
+        } else {
+          openFile(entry.path);
+        }
       }
     }
-  }, [openFile, openDatabaseTab, openPDFTab]);
+  }, [openFile, openDatabaseTab, openPDFTab, splitView, activePane, openSecondaryFile, openSecondaryPdf]);
 
   return (
     <aside className="w-full h-full border-r border-border flex flex-col bg-muted/30 transition-colors duration-300">
