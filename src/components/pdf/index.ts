@@ -5,3 +5,5 @@ export { PDFThumbnails } from "./PDFThumbnails";
 export { PDFOutline } from "./PDFOutline";
 export { PDFSidebar } from "./PDFSidebar";
 export { PDFSearch } from "./PDFSearch";
+export { InteractiveLayer } from "./InteractiveLayer";
+export { ElementPanel } from "./ElementPanel";

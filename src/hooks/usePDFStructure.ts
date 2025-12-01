@@ -12,7 +12,7 @@ export function usePDFStructure() {
   const [parseBackend, setParseBackend] = useState<ParseBackend>('none');
 
   // 解析 PDF 结构（当前为模拟实现）
-  const parseStructure = useCallback(async (pdfPath: string, backend: ParseBackend = 'none') => {
+  const parseStructure = useCallback(async (_pdfPath: string, backend: ParseBackend = 'none') => {
     setParseStatus('parsing');
     setParseError(null);
     setParseBackend(backend);
