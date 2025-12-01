@@ -23,8 +23,10 @@ import {
   FileText,
   Mic,
   Loader2,
+  Bot,
 } from "lucide-react";
 import { useVoiceNote } from "@/hooks/useVoiceNote";
+import { useUIStore } from "@/stores/useUIStore";
 
 interface ContextMenuState {
   x: number;
@@ -42,7 +44,8 @@ interface CreatingState {
 export function Sidebar() {
   const { vaultPath, fileTree, currentFile, openFile, refreshFileTree, isLoadingTree, closeFile, openDatabaseTab, openPDFTab } =
     useFileStore();
-  const { config: ragConfig, isIndexing: ragIsIndexing, indexStatus } = useRAGStore();
+  const { config: ragConfig, isIndexing: ragIsIndexing, indexStatus, rebuildIndex, cancelIndex } = useRAGStore();
+  const { setRightPanelTab } = useUIStore();
   const { 
     isRecording, 
     status: voiceStatus, 
@@ -434,6 +437,17 @@ export function Sidebar() {
         <span>资源管理器</span>
         <div className="flex items-center gap-1">
           <button
+            onClick={() => {
+              useFileStore.getState().openAIMainTab();
+              // 温和版：仅切换右侧面板 Tab，让 AI 区域消失
+              setRightPanelTab("outline");
+            }}
+            className="p-1 hover:bg-accent rounded transition-colors"
+            title="AI 聊天（在主视图区打开）"
+          >
+            <Bot className="w-3.5 h-3.5" />
+          </button>
+          <button
             onClick={() => handleNewFile()}
             className="p-1 hover:bg-accent rounded transition-colors"
             title="新建文件"
@@ -612,15 +626,38 @@ export function Sidebar() {
         {/* RAG 索引状态 */}
         {ragConfig.enabled && (
           <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${
-                ragIsIndexing ? 'bg-yellow-500 animate-pulse' : 
-                indexStatus?.initialized ? 'bg-green-500' : 'bg-gray-400'
-              }`}></div>
-              <span>
-                {ragIsIndexing ? '索引中...' : 
-                 indexStatus?.initialized ? `索引: ${indexStatus.totalFiles} 文件` : '索引: 未初始化'}
-              </span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${
+                  ragIsIndexing ? 'bg-yellow-500 animate-pulse' : 
+                  indexStatus?.initialized ? 'bg-green-500' : 'bg-gray-400'
+                }`}></div>
+                <span>
+                  {ragIsIndexing ? '索引中...' : 
+                   indexStatus?.initialized ? `索引: ${indexStatus.totalFiles} 文件` : '索引: 未初始化'}
+                </span>
+              </div>
+              
+              {/* 索引操作按钮 */}
+              <div className="flex items-center gap-1">
+                {ragIsIndexing ? (
+                  <button
+                    onClick={cancelIndex}
+                    className="px-1.5 py-0.5 rounded text-[10px] text-red-500 hover:bg-red-500/10 transition-colors"
+                    title="取消索引"
+                  >
+                    取消
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => rebuildIndex()}
+                    className="px-1.5 py-0.5 rounded text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    title="重新索引"
+                  >
+                    重建
+                  </button>
+                )}
+              </div>
             </div>
             
             {/* 索引进度条 */}

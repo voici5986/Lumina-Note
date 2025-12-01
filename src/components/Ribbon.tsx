@@ -10,22 +10,24 @@ import {
   Moon,
   Video,
   Database,
+  Bot,
 } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 import { exists } from "@/lib/tauri";
 import { SettingsModal } from "./SettingsModal";
 
 export function Ribbon() {
   const [showSettings, setShowSettings] = useState(false);
-  const { isDarkMode, toggleTheme } = useUIStore();
-  const { tabs, activeTabIndex, openGraphTab, switchTab, openVideoNoteTab, recentFiles, openFile, fileTree } = useFileStore();
-  
+  const { isDarkMode, toggleTheme, setRightPanelTab } = useUIStore();
+  const { tabs, activeTabIndex, openGraphTab, switchTab, openVideoNoteTab, recentFiles, openFile, fileTree, openAIMainTab } = useFileStore();
+
   // Check active tab type
   const activeTab = activeTabIndex >= 0 ? tabs[activeTabIndex] : null;
   const isGraphActive = activeTab?.type === "graph";
   const isVideoActive = activeTab?.type === "video-note";
   const isDatabaseActive = activeTab?.type === "database";
-  
+
   // Find first file tab to switch to
   const handleSwitchToFiles = async () => {
     const fileTabIndex = tabs.findIndex(tab => tab.type === "file");
@@ -48,7 +50,7 @@ export function Ribbon() {
         }
       }
     }
-    
+
     // Fallback: Open the first file in the file tree
     const findFirstFile = (entries: typeof fileTree): string | null => {
       for (const entry of entries) {
@@ -78,6 +80,18 @@ export function Ribbon() {
           title="全局搜索 (Ctrl+Shift+F)"
         >
           <Search size={20} />
+        </button>
+
+        {/* AI Chat - Main View */}
+        <button
+          onClick={() => {
+            openAIMainTab();
+            setRightPanelTab("outline");
+          }}
+          className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+          title="AI 聊天（主视图）"
+        >
+          <Bot size={20} />
         </button>
 
         {/* Files/Editor */}

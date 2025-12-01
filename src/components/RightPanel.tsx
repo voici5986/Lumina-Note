@@ -335,6 +335,7 @@ export function RightPanel() {
     setFloatingBallPosition,
     setFloatingBallDragging,
   } = useUIStore();
+  const { tabs, activeTabIndex } = useFileStore();
   const { 
     config,
     clearChat,
@@ -354,6 +355,9 @@ export function RightPanel() {
   const [showSettings, setShowSettings] = useState(false);
   const [isDraggingAI, setIsDraggingAI] = useState(false);
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
+
+  const activeTab = activeTabIndex >= 0 ? tabs[activeTabIndex] : null;
+  const isMainAIActive = activeTab?.type === "ai-chat";
 
   // 处理 AI tab 拖拽开始
   const handleAIDragStart = (e: React.MouseEvent) => {
@@ -412,8 +416,8 @@ export function RightPanel() {
     <aside className="w-full h-full bg-background border-l border-border flex flex-col transition-colors duration-300">
       {/* Tabs */}
       <div className="flex border-b border-border">
-        {/* AI Tab - 只在 docked 模式下显示 */}
-        {aiPanelMode === "docked" && (
+        {/* AI Tab - 只在 docked 模式且主视图未处于 AI 聊天时显示 */}
+        {aiPanelMode === "docked" && !isMainAIActive && (
           <button
             onClick={() => setRightPanelTab("chat")}
             onMouseDown={handleAIDragStart}
@@ -466,8 +470,8 @@ export function RightPanel() {
         </button>
       </div>
 
-      {/* Chat Interface - 只在 docked 模式下显示 */}
-      {rightPanelTab === "chat" && aiPanelMode === "docked" && (
+      {/* Chat Interface - 只在 docked 模式且主视图未处于 AI 聊天时显示 */}
+      {rightPanelTab === "chat" && aiPanelMode === "docked" && !isMainAIActive && (
         <div className="flex-1 flex overflow-hidden">
           {/* 可折叠的对话列表侧栏 */}
           <ConversationList />

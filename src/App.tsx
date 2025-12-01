@@ -366,7 +366,7 @@ function App() {
         </button>
       </div>
 
-      {/* Main content - switches between Editor, Graph, Split, Diff, and VideoNote based on state */}
+      {/* Main content - switches between Editor, Graph, Split, Diff, VideoNote and AI Chat based on state */}
       <main className="flex-1 flex flex-col overflow-hidden min-w-0">
         {pendingDiff ? (
           // Show diff view when there's a pending AI edit
@@ -399,6 +399,9 @@ function App() {
           <TabBar />
           <PDFViewer filePath={activeTab.path} className="flex-1" />
         </div>
+        ) : activeTab?.type === "ai-chat" ? (
+          // 主视图区 AI 聊天标签页，交给 Editor 内部根据 tab 类型渲染
+          <Editor />
         ) : splitView && currentFile ? (
           // Show split editor when enabled
           <SplitEditor />

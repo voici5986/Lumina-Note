@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useCallback, useRef } from "react";
 import { useFileStore } from "@/stores/useFileStore";
 import { useUIStore, EditorMode } from "@/stores/useUIStore";
+import { useAIStore } from "@/stores/useAIStore";
+import { useAgentStore } from "@/stores/useAgentStore";
+import { MainAIChatShell } from "@/components/MainAIChatShell";
 import { debounce, getFileName } from "@/lib/utils";
 import { ReadingView } from "./ReadingView";
 import { CodeMirrorEditor, CodeMirrorEditorRef } from "./CodeMirrorEditor";
@@ -26,6 +29,8 @@ const modeConfig: Record<EditorMode, { icon: React.ReactNode; label: string }> =
 
 export function Editor() {
   const {
+    tabs,
+    activeTabIndex,
     currentFile,
     currentContent,
     updateContent,
@@ -50,7 +55,12 @@ export function Editor() {
     editorMode, 
     setEditorMode,
     toggleSplitView,
+    chatMode,
   } = useUIStore();
+
+  // 获取当前会话标题
+  const { sessions: chatSessions, currentSessionId: chatSessionId } = useAIStore();
+  const { sessions: agentSessions, currentSessionId: agentSessionId } = useAgentStore();
 
   // 滚动位置保持（基于行号）
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -68,6 +78,17 @@ export function Editor() {
     const lines = currentContent.split('\n').length;
     return Math.min(Math.max(1, estimatedLine), lines);
   }, [currentContent]);
+
+  const activeTab = activeTabIndex >= 0 ? tabs[activeTabIndex] : null;
+
+  // 当前会话标题（AI 聊天页使用）
+  const currentSessionTitle = useMemo(() => {
+    if (activeTab?.type !== "ai-chat") return null;
+    const sessions = chatMode === "agent" ? agentSessions : chatSessions;
+    const sessionId = chatMode === "agent" ? agentSessionId : chatSessionId;
+    const session = sessions.find(s => s.id === sessionId);
+    return session?.title || "新对话";
+  }, [activeTab?.type, chatMode, agentSessions, chatSessions, agentSessionId, chatSessionId]);
 
   // 滚动到指定行号
   const scrollToLine = useCallback((container: HTMLElement, line: number) => {
@@ -275,45 +296,50 @@ export function Editor() {
 
           <span className="text-muted-foreground/50">/</span>
           <span className="text-foreground font-medium">
-            {currentFile ? getFileName(currentFile) : "未命名"}
+            {activeTab?.type === "ai-chat" 
+              ? currentSessionTitle 
+              : (currentFile ? getFileName(currentFile) : "未命名")}
           </span>
-          {isDirty && (
+          {isDirty && activeTab?.type !== "ai-chat" && (
             <span className="w-2 h-2 rounded-full bg-orange-400" title="未保存更改" />
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* Undo/Redo: live 模式由 CodeMirror 处理 (Ctrl+Z/Y)，不显示按钮 */}
+          {/* 只在非 AI 聊天页显示编辑器工具栏 */}
+          {activeTab?.type !== "ai-chat" && (
+            <>
+              {/* Mode Switcher */}
+              <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
+                {(Object.keys(modeConfig) as EditorMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => handleModeChange(mode)}
+                    className={cn(
+                      "mode-switcher-btn flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium",
+                      editorMode === mode
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                    )}
+                    title={modeConfig[mode].label}
+                  >
+                    {modeConfig[mode].icon}
+                    <span className="hidden sm:inline">{modeConfig[mode].label}</span>
+                  </button>
+                ))}
+              </div>
 
-          {/* Mode Switcher */}
-          <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
-            {(Object.keys(modeConfig) as EditorMode[]).map((mode) => (
+              <span className="text-xs text-muted-foreground">
+                {isSaving ? "保存中..." : isDirty ? "已编辑" : "已保存"}
+              </span>
               <button
-                key={mode}
-                onClick={() => handleModeChange(mode)}
-                className={cn(
-                  "mode-switcher-btn flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium",
-                  editorMode === mode
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                )}
-                title={modeConfig[mode].label}
+                onClick={toggleSplitView}
+                className="p-1 hover:bg-accent rounded transition-colors text-muted-foreground hover:text-foreground"
+                title="分屏编辑"
               >
-                {modeConfig[mode].icon}
-                <span className="hidden sm:inline">{modeConfig[mode].label}</span>
+                <Columns size={16} />
               </button>
-            ))}
-          </div>
-
-          <span className="text-xs text-muted-foreground">
-            {isSaving ? "保存中..." : isDirty ? "已编辑" : "已保存"}
-          </span>
-          <button
-            onClick={toggleSplitView}
-            className="p-1 hover:bg-accent rounded transition-colors text-muted-foreground hover:text-foreground"
-            title="分屏编辑"
-          >
-            <Columns size={16} />
-          </button>
+            </>
+          )}
           <button
             onClick={toggleRightSidebar}
             className="p-1 hover:bg-accent rounded transition-colors text-muted-foreground hover:text-foreground"
@@ -324,57 +350,63 @@ export function Editor() {
         </div>
       </div>
 
-      {/* Editor area - different modes */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-auto relative">
-        {/* Selection Toolbar - Add to Chat */}
-        <SelectionToolbar containerRef={scrollContainerRef} />
-        
-        <div className="max-w-3xl mx-auto px-6 py-4 editor-mode-container">
-            {isVideoNoteFile && (
-              <div className="mb-3 flex items-center justify-between px-3 py-2 bg-blue-500/5 border border-blue-500/30 rounded-md text-xs text-blue-700 dark:text-blue-300">
-                <span>检测到这是一个视频笔记 Markdown，可以在专用的视频笔记视图中查看和编辑。</span>
-                <button
-                  onClick={() => openVideoNoteFromContent(currentContent, getFileName(currentFile || '视频笔记'))}
-                  className="ml-3 px-2 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 text-xs font-medium"
-                >
-                  以视频笔记方式打开
-                </button>
+      {/* Main content area */}
+      {activeTab?.type === "ai-chat" ? (
+        // 主视图区 AI 聊天视图
+        <MainAIChatShell />
+      ) : (
+        // 普通笔记编辑视图
+        <div ref={scrollContainerRef} className="flex-1 overflow-auto relative">
+          {/* Selection Toolbar - Add to Chat */}
+          <SelectionToolbar containerRef={scrollContainerRef} />
+          
+          <div className="max-w-3xl mx-auto px-6 py-4 editor-mode-container">
+              {isVideoNoteFile && (
+                <div className="mb-3 flex items-center justify-between px-3 py-2 bg-blue-500/5 border border-blue-500/30 rounded-md text-xs text-blue-700 dark:text-blue-300">
+                  <span>检测到这是一个视频笔记 Markdown，可以在专用的视频笔记视图中查看和编辑。</span>
+                  <button
+                    onClick={() => openVideoNoteFromContent(currentContent, getFileName(currentFile || '视频笔记'))}
+                    className="ml-3 px-2 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 text-xs font-medium"
+                  >
+                    以视频笔记方式打开
+                  </button>
+                </div>
+              )}
+            {editorMode === "reading" && (
+              <div key="reading" className="editor-mode-content">
+                <ReadingView content={currentContent} />
               </div>
             )}
-          {editorMode === "reading" && (
-            <div key="reading" className="editor-mode-content">
-              <ReadingView content={currentContent} />
-            </div>
-          )}
-          
-          {editorMode === "live" && (
-            <div key="live" className="editor-mode-content h-full">
-              <CodeMirrorEditor 
-                ref={codeMirrorRef}
-                content={currentContent} 
-                onChange={(newContent) => {
-                  updateContent(newContent);
-                  debouncedSave();
-                }}
-              />
-            </div>
-          )}
-          
-          {editorMode === "source" && (
-            <div key="source" className="editor-mode-content h-full">
-              <CodeMirrorEditor 
-                ref={codeMirrorRef}
-                content={currentContent} 
-                onChange={(newContent) => {
-                  updateContent(newContent);
-                  debouncedSave();
-                }}
-                livePreview={false}
-              />
-            </div>
-          )}
+            
+            {editorMode === "live" && (
+              <div key="live" className="editor-mode-content h-full">
+                <CodeMirrorEditor 
+                  ref={codeMirrorRef}
+                  content={currentContent} 
+                  onChange={(newContent) => {
+                    updateContent(newContent);
+                    debouncedSave();
+                  }}
+                />
+              </div>
+            )}
+            
+            {editorMode === "source" && (
+              <div key="source" className="editor-mode-content h-full">
+                <CodeMirrorEditor 
+                  ref={codeMirrorRef}
+                  content={currentContent} 
+                  onChange={(newContent) => {
+                    updateContent(newContent);
+                    debouncedSave();
+                  }}
+                  livePreview={false}
+                />
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

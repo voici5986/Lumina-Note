@@ -12,7 +12,14 @@ interface HistoryEntry {
 }
 
 // 标签页类型
-export type TabType = "file" | "graph" | "isolated-graph" | "video-note" | "database" | "pdf";
+export type TabType =
+  | "file"
+  | "graph"
+  | "isolated-graph"
+  | "video-note"
+  | "database"
+  | "pdf"
+  | "ai-chat";
 
 // 孤立视图节点信息
 export interface IsolatedNodeInfo {
@@ -94,6 +101,7 @@ interface FileState {
   openVideoNoteFromContent: (content: string, title?: string) => void;
   openDatabaseTab: (dbId: string, dbName: string) => void;
   openPDFTab: (pdfPath: string) => void;
+  openAIMainTab: () => void;
   
   // Undo/Redo actions
   undo: () => void;
@@ -510,6 +518,55 @@ export const useFileStore = create<FileState>()(
       currentFile: null,
       currentContent: "",
       isDirty: false,
+    });
+  },
+
+  // 打开主视图区 AI 聊天标签页
+  openAIMainTab: () => {
+    const { tabs, activeTabIndex, currentContent, isDirty, undoStack, redoStack } = get();
+
+    // 如果已经有 ai-chat 标签页，直接切换
+    const existingIndex = tabs.findIndex((tab) => tab.type === "ai-chat");
+    if (existingIndex !== -1) {
+      get().switchTab(existingIndex);
+      return;
+    }
+
+    // 保存当前标签页状态
+    let updatedTabs = [...tabs];
+    if (activeTabIndex >= 0 && tabs[activeTabIndex]) {
+      updatedTabs[activeTabIndex] = {
+        ...updatedTabs[activeTabIndex],
+        content: currentContent,
+        isDirty,
+        undoStack,
+        redoStack,
+      };
+    }
+
+    // 创建 AI 聊天标签页
+    const aiTab: Tab = {
+      id: "__ai_chat__",
+      type: "ai-chat",
+      path: "",
+      name: "AI 聊天",
+      content: "",
+      isDirty: false,
+      undoStack: [],
+      redoStack: [],
+    };
+
+    updatedTabs.push(aiTab);
+
+    set({
+      tabs: updatedTabs,
+      activeTabIndex: updatedTabs.length - 1,
+      currentFile: null,
+      currentContent: "",
+      isDirty: false,
+      undoStack: [],
+      redoStack: [],
+      lastSavedContent: "",
     });
   },
 
