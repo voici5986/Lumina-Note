@@ -104,15 +104,21 @@ ${result.error || result.content}
  * 获取无工具使用的提示
  */
 export function getNoToolUsedPrompt(): string {
-  return `你的响应没有包含有效的工具调用。请使用 XML 格式调用工具来完成任务。
+  return `你的响应没有包含有效的工具调用。
 
-工具调用格式示例:
+**重要**：所有响应都必须使用工具格式。
+
+1. **如果需要操作笔记**，使用对应工具：
 <read_note>
 <paths>["笔记路径.md"]</paths>
 </read_note>
 
-如果任务已完成，请使用 attempt_completion 工具:
+2. **如果是回答问题/对话**，直接使用 attempt_completion，把完整回复放在 result 里：
 <attempt_completion>
-<result>任务完成的描述</result>
-</attempt_completion>`;
+<result>这里是你要回复给用户的完整内容...
+
+可以包含多段落、列表、代码等...</result>
+</attempt_completion>
+
+请立即使用上述格式重新响应。`;
 }

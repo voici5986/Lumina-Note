@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useUIStore } from "@/stores/useUIStore";
 import { useAIStore } from "@/stores/useAIStore";
 import { useAgentStore } from "@/stores/useAgentStore";
+import { getAgentLoop } from "@/agent/core/AgentLoop";
 import { useRAGStore } from "@/stores/useRAGStore";
 import { useFileStore } from "@/stores/useFileStore";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
@@ -1032,13 +1033,17 @@ export function MainAIChatShell() {
         </button>
 
         {/* 调试面板 */}
-        {showDebug && (
+        {showDebug && (() => {
+          // 获取完整消息（包含 system prompt）
+          const fullMessages = getAgentLoop().getState().messages;
+          
+          return (
           <div className="fixed inset-4 z-50 bg-background/95 backdrop-blur border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/50">
               <h2 className="font-bold text-lg">🐛 Agent 调试面板</h2>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">
-                  模式: {chatMode} | 状态: {agentStatus} | 消息数: {agentMessages.length}
+                  模式: {chatMode} | 状态: {agentStatus} | 完整消息数: {fullMessages.length} | 显示消息数: {agentMessages.length}
                 </span>
                 <button
                   onClick={() => setShowDebug(false)}
@@ -1049,7 +1054,7 @@ export function MainAIChatShell() {
               </div>
             </div>
             <div className="flex-1 overflow-auto p-4 font-mono text-xs space-y-4">
-              {agentMessages.map((msg, idx) => (
+              {fullMessages.map((msg, idx) => (
                 <div
                   key={idx}
                   className={`p-3 rounded-lg border ${
@@ -1075,19 +1080,20 @@ export function MainAIChatShell() {
                       {msg.content.length} chars
                     </span>
                   </div>
-                  <pre className="whitespace-pre-wrap break-all text-foreground/90 max-h-[400px] overflow-auto">
+                  <pre className="whitespace-pre-wrap break-all text-foreground/90 max-h-[600px] overflow-auto">
                     {msg.content}
                   </pre>
                 </div>
               ))}
-              {agentMessages.length === 0 && (
+              {fullMessages.length === 0 && (
                 <div className="text-center text-muted-foreground py-8">
                   暂无消息，发送一条消息开始调试
                 </div>
               )}
             </div>
           </div>
-        )}
+          );
+        })()}
       </div>
 
     </div>

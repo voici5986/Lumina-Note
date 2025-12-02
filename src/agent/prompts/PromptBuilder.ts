@@ -21,21 +21,23 @@ export class PromptBuilder {
 
   /**
    * 构建完整的 System Prompt
+   * 
+   * 结构优化：上下文/引用放前面，重要指示放后面（大模型更容易记住后面的内容）
    */
   build(context: TaskContext): string {
     const mode = context.mode || this.mode;
     
     return `${this.getRoleDefinition(mode)}
 
-${this.getToolUseSection()}
+${this.getContextSection(context)}
 
 ${this.getToolsCatalog()}
 
 ${this.getCapabilitiesSection()}
 
-${this.getRulesSection(context)}
+${this.getToolUseSection()}
 
-${this.getContextSection(context)}
+${this.getRulesSection(context)}
 
 ${this.getObjectiveSection()}`;
   }
@@ -213,7 +215,18 @@ ${context.ragResults.map((r, i) => `${i + 1}. ${r.filePath} (${(r.score * 100).t
 
 OBJECTIVE
 
-根据用户的请求，使用可用的工具来完成任务。完成后使用 attempt_completion 工具报告结果。
+根据用户的请求完成任务。
+
+**关键规则：所有响应必须以 attempt_completion 结束**
+
+1. **工具操作任务**（读取/编辑/创建笔记等）：
+   - 先使用对应工具完成操作
+   - 最后用 attempt_completion 报告操作结果
+
+2. **问答/对话任务**（回答问题、解释概念、分析内容等）：
+   - 直接使用 attempt_completion
+   - 把完整回复内容放在 <result> 标签内
+   - 不要在 attempt_completion 外面写任何回复内容
 
 现在，请等待用户的任务指令。`;
   }

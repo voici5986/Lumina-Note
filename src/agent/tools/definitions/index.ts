@@ -328,26 +328,44 @@ export const attemptCompletionDefinition: ToolDefinition = {
       name: "result",
       type: "string",
       required: true,
-      description: "任务完成的结果描述",
+      description: "任务完成的结果描述或完整回复",
     },
   ],
   definition: `## attempt_completion
-描述: 当任务完成时调用此工具。用于向用户报告任务结果。
+描述: 当任务完成时调用此工具。用于向用户报告最终结果。
 
 参数:
-- result: (必需) 任务完成的结果描述，简洁说明做了什么
+- result: (必需) 最终回复内容
 
-用法:
-<attempt_completion>
-<result>已完成以下操作：
-1. 读取了 daily/2024-01-15.md
-2. 修改了待办事项状态
-3. 添加了新的笔记内容</result>
-</attempt_completion>
+**调用前，先判断本次任务类型：**
+
+1. **工具操作任务**（本次调用了 read_note/edit_note/create_note 等工具）
+   → result 放操作摘要
+   
+   示例:
+   <attempt_completion>
+   <result>已完成以下操作：
+   1. 读取了 daily/2024-01-15.md
+   2. 修改了待办事项状态</result>
+   </attempt_completion>
+
+2. **问答/对话任务**（本次没有调用任何工具，只是回答用户问题）
+   → result 放完整回复内容，所有要展示给用户的内容都必须在 result 标签内
+   
+   示例:
+   <attempt_completion>
+   <result>关于你的问题，我的回答是：
+   
+   这是完整的回复内容...
+   
+   ## 详细说明
+   更多内容...</result>
+   </attempt_completion>
 
 重要:
 - 只有在任务真正完成后才使用此工具
-- result 应该是用户友好的总结
+- **所有给用户看的内容必须放在 result 标签内**
+- 不要在 attempt_completion 标签外面写回复内容
 - 调用此工具后，Agent 循环将结束`,
 };
 

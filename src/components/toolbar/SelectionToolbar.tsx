@@ -150,11 +150,14 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
         {
           role: "system",
           content:
-            "你是一个翻译助手。请根据原文主要语言，在中英文之间互译：如果原文主要是中文则翻译成自然流畅的英文；如果主要是英文则翻译成自然流畅的中文。只返回译文本身，使用合适的分行，不要解释。",
+            "你是一个翻译助手。",
         },
         {
           role: "user",
-          content: text,
+          content: `原文：
+${text}
+
+要求：根据原文主要语言，在中英文之间互译。如果原文主要是中文则翻译成自然流畅的英文；如果主要是英文则翻译成自然流畅的中文。只返回译文本身，使用合适的分行，不要解释。`,
         },
       ];
 
@@ -203,11 +206,14 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
         {
           role: "system",
           content:
-            "你是一个写作润色助手。请在保持原意不变的前提下，优化用户的文本：提高表达清晰度和流畅度，修正语法和用词问题，语言保持与原文一致（中文就用中文，英文就用英文）。只返回润色后的文本，不要解释。",
+            "你是一个写作润色助手。",
         },
         {
           role: "user",
-          content: text,
+          content: `原文：
+${text}
+
+要求：在保持原意不变的前提下，优化文本。提高表达清晰度和流畅度，修正语法和用词问题，语言保持与原文一致（中文就用中文，英文就用英文）。只返回润色后的文本，不要解释。`,
         },
       ];
 
@@ -246,11 +252,14 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
         {
           role: "system",
           content:
-            "你是一个任务提取助手。请从用户提供的文本中提取清晰、可执行的待办事项，输出 Markdown 任务列表，每一项使用 `- [ ]` 开头；如果没有合理的待办事项，请输出一条 `- [ ] 暂无明确待办`。只返回任务列表，不要解释。",
+            "你是一个任务提取助手。",
         },
         {
           role: "user",
-          content: text,
+          content: `文本内容：
+${text}
+
+要求：从上述文本中提取清晰、可执行的待办事项，输出 Markdown 任务列表，每一项使用 \`- [ ]\` 开头；如果没有合理的待办事项，请输出一条 \`- [ ] 暂无明确待办\`。只返回任务列表，不要解释。`,
         },
       ];
 
@@ -299,11 +308,14 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
         {
           role: "system",
           content:
-            "你是一个笔记助手，请对用户选中的这段文本生成简洁的要点式总结，使用中文，输出为 Markdown 列表，不要额外解释。",
+            "你是一个笔记助手。",
         },
         {
           role: "user",
-          content: `请对以下文本进行总结，输出 Markdown 列表：\n\n${text}`,
+          content: `文本内容：
+${text}
+
+要求：对上述文本生成简洁的要点式总结，使用中文，输出为 Markdown 列表，不要额外解释。`,
         },
       ];
 
