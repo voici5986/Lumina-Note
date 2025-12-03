@@ -26,7 +26,7 @@ export class PromptBuilder {
    */
   build(context: TaskContext): string {
     const mode = context.mode || this.mode;
-    
+
     return `${this.getRoleDefinition(mode)}
 
 ${this.getContextSection(context)}
@@ -72,7 +72,14 @@ ${mode.roleDefinition}
 
 TOOL USE
 
-你可以使用一组工具来完成用户的任务。每条消息中可以包含一个或多个工具调用。
+你可以使用一组工具来完成用户的任务。**在任何涉及笔记内容、结构或文件操作的任务中，优先选择使用工具来完成，而不是仅在对话中给出结果。**
+
+总体原则：
+- 只要任务可能影响笔记文件、目录结构、数据库或需要读取现有内容，就应该调用相应工具。
+- 即使仅凭思考也能回答，如果使用工具能让结果更完整、更可复用（例如写入笔记文件），也应偏向使用工具。
+- 只有在任务**明确与笔记系统无关**，且不需要保存或读取任何文件时，才可以只用 attempt_completion 直接回答。
+
+每条消息中可以包含一个或多个工具调用。
 你需要逐步使用工具，每次工具调用都基于上一次的结果。
 
 # 工具调用格式
@@ -116,7 +123,21 @@ TOOL USE
 ✅ **唯一合法的工具名**（只能使用这些）：
 read_note, edit_note, create_note, delete_note, list_notes, move_note, search_notes, grep_search, semantic_search, query_database, add_database_row, get_backlinks, ask_user, attempt_completion
 
-使用任何不在上述列表中的工具名都会导致失败！`;
+使用任何不在上述列表中的工具名都会导致失败！
+
+# 工具使用优先级与决策
+
+当你判断是否需要工具时，按以下优先级思考：
+
+1. **需要读/写/搜索笔记或数据库 → 必须使用工具**
+  - 例如：整理某个文件、批量替换内容、根据目录结构给建议、查询关联笔记等。
+2. **创作类任务（写文章、计划、总结等）且与笔记相关 → 优先写入文件**
+  - 优先通过 create_note / edit_note 将结果保存为笔记，再用 attempt_completion 向用户报告。
+3. **仅为临时对话、且用户明确表示“不用保存/不改文件” → 可只用 attempt_completion**
+4. **不确定是否需要工具时 → 先用 read_note / list_notes / search_notes 探查**
+  - 宁可多一步只读类工具调用，也不要完全不使用工具。
+
+记住：你的目标是借助工具**真正完成任务并落地到笔记系统中**，而不是只在对话中给出抽象建议。`;
   }
 
   private getToolsCatalog(): string {
