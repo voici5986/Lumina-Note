@@ -39,7 +39,7 @@ export const readNoteDefinition: ToolDefinition = {
 
 export const editNoteDefinition: ToolDefinition = {
   name: "edit_note",
-  description: "对笔记进行精确的查找替换修改",
+  description: "对笔记进行精确的查找替换修改，可选重命名文件",
   parameters: [
     {
       name: "path",
@@ -53,15 +53,22 @@ export const editNoteDefinition: ToolDefinition = {
       required: true,
       description: "编辑操作数组，每个操作包含 search 和 replace",
     },
+    {
+      name: "new_name",
+      type: "string",
+      required: false,
+      description: "新文件名（可选），不包含路径",
+    },
   ],
   definition: `## edit_note
-描述: 对笔记进行精确的查找替换修改。使用 SEARCH/REPLACE 方式。
+描述: 对笔记进行精确的查找替换修改。使用 SEARCH/REPLACE 方式。可选择同时重命名文件。
 
 参数:
 - path: (必需) 要编辑的笔记路径，相对于笔记库根目录
 - edits: (必需) 编辑操作数组，JSON 格式，每个操作包含:
   - search: 要查找的原始内容 (必须与文件内容完全匹配)
   - replace: 替换后的新内容
+- new_name: (可选) 新文件名，不包含路径。**如果笔记内容发生本质性改变（如主题、标题、核心内容变化），应该提供新文件名以保持文件名与内容的一致性**
 
 用法:
 <edit_note>
@@ -74,11 +81,25 @@ export const editNoteDefinition: ToolDefinition = {
 ]</edits>
 </edit_note>
 
+内容本质改变时同时重命名:
+<edit_note>
+<path>notes/Python基础.md</path>
+<edits>[
+  {
+    "search": "# Python基础\\n\\n这是关于Python的基础教程",
+    "replace": "# Python高级编程\\n\\n这是关于Python高级特性的教程"
+  }
+]</edits>
+<new_name>Python高级编程.md</new_name>
+</edit_note>
+
 重要:
 - search 内容必须与文件中的内容完全一致（包括换行和空格）
 - 可以进行多处修改，按顺序应用
 - 修改前请先用 read_note 确认当前内容
-- 如果 search 内容找不到，修改将失败`,
+- 如果 search 内容找不到，修改将失败
+- new_name 不能包含路径分隔符，仅修改文件名
+- **智能重命名**: 当修改一级标题(# 标题)或笔记主题发生本质性改变时，应提供 new_name 参数，使文件名与内容保持一致。例如标题从"项目规划"改为"项目总结"时，应将文件重命名为"项目总结.md"`,
 };
 
 // ============ create_note ============

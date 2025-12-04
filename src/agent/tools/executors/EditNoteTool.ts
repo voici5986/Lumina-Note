@@ -3,9 +3,10 @@
  */
 
 import { ToolExecutor, ToolResult, ToolContext } from "../../types";
-import { readFile } from "@/lib/tauri";
-import { join, resolve } from "@/lib/path";
+import { readFile, rename, exists } from "@/lib/tauri";
+import { join, resolve, dirname } from "@/lib/path";
 import { useAIStore } from "@/stores/useAIStore";
+import { useFileStore } from "@/stores/useFileStore";
 
 interface EditOperation {
   search: string;
@@ -21,6 +22,18 @@ export const EditNoteTool: ToolExecutor = {
     context: ToolContext
   ): Promise<ToolResult> {
     const path = params.path as string;
+    const newName = params.new_name as string | undefined;
+
+    // 验证 new_name 参数
+    if (newName) {
+      if (newName.includes("/") || newName.includes("\\")) {
+        return {
+          success: false,
+          content: "",
+          error: "参数错误: new_name 不能包含路径分隔符。new_name 只能是文件名，不能包含路径。",
+        };
+      }
+    }
 
     // 兼容多种参数格式
     let edits: EditOperation[] = [];
@@ -168,6 +181,38 @@ export const EditNoteTool: ToolExecutor = {
 
           if (failedEdits.length > 0) {
             summary.push(`失败: ${failedEdits.length} 处`, ...failedEdits);
+          }
+
+          // 如果提供了 new_name，执行重命名
+          if (newName) {
+            try {
+              const dir = dirname(fullPath);
+              const newFullPath = join(dir, newName);
+
+              // 检查目标文件是否已存在
+              if (await exists(newFullPath)) {
+                summary.push(`\n警告: 重命名失败 - 目标文件名已存在: ${newName}`);
+              } else {
+                // 执行重命名
+                await rename(fullPath, newFullPath);
+                
+                // 计算新路径
+                const dir = dirname(path);
+                const newPath = dir ? `${dir}/${newName}` : newName;
+                
+                summary.push(`\n已重命名: ${path} -> ${newName}`);
+
+                // 更新标签页中的路径和名称
+                useFileStore.getState().updateTabPath(path, newPath);
+                
+                // 延迟刷新文件树
+                setTimeout(() => {
+                  useFileStore.getState().refreshFileTree();
+                }, 100);
+              }
+            } catch (error) {
+              summary.push(`\n警告: 重命名失败 - ${error instanceof Error ? error.message : "未知错误"}`);
+            }
           }
 
           return {

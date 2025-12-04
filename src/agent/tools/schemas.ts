@@ -46,7 +46,7 @@ export const TOOL_SCHEMAS: FunctionSchema[] = [
     type: "function",
     function: {
       name: "edit_note",
-      description: "对笔记进行精确的查找替换修改",
+      description: "对笔记进行精确的查找替换修改，可选重命名文件",
       parameters: {
         type: "object",
         properties: {
@@ -58,6 +58,10 @@ export const TOOL_SCHEMAS: FunctionSchema[] = [
             type: "array",
             description: "编辑操作数组，每个操作包含 search 和 replace 字段",
             items: { type: "object" },
+          },
+          new_name: {
+            type: "string",
+            description: "新文件名（可选），不包含路径，仅文件名",
           },
         },
         required: ["path", "edits"],

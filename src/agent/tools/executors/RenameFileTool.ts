@@ -42,8 +42,8 @@ export const RenameFileTool: ToolExecutor = {
 
     try {
       const fullPath = resolve(context.workspacePath, path);
-      const dir = dirname(fullPath);
-      const newFullPath = join(dir, newName);
+      const fullDir = dirname(fullPath);
+      const newFullPath = join(fullDir, newName);
 
       // 检查源文件是否存在
       if (!(await exists(fullPath))) {
@@ -65,6 +65,13 @@ export const RenameFileTool: ToolExecutor = {
 
       // 执行重命名
       await rename(fullPath, newFullPath);
+      
+      // 计算新路径（相对路径）
+      const relativeDir = dirname(path);
+      const newPath = relativeDir ? `${relativeDir}/${newName}` : newName;
+      
+      // 更新标签页中的路径和名称
+      useFileStore.getState().updateTabPath(path, newPath);
 
       // 延迟刷新文件树，避免在 Agent 运行时触发 UI 重渲染
       setTimeout(() => {

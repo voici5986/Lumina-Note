@@ -90,6 +90,7 @@ interface FileState {
   closeOtherTabs: (index: number) => Promise<void>;
   closeAllTabs: () => Promise<void>;
   reorderTabs: (fromIndex: number, toIndex: number) => void;
+  updateTabPath: (oldPath: string, newPath: string) => void;
   
   // Create new file
   createNewFile: (fileName?: string) => Promise<void>;
@@ -449,6 +450,33 @@ export const useFileStore = create<FileState>()(
       undoStack: [],
       redoStack: [],
     });
+  },
+
+  // 更新标签页路径（用于文件重命名）
+  updateTabPath: (oldPath: string, newPath: string) => {
+    const { tabs, currentFile } = get();
+    const newFileName = newPath.split(/[/\\/]/).pop()?.replace(/\.md$/, "") || "未命名";
+    
+    // 查找并更新所有匹配的标签页
+    const updatedTabs = tabs.map(tab => {
+      if (tab.type === "file" && tab.path === oldPath) {
+        return {
+          ...tab,
+          path: newPath,
+          name: newFileName,
+          id: newPath, // 更新 id 以匹配新路径
+        };
+      }
+      return tab;
+    });
+    
+    // 如果当前打开的是被重命名的文件，更新 currentFile
+    const newState: Partial<FileState> = { tabs: updatedTabs };
+    if (currentFile === oldPath) {
+      newState.currentFile = newPath;
+    }
+    
+    set(newState);
   },
 
   // 重新排序标签页

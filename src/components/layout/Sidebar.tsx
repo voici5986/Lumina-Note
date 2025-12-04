@@ -221,9 +221,10 @@ export function Sidebar() {
     try {
       await renameFile(renamingPath, newPath);
       refreshFileTree();
-      if (currentFile === renamingPath) {
-        openFile(newPath);
-      }
+      
+      // 更新标签页中的路径和名称（如果文件在标签页中打开）
+      const { updateTabPath } = useFileStore.getState();
+      updateTabPath(renamingPath, newPath);
     } catch (error) {
       console.error("Rename failed:", error);
       alert("重命名失败");
