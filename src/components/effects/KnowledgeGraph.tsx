@@ -35,18 +35,32 @@ interface GraphEdge {
   type: 'link' | 'hierarchy'; // link = 双链, hierarchy = 父子关系
 }
 
-// 预定义的文件夹颜色调色板（柔和配色）
+// 预定义的文件夹颜色调色板（饱和度较高，用于文件夹刺球）
 const FOLDER_COLORS = [
-  'hsl(210, 50%, 60%)',  // 灰蓝
-  'hsl(350, 45%, 62%)',  // 玫瑰粉
-  'hsl(160, 40%, 50%)',  // 薄荷绿
-  'hsl(270, 40%, 60%)',  // 淡紫
-  'hsl(30, 55%, 58%)',   // 暖橙
-  'hsl(185, 40%, 52%)',  // 青蓝
-  'hsl(50, 50%, 55%)',   // 暖黄
-  'hsl(320, 40%, 58%)',  // 淡洋红
-  'hsl(95, 35%, 52%)',   // 橄榄绿
-  'hsl(225, 45%, 62%)',  // 靛蓝
+  'hsl(210, 65%, 50%)',  // 灰蓝
+  'hsl(350, 60%, 55%)',  // 玫瑰粉
+  'hsl(160, 55%, 42%)',  // 薄荷绿
+  'hsl(270, 55%, 55%)',  // 淡紫
+  'hsl(30, 70%, 50%)',   // 暖橙
+  'hsl(185, 55%, 45%)',  // 青蓝
+  'hsl(50, 65%, 48%)',   // 暖黄
+  'hsl(320, 55%, 52%)',  // 淡洋红
+  'hsl(95, 50%, 45%)',   // 橄榄绿
+  'hsl(225, 60%, 55%)',  // 靛蓝
+];
+
+// 文件节点颜色（基于文件夹颜色，但更柔和/更浅）
+const FILE_COLORS = [
+  'hsl(210, 40%, 70%)',  // 灰蓝（浅）
+  'hsl(350, 35%, 72%)',  // 玫瑰粉（浅）
+  'hsl(160, 30%, 62%)',  // 薄荷绿（浅）
+  'hsl(270, 30%, 70%)',  // 淡紫（浅）
+  'hsl(30, 45%, 68%)',   // 暖橙（浅）
+  'hsl(185, 30%, 62%)',  // 青蓝（浅）
+  'hsl(50, 40%, 65%)',   // 暖黄（浅）
+  'hsl(320, 30%, 68%)',  // 淡洋红（浅）
+  'hsl(95, 25%, 62%)',   // 橄榄绿（浅）
+  'hsl(225, 35%, 72%)',  // 靛蓝（浅）
 ];
 
 // Extract [[wikilinks]] from content
@@ -276,16 +290,18 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
     const nodes: GraphNode[] = [];
     const edges: GraphEdge[] = [];
     const nodeMap = new Map<string, GraphNode>();
-    const folderColorMap = new Map<string, string>(); // 文件夹路径 -> 颜色
+    const folderColorMap = new Map<string, { folderColor: string; fileColor: string }>(); // 文件夹路径 -> 颜色对
     let colorIndex = 0;
 
     // 递归处理文件树，同时创建文件夹节点和父子关系
     const processEntries = (entries: typeof fileTree, parentPath: string | null, depth: number) => {
       for (const entry of entries) {
         if (entry.is_dir && entry.children) {
-          // 为文件夹分配颜色
-          const folderColor = FOLDER_COLORS[colorIndex % FOLDER_COLORS.length];
-          folderColorMap.set(entry.path, folderColor);
+          // 为文件夹分配颜色（文件夹用饱和色，文件用柔和色）
+          const idx = colorIndex % FOLDER_COLORS.length;
+          const folderColor = FOLDER_COLORS[idx];
+          const fileColor = FILE_COLORS[idx];
+          folderColorMap.set(entry.path, { folderColor, fileColor });
           colorIndex++;
 
           // 创建文件夹节点
@@ -301,7 +317,7 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
             connections: 0,
             isFolder: true,
             parentId: parentPath ? `folder:${parentPath}` : undefined,
-            color: folderColor,
+            color: folderColor, // 文件夹使用饱和色
             depth,
           };
           nodes.push(folderNode);
@@ -325,10 +341,10 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
           // 获取文件所在文件夹的颜色（子层覆盖父层）
           let nodeColor = 'hsl(var(--muted-foreground))';
           
-          // 查找最近的父文件夹颜色
-          for (const [folderPath, color] of folderColorMap.entries()) {
+          // 查找最近的父文件夹颜色，文件使用柔和色
+          for (const [folderPath, colors] of folderColorMap.entries()) {
             if (entry.path.startsWith(folderPath)) {
-              nodeColor = color;
+              nodeColor = colors.fileColor; // 文件使用柔和色
             }
           }
 
