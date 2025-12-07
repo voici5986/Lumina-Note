@@ -25,8 +25,10 @@ import { ToolRegistry } from "../tools/ToolRegistry";
 import { callLLM } from "../providers";
 import { useRAGStore } from "@/stores/useRAGStore";
 import { getToolSchemas } from "../tools/schemas";
+import { cacheToolOutput } from "./ToolOutputCache";
 
 const MAX_CONSECUTIVE_ERRORS = 3;
+const LONG_TOOL_RESULT_THRESHOLD = 4000;
 
 export class AgentLoop {
   private stateManager: StateManager;
@@ -379,6 +381,45 @@ export class AgentLoop {
         break;
       }
 
+      // 协议动作：attempt_completion 直接处理，不再走工具执行器
+      if (toolCall.name === "attempt_completion") {
+        const completionResult = typeof toolCall.params.result === "string" ? toolCall.params.result : "";
+        if (completionResult) {
+          this.stateManager.addMessage({
+            role: "assistant",
+            content: `<attempt_completion_result>\n${completionResult}\n</attempt_completion_result>`,
+          });
+        }
+        this.stateManager.setStatus("completed");
+        this.stateManager.setPendingTool(null);
+        return;
+      }
+
+      // 协议动作：ask_user 直接写入问题，不再走工具执行器，并进入 waiting_user
+      if (toolCall.name === "ask_user") {
+        const question = typeof toolCall.params.question === "string" ? toolCall.params.question : "";
+        const options = Array.isArray(toolCall.params.options) ? toolCall.params.options : null;
+        const optionsText = options && options.length > 0 ? `\n\n选项：\n${options.map((o, i) => `${i + 1}. ${o}`).join("\n")}` : "";
+        const content = `**Agent 提问**\n${question}${optionsText}`.trim();
+
+        const askResult: ToolResult = {
+          success: true,
+          content: content || "ask_user 未提供 question",
+        };
+
+        const askMessage = formatToolResult(toolCall, askResult);
+        this.stateManager.addMessage({
+          role: "user",
+          content: askMessage,
+        });
+
+        this.stateManager.setStatus("running");
+        this.stateManager.setPendingTool(null);
+        this.stateManager.resetErrors();
+        this.stateManager.setStatus("waiting_user");
+        return;
+      }
+
       // 检查是否需要用户审批
       if (this.requiresApproval(toolCall)) {
         // 先创建等待 Promise（设置 resolver），再更新状态
@@ -402,18 +443,22 @@ export class AgentLoop {
       }
 
       // 执行工具
-      const result = await this.executeTool(toolCall, context);
+      let result = await this.executeTool(toolCall, context);
 
-      // 特殊处理 attempt_completion：将 result 内容作为 assistant 最终回复
-      // 这样无论是 XML 模式还是 FC 模式，最终回答都能正确显示
-      if (toolCall.name === "attempt_completion" && result.success) {
-        const completionResult = toolCall.params.result as string;
-        if (completionResult) {
-          this.stateManager.addMessage({
-            role: "assistant",
-            content: `<attempt_completion_result>\n${completionResult}\n</attempt_completion_result>`,
-          });
-        }
+      // 长输出：摘要 + 缓存，避免占用上下文
+      if (
+        toolCall.name !== "attempt_completion" &&
+        result.success &&
+        typeof result.content === "string" &&
+        result.content.length > LONG_TOOL_RESULT_THRESHOLD
+      ) {
+        const cacheId = cacheToolOutput(toolCall.name, result.content);
+        const summary = await this.summarizeToolOutput(result.content, toolCall.name);
+        const summaryText = summary?.trim() || result.content.slice(0, LONG_TOOL_RESULT_THRESHOLD);
+        result = {
+          ...result,
+          content: `${summaryText}\n\n[长输出已缓存 ID: ${cacheId}，此段为摘要。需要全文或继续推理前，必须调用 read_cached_output（或说“查看详情 ${cacheId}”）获取原文，不要重复调用 read_note/其他读取工具。]`,
+        };
       }
 
       // 将结果添加到消息
@@ -450,6 +495,36 @@ export class AgentLoop {
     return new Promise((resolve) => {
       this.approvalResolver = resolve;
     });
+  }
+
+  /**
+   * 使用当前 Chat 模型配置对长结果生成摘要
+   */
+  private async summarizeToolOutput(content: string, toolName: string): Promise<string | null> {
+    const configOverride = this.stateManager.getLLMConfig();
+    const messages: Message[] = [
+      {
+        role: "system",
+        content:
+          "你是摘要助手，请用简洁中文要点总结工具输出，保留关键数据/路径/错误提示；限制在300字以内，避免丢失关键信息。",
+      },
+      {
+        role: "user",
+        content: `请摘要以下 ${toolName} 的输出：\n\n<output>\n${content}\n</output>`,
+      },
+    ];
+
+    try {
+      const response = await callLLM(
+        messages,
+        { signal: this.abortController?.signal },
+        configOverride
+      );
+      return response.content?.trim() || null;
+    } catch (error) {
+      console.error("[Agent] 摘要工具输出失败:", error);
+      return null;
+    }
   }
 
   /**

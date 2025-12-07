@@ -15,7 +15,7 @@ export const MODES: Record<AgentModeSlug, AgentMode> = {
       "list_notes", "search_notes", "grep_search",
       "query_database", "add_database_row",
       "generate_flashcards", "create_flashcard",
-      "get_backlinks", "ask_user", "attempt_completion"
+      "get_backlinks", "read_cached_output"
     ],
   },
 
@@ -28,7 +28,7 @@ export const MODES: Record<AgentModeSlug, AgentMode> = {
       "read_note", "delete_note", "move_file", "rename_file", "create_folder",
       "list_notes", "search_notes", "grep_search",
       "query_database", "add_database_row",
-      "get_backlinks", "ask_user", "attempt_completion"
+      "get_backlinks", "read_cached_output"
     ],
   },
 
@@ -42,7 +42,7 @@ export const MODES: Record<AgentModeSlug, AgentMode> = {
       "search_notes", "grep_search", "semantic_search",
       "query_database",
       "generate_flashcards", "create_flashcard",
-      "get_backlinks", "ask_user", "attempt_completion"
+      "get_backlinks", "read_cached_output"
     ],
   },
 
@@ -54,8 +54,7 @@ export const MODES: Record<AgentModeSlug, AgentMode> = {
     tools: [
       "read_note", "create_note", "create_folder",
       "list_notes", "search_notes", "grep_search",
-      "generate_flashcards", "create_flashcard",
-      "ask_user", "attempt_completion"
+      "generate_flashcards", "create_flashcard", "read_cached_output"
     ],
   },
 };

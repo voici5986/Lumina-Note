@@ -5,7 +5,7 @@
  */
 
 import { TaskContext, AgentMode, ToolDefinition } from "../types";
-import { getAllToolDefinitions } from "../tools/definitions";
+import { getAllToolDefinitions, attemptCompletionDefinition } from "../tools/definitions";
 import { MODES } from "../modes";
 
 export class PromptBuilder {
@@ -14,9 +14,7 @@ export class PromptBuilder {
 
   constructor(mode?: AgentMode) {
     this.mode = mode || MODES.editor;
-    this.tools = getAllToolDefinitions().filter(
-      (tool) => this.mode.tools.includes(tool.name)
-    );
+    this.tools = this.buildToolList(this.mode);
   }
 
   /**
@@ -47,9 +45,14 @@ ${this.getObjectiveSection(mode)}`;
    */
   setMode(mode: AgentMode): void {
     this.mode = mode;
-    this.tools = getAllToolDefinitions().filter(
-      (tool) => mode.tools.includes(tool.name)
-    );
+    this.tools = this.buildToolList(mode);
+  }
+
+  private buildToolList(mode: AgentMode): ToolDefinition[] {
+    const base = getAllToolDefinitions().filter((tool) => mode.tools.includes(tool.name));
+    // 协议标记：始终附加 attempt_completion 规范（无副作用，仅用于结束汇报）
+    const exists = base.some((t) => t.name === "attempt_completion");
+    return exists ? base : [...base, attemptCompletionDefinition];
   }
 
   // ============ Prompt 各部分 ============
@@ -128,13 +131,13 @@ TOOL USE
 ✅ **唯一合法的业务工具名**（只能使用这些对笔记/数据库产生实际操作）：
 read_note, edit_note, create_note, delete_note, list_notes, move_note, search_notes, grep_search, semantic_search, query_database, add_database_row, get_backlinks, generate_flashcards, create_flashcard
 
-此外还有两类**协议动作**，只用于对话包装，不视为业务工具调用：
-- ask_user：在信息不足时向用户询问或确认，格式化你的提问
-- attempt_completion：在任务结束时包裹最终结果，向用户报告任务完成情况
+此外还有两类**协议动作**（非业务工具，无副作用），只用于对话包装：
+- ask_user：在信息不足时向用户询问或确认，必须用 <ask_user>…</ask_user> 格式提问；提问后应停止执行并等待用户回复，不要自行编造答案继续。
+- attempt_completion：在任务真正完成时，必须用 <attempt_completion><result>…完整总结…</result></attempt_completion> 包裹最终结果；不要在标签外输出内容，未完成时不要提前使用。
 
 注意：
 - 使用任何不在上述业务工具列表中的名字来尝试操作笔记/数据库，都会导致失败。
-- 不要把 ask_user 或 attempt_completion 当作“已经使用工具修改了内容”的依据，它们**不会对笔记或数据库做任何实际变更**。
+- 不要把 ask_user 或 attempt_completion 当作“已经使用工具修改了内容”的依据，它们不会对笔记或数据库做任何实际变更；attempt_completion 只是结束汇报的格式要求。
 
 # 工具使用优先级与决策
 

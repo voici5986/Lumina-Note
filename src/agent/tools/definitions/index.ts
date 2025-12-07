@@ -390,6 +390,34 @@ export const attemptCompletionDefinition: ToolDefinition = {
 - 调用此工具后，Agent 循环将结束`,
 };
 
+// ============ read_cached_output ============
+
+export const readCachedOutputDefinition: ToolDefinition = {
+  name: "read_cached_output",
+  description: "读取此前缓存的工具长输出全文",
+  parameters: [
+    {
+      name: "id",
+      type: "string",
+      required: true,
+      description: "cache_id（来自长输出摘要提示）",
+    },
+  ],
+  definition: `## read_cached_output
+描述: 读取此前缓存的工具长输出全文。
+
+参数:
+- id: (必需) cache_id，来自之前的长输出摘要提示
+
+用法:
+<read_cached_output>
+<id>read_note-abc123</id>
+</read_cached_output>
+
+返回格式:
+- 原始完整输出（未做摘要/截断）`,
+};
+
 // ============ delete_note ============
 
 export const deleteNoteDefinition: ToolDefinition = {
@@ -941,13 +969,13 @@ export function getAllToolDefinitions(): ToolDefinition[] {
     renameFileDefinition,
     searchNotesDefinition,
     attemptCompletionDefinition,
+    readCachedOutputDefinition,
     deleteNoteDefinition,
     grepSearchDefinition,
     semanticSearchDefinition,
     queryDatabaseDefinition,
     addDatabaseRowDefinition,
     getBacklinksDefinition,
-    askUserDefinition,
     generateFlashcardsDefinition,
     createFlashcardDefinition,
   ];

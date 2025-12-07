@@ -346,45 +346,6 @@ export const TOOL_SCHEMAS: FunctionSchema[] = [
   {
     type: "function",
     function: {
-      name: "ask_user",
-      description: "向用户提问并等待回复",
-      parameters: {
-        type: "object",
-        properties: {
-          question: {
-            type: "string",
-            description: "要问用户的问题",
-          },
-          options: {
-            type: "array",
-            description: "可选的选项列表",
-            items: { type: "string" },
-          },
-        },
-        required: ["question"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "attempt_completion",
-      description: "标记任务完成并提供结果总结",
-      parameters: {
-        type: "object",
-        properties: {
-          result: {
-            type: "string",
-            description: "任务完成的结果描述",
-          },
-        },
-        required: ["result"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
       name: "generate_flashcards",
       description: "从笔记内容生成闪卡（支持问答、填空、选择题等类型）",
       parameters: {
@@ -481,6 +442,23 @@ export const TOOL_SCHEMAS: FunctionSchema[] = [
           },
         },
         required: ["type"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "read_cached_output",
+      description: "读取此前缓存的工具长输出全文",
+      parameters: {
+        type: "object",
+        properties: {
+          id: {
+            type: "string",
+            description: "cache_id（来自长输出摘要提示）",
+          },
+        },
+        required: ["id"],
       },
     },
   },

@@ -15,15 +15,14 @@ import { CreateFolderTool } from "./executors/CreateFolderTool";
 import { MoveFileTool } from "./executors/MoveFileTool";
 import { RenameFileTool } from "./executors/RenameFileTool";
 import { SearchNotesTool } from "./executors/SearchNotesTool";
-import { AttemptCompletionTool } from "./executors/AttemptCompletionTool";
 import { DeleteNoteTool } from "./executors/DeleteNoteTool";
 import { GrepSearchTool } from "./executors/GrepSearchTool";
 import { SemanticSearchTool } from "./executors/SemanticSearchTool";
 import { QueryDatabaseTool } from "./executors/QueryDatabaseTool";
 import { AddDatabaseRowTool } from "./executors/AddDatabaseRowTool";
 import { GetBacklinksTool } from "./executors/GetBacklinksTool";
-import { AskUserTool } from "./executors/AskUserTool";
 import { GenerateFlashcardsTool, CreateFlashcardTool } from "./executors/GenerateFlashcardsTool";
+import { ReadCachedOutputTool } from "./executors/ReadCachedOutputTool";
 
 export class ToolRegistry {
   private tools: Map<string, ToolExecutor> = new Map();
@@ -57,10 +56,7 @@ export class ToolRegistry {
     
     // 知识图谱工具
     this.register(GetBacklinksTool);
-    
-    // 交互工具
-    this.register(AskUserTool);
-    this.register(AttemptCompletionTool);
+    this.register(ReadCachedOutputTool);
     
     // 闪卡工具
     this.register(GenerateFlashcardsTool);

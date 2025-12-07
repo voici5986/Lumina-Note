@@ -21,6 +21,7 @@ export type AgentStatus =
   | "idle"
   | "running"
   | "waiting_approval"
+  | "waiting_user"
   | "completed"
   | "error"
   | "aborted";

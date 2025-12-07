@@ -92,29 +92,27 @@ function parseToolParams(content: string): Record<string, unknown> {
  */
 export function formatToolResult(toolCall: ToolCall, result: { success: boolean; content: string; error?: string }): string {
   const MAX_CONTENT_LENGTH = 8000; // 单个工具结果最大字符数
-  
+
   let content = result.success ? result.content : (result.error || result.content);
-  
-  // 截断过长的内容
-  if (content.length > MAX_CONTENT_LENGTH) {
-    content = content.slice(0, MAX_CONTENT_LENGTH) + `\n\n... [内容已截断，原长度: ${result.content.length} 字符]`;
-  }
-  
+
   // 生成参数签名（用于前端精确匹配同名工具调用）
   const paramsSignature = toolCall.raw
     .replace(/\s+/g, " ")
     .slice(0, 100)
     .replace(/"/g, "&quot;");  // 转义引号
-  
-  if (result.success) {
-    return `<tool_result name="${toolCall.name}" params="${paramsSignature}">
-${content}
-</tool_result>`;
-  } else {
-    return `<tool_error name="${toolCall.name}" params="${paramsSignature}">
-${content}
-</tool_error>`;
+
+  if (content.length > MAX_CONTENT_LENGTH) {
+    content = content.slice(0, MAX_CONTENT_LENGTH) + `
+
+... [内容已截断，原长度 ${result.content.length} 字符]`;
   }
+
+  const attributes = [`name="${toolCall.name}"`, `params="${paramsSignature}"`];
+  const tagName = result.success ? "tool_result" : "tool_error";
+
+  return `<${tagName} ${attributes.join(" ")}>
+${content}
+</${tagName}>`;
 }
 
 /**

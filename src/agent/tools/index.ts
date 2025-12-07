@@ -28,5 +28,3 @@ export { AddDatabaseRowTool } from "./executors/AddDatabaseRowTool";
 export { GetBacklinksTool } from "./executors/GetBacklinksTool";
 
 // 工具执行器 - 交互
-export { AskUserTool } from "./executors/AskUserTool";
-export { AttemptCompletionTool } from "./executors/AttemptCompletionTool";
