@@ -60,8 +60,8 @@ export function TableView({ dbId }: TableViewProps) {
   const columns = db.columns;
   
   return (
-    <div className="h-full overflow-auto" ref={tableRef}>
-      <table className="w-full border-collapse min-w-max">
+    <div className="h-full overflow-x-auto overflow-y-auto" ref={tableRef}>
+      <table className="border-collapse min-w-max">
         {/* 表头 */}
         <thead className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
           <tr>
