@@ -202,7 +202,7 @@ export interface CreateDatabaseOptions {
   name: string;
   icon?: string;
   description?: string;
-  template?: 'blank' | 'task' | 'project' | 'reading';
+  template?: 'blank' | 'task' | 'project' | 'reading' | 'flashcard';
 }
 
 // 预置模板

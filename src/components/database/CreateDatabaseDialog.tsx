@@ -15,6 +15,7 @@ const templates = [
   { id: 'task', name: '任务管理', icon: ListTodo, description: '跟踪待办事项' },
   { id: 'project', name: '项目管理', icon: FolderKanban, description: '管理项目进度' },
   { id: 'reading', name: '阅读清单', icon: Book, description: '记录阅读进度' },
+  { id: 'flashcard', name: '闪卡管理', icon: Book, description: '统一管理与复习所有闪卡' },
 ] as const;
 
 export function CreateDatabaseDialog({ isOpen, onClose }: CreateDatabaseDialogProps) {
@@ -23,7 +24,9 @@ export function CreateDatabaseDialog({ isOpen, onClose }: CreateDatabaseDialogPr
   const { hideAllWebViews, showAllWebViews } = useBrowserStore();
   
   const [name, setName] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState<CreateDatabaseOptions['template']>('blank');
+  const [selectedTemplate, setSelectedTemplate] = useState<
+    'blank' | 'task' | 'project' | 'reading' | 'flashcard'
+  >('blank');
   const [isCreating, setIsCreating] = useState(false);
   
   // 弹窗打开时隐藏 WebView，关闭时恢复

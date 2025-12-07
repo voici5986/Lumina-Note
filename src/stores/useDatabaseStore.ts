@@ -226,6 +226,7 @@ export const useDatabaseStore = create<DatabaseState>()(
         
         const fileTree = useFileStore.getState().fileTree;
         const rows: DatabaseRow[] = [];
+        const seenPaths = new Set<string>();
         
         // 递归收集所有 .md 文件
         const collectMdFiles = (entries: typeof fileTree): string[] => {
@@ -241,9 +242,42 @@ export const useDatabaseStore = create<DatabaseState>()(
         };
         
         const mdFiles = collectMdFiles(fileTree);
+
+        // 特殊处理：闪卡数据库额外显式扫描 Flashcards 目录，防止某些环境下未出现在 fileTree 中
+        const extraMdFiles: string[] = [];
+        if (dbId === "flashcards") {
+          try {
+            const { readDir } = await import("@tauri-apps/plugin-fs");
+            const { join } = await import("@tauri-apps/api/path");
+
+            const candidateDirs = [
+              await join(vaultPath, "Flashcards"),
+              await join(vaultPath, "flashcard"),
+              await join(vaultPath, "flashcards"),
+            ];
+
+            for (const dir of candidateDirs) {
+              try {
+                const entries = await readDir(dir);
+                for (const entry of entries) {
+                  if (entry.name?.endsWith(".md")) {
+                    const filePath = await join(dir, entry.name);
+                    extraMdFiles.push(filePath);
+                  }
+                }
+              } catch {
+                // 目录不存在时忽略
+              }
+            }
+          } catch (error) {
+            console.warn("[Database] Failed to scan Flashcards directories:", error);
+          }
+        }
+
+        const allMdFiles = Array.from(new Set<string>([...mdFiles, ...extraMdFiles]));
         
         // 读取每个文件的 frontmatter
-        for (const filePath of mdFiles) {
+        for (const filePath of allMdFiles) {
           try {
             const content = await readFile(filePath);
             const { frontmatter, hasFrontmatter } = parseFrontmatter(content);
@@ -268,16 +302,19 @@ export const useDatabaseStore = create<DatabaseState>()(
                 }
               }
               
-              const row: DatabaseRow = {
-                id: filePath,
-                notePath: filePath,
-                noteTitle: (frontmatter.title as string) || getTitleFromPath(filePath),
-                cells,
-                createdAt: (frontmatter.createdAt as string) || new Date().toISOString(),
-                updatedAt: (frontmatter.updatedAt as string) || new Date().toISOString(),
-              };
-              
-              rows.push(row);
+              if (!seenPaths.has(filePath)) {
+                const row: DatabaseRow = {
+                  id: filePath,
+                  notePath: filePath,
+                  noteTitle: (frontmatter.title as string) || getTitleFromPath(filePath),
+                  cells,
+                  createdAt: (frontmatter.createdAt as string) || new Date().toISOString(),
+                  updatedAt: (frontmatter.updatedAt as string) || new Date().toISOString(),
+                };
+                
+                rows.push(row);
+                seenPaths.add(filePath);
+              }
             }
           } catch (error) {
             console.warn(`Failed to read note ${filePath}:`, error);
@@ -304,7 +341,10 @@ export const useDatabaseStore = create<DatabaseState>()(
       // ===== 数据库操作 =====
       createDatabase: async (options: CreateDatabaseOptions) => {
         // 使用数据库名称生成 ID（更有意义）
-        const baseId = slugify(options.name) || generateId();
+        // 闪卡数据库固定使用 flashcards，便于与 YAML db 字段对应
+        const baseId = options.template === 'flashcard'
+          ? 'flashcards'
+          : (slugify(options.name) || generateId());
         const dbDir = getDbDir();
         
         // 确保目录存在
