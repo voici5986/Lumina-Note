@@ -15,6 +15,8 @@ Build your second brain with a Markdown note app deeply integrated with AI Agent
 
 **Language**: [简体中文](./README.md) · English · [日本語](./README.ja.md)
 
+> 🚀 **This entire project was built by one person in 10 days with AI-assisted development, containing 47,000+ lines of source code**
+
 [Quick Start](#-getting-started) • [Features](#-core-features) • [Usage Guide](#-usage-guide) • [Architecture](#️-architecture-high-level)
 
 </div>
