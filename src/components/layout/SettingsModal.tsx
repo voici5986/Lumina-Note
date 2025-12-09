@@ -285,8 +285,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   </div>
                   
                   {/* 主题名称 */}
-                  <p className="font-medium text-sm">{theme.name}</p>
-                  <p className="text-xs text-muted-foreground">{theme.description}</p>
+                  <p className="font-medium text-sm">
+                    {(t.settingsModal.themes as any)?.[theme.id]?.name || theme.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {(t.settingsModal.themes as any)?.[theme.id]?.description || theme.description}
+                  </p>
                   
                   {/* 选中标记 */}
                   {themeId === theme.id && (
