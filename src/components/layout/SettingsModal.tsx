@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { useUIStore } from "@/stores/useUIStore";
 import { useAIStore } from "@/stores/useAIStore";
 import { useBrowserStore } from "@/stores/useBrowserStore";
@@ -15,6 +16,7 @@ import { loadUserThemes, getUserThemes, deleteUserTheme } from "@/lib/themePlugi
 import { X, Check, Plus, Trash2, Palette } from "lucide-react";
 import { LiquidGlassEffect } from "../effects/LiquidGlassEffect";
 import { ThemeEditor } from "../ai/ThemeEditor";
+import { WebDAVSettings } from "../settings/WebDAVSettings";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -31,6 +33,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [showThemeEditor, setShowThemeEditor] = useState(false);
   const [editingTheme, setEditingTheme] = useState<Theme | undefined>();
   const [userThemes, setUserThemes] = useState<Theme[]>([]);
+  const [appVersion, setAppVersion] = useState<string>("");
 
   // 弹窗打开时隐藏 WebView，关闭时恢复
   useEffect(() => {
@@ -49,6 +52,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       });
     }
   }, [isOpen, vaultPath]);
+
+  // 加载应用版本号
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => setAppVersion("dev"));
+  }, []);
 
   // 删除用户主题
   const handleDeleteTheme = async (theme: Theme) => {
@@ -343,6 +351,17 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </div>
           </section>
 
+          {/* WebDAV 同步设置 */}
+          <section 
+            className="rounded-xl overflow-hidden"
+            style={{
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.08)",
+            }}
+          >
+            <WebDAVSettings compact />
+          </section>
+
           {/* 关于 */}
           <section className="space-y-4">
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
@@ -355,7 +374,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <p className="text-sm text-muted-foreground">{t.settingsModal.appDescription}</p>
               </div>
               <span className="text-sm text-muted-foreground">
-                v0.1.0
+                v{appVersion || "..."}
               </span>
             </div>
           </section>

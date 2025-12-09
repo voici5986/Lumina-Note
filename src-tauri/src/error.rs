@@ -20,6 +20,9 @@ pub enum AppError {
 
     #[error("Trash error: {0}")]
     Trash(#[from] trash::Error),
+
+    #[error("WebDAV error: {0}")]
+    WebDAV(String),
 }
 
 impl Serialize for AppError {

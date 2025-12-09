@@ -9,6 +9,7 @@ mod error;
 mod vector_db;
 mod llm;
 mod cef;
+mod webdav;
 
 use tauri::Manager;
 
@@ -86,7 +87,22 @@ fn main() {
             // Debug logging
             llm::append_debug_log,
             llm::get_debug_log_path,
+            // WebDAV commands
+            webdav::commands::webdav_set_config,
+            webdav::commands::webdav_get_config,
+            webdav::commands::webdav_test_connection,
+            webdav::commands::webdav_list_remote,
+            webdav::commands::webdav_list_all_remote,
+            webdav::commands::webdav_download,
+            webdav::commands::webdav_upload,
+            webdav::commands::webdav_create_dir,
+            webdav::commands::webdav_delete,
+            webdav::commands::webdav_compute_sync_plan,
+            webdav::commands::webdav_execute_sync,
+            webdav::commands::webdav_quick_sync,
+            webdav::commands::webdav_scan_local,
         ])
+        .manage(webdav::commands::WebDAVState::new())
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
             
