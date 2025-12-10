@@ -11,9 +11,8 @@ import { useFileStore } from "@/stores/useFileStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { useNoteIndexStore } from "@/stores/useNoteIndexStore";
 import { useRAGStore } from "@/stores/useRAGStore";
-import { FolderOpen, Sparkles, PanelLeftClose, PanelRightClose, PanelLeft, PanelRight, Globe, ChevronDown } from "lucide-react";
+import { FolderOpen, Sparkles, PanelLeftClose, PanelRightClose, PanelLeft, PanelRight } from "lucide-react";
 import { useLocaleStore } from "@/stores/useLocaleStore";
-import { SUPPORTED_LOCALES, Locale } from "@/i18n";
 import { CommandPalette, PaletteMode } from "@/components/search/CommandPalette";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { TabBar } from "@/components/layout/TabBar";
@@ -29,6 +28,7 @@ import { saveFile } from "@/lib/tauri";
 import { TitleBar } from "@/components/layout/TitleBar";
 import { VoiceInputBall } from "@/components/ai/VoiceInputBall";
 import { enableDebugLogger } from "@/lib/debugLogger";
+import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
 
 // 启用调试日志收集（开发模式下）
 if (import.meta.env.DEV) {
@@ -407,8 +407,7 @@ function App() {
   );
 
   // Welcome screen when no vault is open
-  const { locale, setLocale, t } = useLocaleStore();
-  const [langMenuOpen, setLangMenuOpen] = useState(false);
+  const { t } = useLocaleStore();
   
   if (!vaultPath) {
     return (
@@ -416,38 +415,7 @@ function App() {
         <TitleBar />
         <div className="flex-1 flex items-center justify-center relative">
           {/* Language Selector - Top Right */}
-          <div className="absolute top-4 right-4">
-            <div className="relative">
-              <button
-                onClick={() => setLangMenuOpen(!langMenuOpen)}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-background hover:bg-accent transition-colors text-sm"
-              >
-                <Globe className="w-4 h-4" />
-                <span>{SUPPORTED_LOCALES.find(l => l.code === locale)?.nativeName}</span>
-                <ChevronDown className={`w-4 h-4 transition-transform ${langMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
-              
-              {langMenuOpen && (
-                <div className="absolute right-0 mt-1 w-40 rounded-lg border border-border bg-background shadow-lg py-1 z-50">
-                  {SUPPORTED_LOCALES.map((loc) => (
-                    <button
-                      key={loc.code}
-                      onClick={() => {
-                        setLocale(loc.code as Locale);
-                        setLangMenuOpen(false);
-                      }}
-                      className={`w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors flex items-center justify-between ${
-                        locale === loc.code ? 'text-primary font-medium' : ''
-                      }`}
-                    >
-                      <span>{loc.nativeName}</span>
-                      {locale === loc.code && <span className="text-primary">✓</span>}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          <LanguageSwitcher className="absolute top-4 right-4" />
           
           <div className="text-center space-y-8">
             {/* Logo */}

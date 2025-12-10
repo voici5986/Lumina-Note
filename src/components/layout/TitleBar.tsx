@@ -1,7 +1,7 @@
 /**
- * 自定义标题栏
- * 替代系统标题栏，支持主题颜色
- * Mac 上使用原生透明标题栏，只显示拖拽区域
+ * è‡ªå®šä¹‰æ ‡é¢˜æ 
+ * æ›¿ä»£ç³»ç»Ÿæ ‡é¢˜æ ï¼Œæ”¯æŒä¸»é¢˜é¢œè‰²
+ * Mac ä¸Šä½¿ç”¨åŽŸç”Ÿé€æ˜Žæ ‡é¢˜æ ï¼Œåªæ˜¾ç¤ºæ‹–æ‹½åŒºåŸ?
  */
 
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -9,6 +9,7 @@ import { Minus, Square, X, Copy } from "lucide-react";
 import { useState, useEffect } from "react";
 import { platform } from "@tauri-apps/plugin-os";
 import { useLocaleStore } from "@/stores/useLocaleStore";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 export function TitleBar() {
   const { t } = useLocaleStore();
@@ -16,7 +17,7 @@ export function TitleBar() {
   const [isMac, setIsMac] = useState(false);
 
   useEffect(() => {
-    // 检测平台
+    // æ£€æµ‹å¹³å?
     const checkPlatform = async () => {
       try {
         const os = platform();
@@ -27,7 +28,7 @@ export function TitleBar() {
     };
     checkPlatform();
     
-    // 监听窗口最大化状态
+    // ç›‘å¬çª—å£æœ€å¤§åŒ–çŠ¶æ€?
     const checkMaximized = async () => {
       try {
         const maximized = await getCurrentWindow().isMaximized();
@@ -38,7 +39,7 @@ export function TitleBar() {
     };
     checkMaximized();
 
-    // 监听窗口状态变化
+    // ç›‘å¬çª—å£çŠ¶æ€å˜åŒ?
     let unlistenFn: (() => void) | null = null;
     getCurrentWindow().onResized(() => {
       checkMaximized();
@@ -52,9 +53,9 @@ export function TitleBar() {
   }, []);
 
   const handleDragStart = (e: React.MouseEvent) => {
-    // 只响应左键
+    // åªå“åº”å·¦é”?
     if (e.button !== 0) return;
-    // 开始拖拽
+    // å¼€å§‹æ‹–æ‹?
     getCurrentWindow().startDragging();
   };
 
@@ -82,33 +83,42 @@ export function TitleBar() {
     }
   };
 
-  // Mac 上使用原生标题栏，只需要一个透明的拖拽区域
+  // Mac ä¸Šä½¿ç”¨åŽŸç”Ÿæ ‡é¢˜æ ï¼Œåªéœ€è¦ä¸€ä¸ªé€æ˜Žçš„æ‹–æ‹½åŒºåŸ?
   if (isMac) {
     return (
       <div 
         className="h-8 flex items-center bg-transparent select-none"
         data-tauri-drag-region
       >
-        {/* Mac 上左侧留空给原生红绿灯按钮 */}
+        {/* Mac ä¸Šå·¦ä¾§ç•™ç©ºç»™åŽŸç”Ÿçº¢ç»¿ç¯æŒ‰é’?*/}
         <div className="w-20" />
-        {/* 中间：应用标题 */}
+        {/* ä¸­é—´ï¼šåº”ç”¨æ ‡é¢?*/}
         <div className="flex-1 flex items-center justify-center">
           <span className="text-xs text-muted-foreground font-medium pointer-events-none">
             Lumina Note
           </span>
         </div>
-        <div className="w-20" />
+        <div
+          className="w-20 flex items-center justify-end pr-2"
+          data-tauri-drag-region="false"
+        >
+          <LanguageSwitcher
+            compact
+            menuAlign="right"
+            buttonClassName="bg-muted/70 hover:bg-accent"
+          />
+        </div>
       </div>
     );
   }
 
-  // Windows/Linux 使用自定义标题栏
+  // Windows/Linux ä½¿ç”¨è‡ªå®šä¹‰æ ‡é¢˜æ 
   return (
     <div 
       className="h-8 flex items-center justify-between bg-muted border-b border-border select-none"
       onMouseDown={handleDragStart}
     >
-      {/* 左侧：应用图标和标题 */}
+      {/* å·¦ä¾§ï¼šåº”ç”¨å›¾æ ‡å’Œæ ‡é¢˜ */}
       <div className="flex items-center gap-2 px-3">
         <img src="/lumina.svg" alt="Logo" className="w-4 h-4 pointer-events-none" />
         <span className="text-xs text-muted-foreground font-medium pointer-events-none">
@@ -116,41 +126,52 @@ export function TitleBar() {
         </span>
       </div>
 
-      {/* 中间：拖拽区域 */}
+      {/* ä¸­é—´ï¼šæ‹–æ‹½åŒºåŸ?*/}
       <div className="flex-1 h-full" />
 
-      {/* 右侧：窗口控制按钮 */}
-      <div className="flex items-center h-full" onMouseDown={(e) => e.stopPropagation()}>
-        {/* 最小化 */}
-        <button
-          onClick={handleMinimize}
-          className="h-full px-4 hover:bg-accent transition-colors flex items-center justify-center"
-          title={t.titleBar.minimize}
-        >
-          <Minus size={14} className="text-muted-foreground" />
-        </button>
+      {/* å³ä¾§ï¼šè¯­è¨€åˆ‡æ¢ + çª—å£æŽ§åˆ¶æŒ‰é’?*/}
+      <div
+        className="flex items-center h-full gap-2 pr-1"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <LanguageSwitcher
+          compact
+          menuAlign="right"
+          stopPropagation
+          buttonClassName="h-7 bg-muted/70 hover:bg-accent"
+        />
+        <div className="flex items-center h-full">
+          {/* æœ€å°åŒ– */}
+          <button
+            onClick={handleMinimize}
+            className="h-full px-4 hover:bg-accent transition-colors flex items-center justify-center"
+            title={t.titleBar.minimize}
+          >
+            <Minus size={14} className="text-muted-foreground" />
+          </button>
 
-        {/* 最大化/还原 */}
-        <button
-          onClick={handleMaximize}
-          className="h-full px-4 hover:bg-accent transition-colors flex items-center justify-center"
-          title={isMaximized ? t.titleBar.restore : t.titleBar.maximize}
-        >
-          {isMaximized ? (
-            <Copy size={12} className="text-muted-foreground" />
-          ) : (
-            <Square size={12} className="text-muted-foreground" />
-          )}
-        </button>
+          {/* æœ€å¤§åŒ–/è¿˜åŽŸ */}
+          <button
+            onClick={handleMaximize}
+            className="h-full px-4 hover:bg-accent transition-colors flex items-center justify-center"
+            title={isMaximized ? t.titleBar.restore : t.titleBar.maximize}
+          >
+            {isMaximized ? (
+              <Copy size={12} className="text-muted-foreground" />
+            ) : (
+              <Square size={12} className="text-muted-foreground" />
+            )}
+          </button>
 
-        {/* 关闭 */}
-        <button
-          onClick={handleClose}
-          className="h-full px-4 hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center"
-          title={t.titleBar.close}
-        >
-          <X size={14} className="text-muted-foreground hover:text-white" />
-        </button>
+          {/* å…³é—­ */}
+          <button
+            onClick={handleClose}
+            className="h-full px-4 hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center"
+            title={t.titleBar.close}
+          >
+            <X size={14} className="text-muted-foreground hover:text-white" />
+          </button>
+        </div>
       </div>
     </div>
   );
