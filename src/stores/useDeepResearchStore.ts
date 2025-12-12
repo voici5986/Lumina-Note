@@ -92,6 +92,13 @@ export interface ClarificationInfo {
   interruptId: string;
 }
 
+/** Token 使用统计 */
+export interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
 /** 研究会话 */
 export interface ResearchSession {
   id: string;
@@ -111,6 +118,8 @@ export interface ResearchSession {
   error: string | null;
   // 澄清相关
   clarification: ClarificationInfo | null;
+  // Token 使用统计
+  tokenUsage: TokenUsage;
 }
 
 // ============ Store 定义 ============
@@ -179,6 +188,7 @@ type DeepResearchEvent =
     }
   | { type: "outline_generated"; data: { outline: ReportOutline } }
   | { type: "report_chunk"; data: { content: string } }
+  | { type: "token_usage"; data: { prompt_tokens: number; completion_tokens: number; total_tokens: number } }
   | { type: "needs_clarification"; data: { question: string; suggestions: string[]; interrupt_id: string } }
   | { type: "complete"; data: { report: string } }
   | { type: "error"; data: { message: string } };
@@ -222,6 +232,7 @@ export const useDeepResearchStore = create<DeepResearchState>()(
       finalReport: null,
       error: null,
       clarification: null,
+      tokenUsage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
     };
 
     set({ currentSession: session, isRunning: true });
@@ -448,6 +459,20 @@ export const useDeepResearchStore = create<DeepResearchState>()(
               ...currentSession.reportChunks,
               event.data.content,
             ],
+          },
+        });
+        break;
+
+      case "token_usage":
+        // 累加 token 使用量
+        set({
+          currentSession: {
+            ...currentSession,
+            tokenUsage: {
+              promptTokens: currentSession.tokenUsage.promptTokens + event.data.prompt_tokens,
+              completionTokens: currentSession.tokenUsage.completionTokens + event.data.completion_tokens,
+              totalTokens: currentSession.tokenUsage.totalTokens + event.data.total_tokens,
+            },
           },
         });
         break;

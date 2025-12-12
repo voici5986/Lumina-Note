@@ -393,6 +393,12 @@ impl LlmClient {
 
     /// 简单的非流式调用（只传入 prompt）
     pub async fn call_simple(&self, prompt: &str) -> Result<String, String> {
+        let response = self.call_simple_with_usage(prompt).await?;
+        Ok(response.content)
+    }
+
+    /// 简单的非流式调用（返回完整响应，包含 token 统计）
+    pub async fn call_simple_with_usage(&self, prompt: &str) -> Result<LlmResponse, String> {
         let messages = vec![Message {
             role: MessageRole::User,
             content: prompt.to_string(),
@@ -400,8 +406,7 @@ impl LlmClient {
             tool_call_id: None,
         }];
         
-        let response = self.call(&messages, None).await?;
-        Ok(response.content)
+        self.call(&messages, None).await
     }
 
     /// 简单的流式调用（只传入 prompt，通过 channel 返回）

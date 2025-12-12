@@ -300,6 +300,12 @@ pub enum DeepResearchEvent {
     OutlineGenerated { outline: ReportOutline },
     /// 报告块（流式输出）
     ReportChunk { content: String },
+    /// Token 使用量更新
+    TokenUsage {
+        prompt_tokens: usize,
+        completion_tokens: usize,
+        total_tokens: usize,
+    },
     /// 需要用户澄清
     NeedsClarification { 
         question: String,

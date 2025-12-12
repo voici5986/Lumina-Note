@@ -559,7 +559,7 @@ export function DeepResearchCard({ className }: DeepResearchCardProps) {
   // 没有会话时不渲染
   if (!currentSession) return null;
 
-  const { topic, phase, phaseMessage, keywords, foundNotes, webSearchResults, crawlingProgress, readingProgress, error } =
+  const { topic, phase, phaseMessage, keywords, foundNotes, webSearchResults, crawlingProgress, readingProgress, tokenUsage, error } =
     currentSession;
 
   const progress = getPhaseProgress(phase);
@@ -814,6 +814,13 @@ ${reportContent}`;
                   >
                     关闭
                   </button>
+                )}
+
+                {/* Token 统计 */}
+                {tokenUsage.totalTokens > 0 && (
+                  <div className="text-xs text-muted-foreground ml-auto">
+                    Token: {tokenUsage.totalTokens.toLocaleString()}
+                  </div>
                 )}
               </div>
             </div>

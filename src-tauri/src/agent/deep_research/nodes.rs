@@ -22,6 +22,15 @@ fn emit_event(app: &AppHandle, event: DeepResearchEvent) {
     let _ = app.emit("deep-research-event", &event);
 }
 
+/// 发送 Token 使用量事件
+fn emit_token_usage(app: &AppHandle, prompt_tokens: usize, completion_tokens: usize, total_tokens: usize) {
+    emit_event(app, DeepResearchEvent::TokenUsage {
+        prompt_tokens,
+        completion_tokens,
+        total_tokens,
+    });
+}
+
 /// 从 LLM 响应中提取 JSON
 /// 
 /// 处理多种常见格式：
@@ -307,10 +316,11 @@ React
         effective_topic
     );
 
-    let response = llm.call_simple(&prompt).await?;
+    let response = llm.call_simple_with_usage(&prompt).await?;
+    emit_token_usage(app, response.prompt_tokens, response.completion_tokens, response.total_tokens);
     
     // 解析关键词
-    let keywords: Vec<String> = response
+    let keywords: Vec<String> = response.content
         .lines()
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty() && s.len() < 50)
@@ -966,10 +976,11 @@ pub async fn generate_outline_node(
         web_summary
     );
 
-    let response = llm.call_simple(&prompt).await?;
+    let response = llm.call_simple_with_usage(&prompt).await?;
+    emit_token_usage(app, response.prompt_tokens, response.completion_tokens, response.total_tokens);
     
     // 解析 JSON（使用健壮的 JSON 提取）
-    let outline: ReportOutline = parse_json(&response, "解析大纲失败")?;
+    let outline: ReportOutline = parse_json(&response.content, "解析大纲失败")?;
 
     emit_event(app, DeepResearchEvent::OutlineGenerated {
         outline: outline.clone(),
