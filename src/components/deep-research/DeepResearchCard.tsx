@@ -36,11 +36,15 @@ import {
   getPhaseLabel,
   getPhaseProgress,
   NoteReference,
+  WebSearchResult,
 } from "@/stores/useDeepResearchStore";
 import ReactMarkdown from "react-markdown";
 import { useFileStore } from "@/stores/useFileStore";
 import { invoke } from "@tauri-apps/api/core";
 import { join } from "@/lib/path";
+import { RainbowText } from "@/components/ui/rainbow-text";
+import { FavIcon } from "@/components/ui/fav-icon";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // ============ 子组件 ============
 
@@ -97,11 +101,13 @@ function ProgressSteps({
   currentPhase,
   keywords,
   foundNotes,
+  webSearchResults,
   readingProgress,
 }: {
   currentPhase: ResearchPhase;
   keywords: string[];
   foundNotes: NoteReference[];
+  webSearchResults: WebSearchResult[];
   readingProgress: { current: number; total: number };
 }) {
   return (
@@ -119,6 +125,8 @@ function ProgressSteps({
           extra = `关键词: ${keywords.join(", ")}`;
         } else if (phase === "searching_notes" && foundNotes.length > 0) {
           extra = `找到 ${foundNotes.length} 篇笔记`;
+        } else if (phase === "searching_web" && webSearchResults.length > 0) {
+          extra = `找到 ${webSearchResults.length} 个结果`;
         } else if (
           phase === "reading_notes" &&
           readingProgress.total > 0
@@ -190,6 +198,78 @@ function NoteList({
         >
           {showAll ? "收起" : `显示全部 ${notes.length} 篇`}
         </button>
+      )}
+    </div>
+  );
+}
+
+/** 网络搜索结果列表 */
+function WebSearchResultsList({
+  results,
+  isSearching = false,
+}: {
+  results: WebSearchResult[];
+  isSearching?: boolean;
+}) {
+  if (!isSearching && results.length === 0) return null;
+
+  return (
+    <div className="mt-4">
+      <div className="font-medium italic mb-2">
+        <RainbowText
+          className="flex items-center text-sm"
+          animated={isSearching}
+        >
+          <Globe className="w-4 h-4 mr-2" />
+          <span>
+            {isSearching
+              ? "正在搜索网络..."
+              : `找到 ${results.length} 个网络结果`}
+          </span>
+        </RainbowText>
+      </div>
+      <ul className="flex flex-wrap gap-2">
+        {/* 搜索中显示骨架屏 */}
+        {isSearching &&
+          results.length === 0 &&
+          [...Array(4)].map((_, i) => (
+            <li key={`skeleton-${i}`}>
+              <Skeleton
+                className="h-8 w-32 rounded-md"
+                style={{ animationDelay: `${i * 0.15}s` }}
+              />
+            </li>
+          ))}
+        {/* 搜索结果卡片 */}
+        {results.slice(0, 10).map((result, i) => (
+          <motion.li
+            key={`${result.url}-${i}`}
+            className="text-muted-foreground bg-accent flex items-center gap-2 rounded-md px-2 py-1 text-xs max-w-[180px]"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: 0.15,
+              delay: Math.min(i * 0.05, 0.3),
+              ease: "easeOut",
+            }}
+          >
+            <FavIcon url={result.url} size={14} />
+            <a
+              href={result.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="truncate hover:text-foreground transition-colors"
+              title={result.title}
+            >
+              {result.title}
+            </a>
+          </motion.li>
+        ))}
+      </ul>
+      {results.length > 10 && (
+        <div className="text-xs text-muted-foreground mt-1">
+          + {results.length - 10} 个其他结果
+        </div>
       )}
     </div>
   );
@@ -395,7 +475,7 @@ export function DeepResearchCard({ className }: DeepResearchCardProps) {
   // 没有会话时不渲染
   if (!currentSession) return null;
 
-  const { topic, phase, phaseMessage, keywords, foundNotes, readingProgress, error } =
+  const { topic, phase, phaseMessage, keywords, foundNotes, webSearchResults, readingProgress, error } =
     currentSession;
 
   const progress = getPhaseProgress(phase);
@@ -549,9 +629,14 @@ ${reportContent}`;
                     currentPhase={phase}
                     keywords={keywords}
                     foundNotes={foundNotes}
+                    webSearchResults={webSearchResults}
                     readingProgress={readingProgress}
                   />
                   <NoteList notes={foundNotes} />
+                  <WebSearchResultsList
+                    results={webSearchResults}
+                    isSearching={phase === "searching_web"}
+                  />
                 </>
               )}
 

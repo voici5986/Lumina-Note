@@ -271,7 +271,7 @@ pub enum DeepResearchEvent {
     /// 找到笔记
     NotesFound { notes: Vec<NoteReference> },
     /// 网络搜索完成
-    WebSearchComplete { count: usize },
+    WebSearchComplete { results: Vec<WebSearchResult> },
     /// 正在阅读笔记
     ReadingNote { path: String, title: String, index: usize, total: usize },
     /// 笔记读取完成

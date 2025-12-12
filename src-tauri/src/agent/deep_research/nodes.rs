@@ -433,7 +433,7 @@ pub async fn search_notes_node(
                 state.web_search_results = web_results;
                 
                 emit_event(app, DeepResearchEvent::WebSearchComplete {
-                    count: state.web_search_results.len(),
+                    results: state.web_search_results.clone(),
                 });
             }
             Err(e) => {

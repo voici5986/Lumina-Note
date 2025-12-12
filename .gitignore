@@ -105,6 +105,3 @@ docs/deer-flow/
 # ===================
 # LangGraph 浏览器版本（不能运行，已迁移到 Rust）
 src/agent/langgraph/
-
-# Deep Research 独立历史组件（已集成到 ConversationList）
-src/components/deep-research/ResearchHistory.tsx

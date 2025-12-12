@@ -35,6 +35,14 @@ export interface NoteReference {
   snippet?: string;
 }
 
+/** 网络搜索结果 */
+export interface WebSearchResult {
+  title: string;
+  url: string;
+  content: string;
+  score?: number;
+}
+
 /** 大纲章节 */
 export interface OutlineSection {
   heading: string;
@@ -93,6 +101,7 @@ export interface ResearchSession {
   phaseMessage: string;
   keywords: string[];
   foundNotes: NoteReference[];
+  webSearchResults: WebSearchResult[];  // 网络搜索结果
   readingProgress: { current: number; total: number };
   outline: ReportOutline | null;
   reportChunks: string[];
@@ -149,6 +158,7 @@ type DeepResearchEvent =
   | { type: "phase_change"; data: { phase: ResearchPhase; message: string } }
   | { type: "keywords_extracted"; data: { keywords: string[] } }
   | { type: "notes_found"; data: { notes: NoteReference[] } }
+  | { type: "web_search_complete"; data: { results: WebSearchResult[] } }
   | {
       type: "reading_note";
       data: { path: string; title: string; index: number; total: number };
@@ -194,6 +204,7 @@ export const useDeepResearchStore = create<DeepResearchState>()(
       phaseMessage: "准备开始研究...",
       keywords: [],
       foundNotes: [],
+      webSearchResults: [],
       readingProgress: { current: 0, total: 0 },
       outline: null,
       reportChunks: [],
@@ -364,6 +375,15 @@ export const useDeepResearchStore = create<DeepResearchState>()(
           currentSession: {
             ...currentSession,
             foundNotes: event.data.notes,
+          },
+        });
+        break;
+
+      case "web_search_complete":
+        set({
+          currentSession: {
+            ...currentSession,
+            webSearchResults: event.data.results,
           },
         });
         break;
