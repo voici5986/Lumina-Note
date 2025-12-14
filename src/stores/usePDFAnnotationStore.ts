@@ -18,7 +18,7 @@ import {
   stringifyAnnotationsMarkdown,
   createEmptyAnnotationFile,
   generateAnnotationId,
-} from '@/lib/annotations';
+} from '@/services/pdf/annotations';
 
 interface PDFAnnotationState {
   // 当前加载的批注文件

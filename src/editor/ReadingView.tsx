@@ -4,7 +4,7 @@ import { useFileStore } from "@/stores/useFileStore";
 import { useSplitStore } from "@/stores/useSplitStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
-import { parseLuminaLink } from "@/lib/annotations";
+import { parseLuminaLink } from "@/services/pdf/annotations";
 import { readBinaryFileBase64 } from "@/lib/tauri";
 import mermaid from "mermaid";
 

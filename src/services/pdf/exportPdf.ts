@@ -1,4 +1,4 @@
-import { parseMarkdown } from "./markdown";
+import { parseMarkdown } from "@/services/markdown/markdown";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import jsPDF from "jspdf";

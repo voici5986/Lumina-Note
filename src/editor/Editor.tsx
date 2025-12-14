@@ -23,7 +23,7 @@ import {
   Network,
   X,
 } from "lucide-react";
-import { exportToPdf, getExportFileName } from "@/lib/exportPdf";
+import { exportToPdf, getExportFileName } from "@/services/pdf/exportPdf";
 import { TabBar } from "@/components/layout/TabBar";
 import { cn } from "@/lib/utils";
 

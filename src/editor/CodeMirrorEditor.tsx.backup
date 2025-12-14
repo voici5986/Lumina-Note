@@ -4,7 +4,7 @@ import { useFileStore } from "@/stores/useFileStore";
 import { useAIStore } from "@/stores/useAIStore";
 import { useSplitStore } from "@/stores/useSplitStore";
 import { useUIStore } from "@/stores/useUIStore";
-import { parseLuminaLink } from "@/lib/annotations";
+import { parseLuminaLink } from "@/services/pdf/annotations";
 import { EditorState, StateField, StateEffect, Compartment, Facet, Extension } from "@codemirror/state";
 import {
   EditorView,

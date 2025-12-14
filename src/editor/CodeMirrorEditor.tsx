@@ -5,7 +5,7 @@ import { useAIStore } from "@/stores/useAIStore";
 import { useSplitStore } from "@/stores/useSplitStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
-import { parseLuminaLink } from "@/lib/annotations";
+import { parseLuminaLink } from "@/services/pdf/annotations";
 import { writeBinaryFile, readBinaryFileBase64 } from "@/lib/tauri";
 import { EditorState, StateField, StateEffect, Compartment, Facet } from "@codemirror/state";
 import { slashCommandExtensions, placeholderExtension } from "./extensions/slashCommand";
