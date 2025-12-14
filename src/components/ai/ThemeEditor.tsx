@@ -5,14 +5,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { X, Save, Copy, Download, Upload, Palette, Sun, Moon } from 'lucide-react';
-import { Theme, ThemeColors, OFFICIAL_THEMES } from '@/lib/themes';
+import { Theme, ThemeColors, OFFICIAL_THEMES } from '@/config/themes';
 import {
   createThemeTemplate,
   exportTheme,
   importTheme,
   saveUserTheme,
   applyTheme
-} from '@/lib/themePlugin';
+} from '@/config/themePlugin';
 import { useUIStore } from '@/stores/useUIStore';
 import { useFileStore } from '@/stores/useFileStore';
 import { useLocaleStore } from '@/stores/useLocaleStore';
