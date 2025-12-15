@@ -103,7 +103,6 @@ describe('useRustAgentStore', () => {
 
     it('should delete a session', () => {
       const store = useRustAgentStore.getState();
-      const initialSessionId = store.currentSessionId;
       const initialCount = store.sessions.length;
       
       // Create a new session

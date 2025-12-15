@@ -83,6 +83,22 @@ export interface AgentConfig {
   locale?: string;
 }
 
+// ============ 任务统计 ============
+
+export interface TaskStats {
+  // 当前任务统计
+  toolCalls: number;
+  toolSuccesses: number;
+  toolFailures: number;
+  // 累计统计（所有会话）
+  totalTasks: number;
+  completedTasks: number;
+  failedTasks: number;
+  totalToolCalls: number;
+  totalToolSuccesses: number;
+  totalToolFailures: number;
+}
+
 // ============ Store 状态 ============
 
 interface RustAgentState {
@@ -101,6 +117,9 @@ interface RustAgentState {
   
   // Token 统计
   totalTokensUsed: number;
+  
+  // 任务统计
+  taskStats: TaskStats;
   
   // 会话管理
   sessions: RustAgentSession[];
@@ -143,6 +162,19 @@ export const useRustAgentStore = create<RustAgentState>()(
       totalTokensUsed: 0,
       autoApprove: false,
       
+      // 任务统计初始状态
+      taskStats: {
+        toolCalls: 0,
+        toolSuccesses: 0,
+        toolFailures: 0,
+        totalTasks: 0,
+        completedTasks: 0,
+        failedTasks: 0,
+        totalToolCalls: 0,
+        totalToolSuccesses: 0,
+        totalToolFailures: 0,
+      },
+      
       // 会话管理初始状态
       sessions: [{
         id: "default-rust-session",
@@ -169,7 +201,8 @@ export const useRustAgentStore = create<RustAgentState>()(
         // 获取当前历史消息（发送前的消息）
         const currentMessages = get().messages;
         
-        // 重置状态
+        // 重置状态 + 更新任务统计
+        const stats = get().taskStats;
         set({
           status: "running",
           error: null,
@@ -180,6 +213,15 @@ export const useRustAgentStore = create<RustAgentState>()(
             ...currentMessages,
             { role: "user", content: task },
           ],
+          taskStats: {
+            ...stats,
+            // 重置当前任务统计
+            toolCalls: 0,
+            toolSuccesses: 0,
+            toolFailures: 0,
+            // 累计任务数+1
+            totalTasks: stats.totalTasks + 1,
+          },
         });
         
         // 将历史消息转换为后端格式并传入
@@ -445,6 +487,7 @@ export const useRustAgentStore = create<RustAgentState>()(
 
           case "tool_call": {
             const { tool } = event.data as { tool: ToolCall };
+            const stats = state.taskStats;
             set({
               messages: [
                 ...state.messages,
@@ -453,6 +496,11 @@ export const useRustAgentStore = create<RustAgentState>()(
                   content: `🔧 ${tool.name}: ${JSON.stringify(tool.params)}`,
                 },
               ],
+              taskStats: {
+                ...stats,
+                toolCalls: stats.toolCalls + 1,
+                totalToolCalls: stats.totalToolCalls + 1,
+              },
             });
             break;
           }
@@ -461,6 +509,7 @@ export const useRustAgentStore = create<RustAgentState>()(
             const { result } = event.data as { 
               result: { success: boolean; content: string; error?: string } 
             };
+            const stats = state.taskStats;
             set({
               messages: [
                 ...state.messages,
@@ -471,6 +520,13 @@ export const useRustAgentStore = create<RustAgentState>()(
                     : `❌ ${result.error}`,
                 },
               ],
+              taskStats: {
+                ...stats,
+                toolSuccesses: stats.toolSuccesses + (result.success ? 1 : 0),
+                toolFailures: stats.toolFailures + (result.success ? 0 : 1),
+                totalToolSuccesses: stats.totalToolSuccesses + (result.success ? 1 : 0),
+                totalToolFailures: stats.totalToolFailures + (result.success ? 0 : 1),
+              },
             });
             break;
           }
@@ -528,6 +584,7 @@ export const useRustAgentStore = create<RustAgentState>()(
 
           case "complete": {
             const { result } = event.data as { result: string };
+            const stats = state.taskStats;
             console.log("[RustAgent] complete event:", { result: result?.slice(0, 100), hasResult: !!result });
             if (result && result.trim()) {
               // 检查最后一条消息是否完全相同（避免完全重复）
@@ -550,13 +607,23 @@ export const useRustAgentStore = create<RustAgentState>()(
                 set({
                   messages: newMessages,
                   streamingContent: "",
+                  taskStats: {
+                    ...stats,
+                    completedTasks: stats.completedTasks + 1,
+                  },
                 });
                 // 保存到会话
                 get()._saveCurrentSession();
                 console.log("[RustAgent] Added complete message");
               } else {
-                // 只清空流式内容
-                set({ streamingContent: "" });
+                // 只清空流式内容，但仍然计入完成
+                set({ 
+                  streamingContent: "",
+                  taskStats: {
+                    ...stats,
+                    completedTasks: stats.completedTasks + 1,
+                  },
+                });
                 // 仍然保存会话
                 get()._saveCurrentSession();
                 console.log("[RustAgent] Skipped duplicate message");
@@ -567,9 +634,14 @@ export const useRustAgentStore = create<RustAgentState>()(
 
           case "error": {
             const { message } = event.data as { message: string };
+            const stats = state.taskStats;
             set({
               error: message,
               streamingContent: "",
+              taskStats: {
+                ...stats,
+                failedTasks: stats.failedTasks + 1,
+              },
             });
             break;
           }
@@ -598,6 +670,19 @@ export const useRustAgentStore = create<RustAgentState>()(
         autoApprove: state.autoApprove,
         sessions: state.sessions,
         currentSessionId: state.currentSessionId,
+        // 持久化累计统计
+        taskStats: {
+          totalTasks: state.taskStats.totalTasks,
+          completedTasks: state.taskStats.completedTasks,
+          failedTasks: state.taskStats.failedTasks,
+          totalToolCalls: state.taskStats.totalToolCalls,
+          totalToolSuccesses: state.taskStats.totalToolSuccesses,
+          totalToolFailures: state.taskStats.totalToolFailures,
+          // 当前任务统计不持久化
+          toolCalls: 0,
+          toolSuccesses: 0,
+          toolFailures: 0,
+        },
       }),
     }
   )
@@ -635,4 +720,47 @@ export function cleanupRustAgentListeners() {
     unlistenFn();
     unlistenFn = null;
   }
+}
+
+// ============ 统计计算 ============
+
+/**
+ * 获取 Agent 统计摘要
+ */
+export function getAgentStats() {
+  const { taskStats, totalTokensUsed } = useRustAgentStore.getState();
+  
+  // 工具调用成功率
+  const toolSuccessRate = taskStats.totalToolCalls > 0
+    ? (taskStats.totalToolSuccesses / taskStats.totalToolCalls * 100).toFixed(1)
+    : "N/A";
+  
+  // 任务完成率
+  const taskCompletionRate = taskStats.totalTasks > 0
+    ? (taskStats.completedTasks / taskStats.totalTasks * 100).toFixed(1)
+    : "N/A";
+  
+  return {
+    // 当前任务
+    current: {
+      toolCalls: taskStats.toolCalls,
+      toolSuccesses: taskStats.toolSuccesses,
+      toolFailures: taskStats.toolFailures,
+      successRate: taskStats.toolCalls > 0
+        ? (taskStats.toolSuccesses / taskStats.toolCalls * 100).toFixed(1) + "%"
+        : "N/A",
+    },
+    // 累计统计
+    total: {
+      tasks: taskStats.totalTasks,
+      completed: taskStats.completedTasks,
+      failed: taskStats.failedTasks,
+      completionRate: taskCompletionRate + "%",
+      toolCalls: taskStats.totalToolCalls,
+      toolSuccesses: taskStats.totalToolSuccesses,
+      toolFailures: taskStats.totalToolFailures,
+      toolSuccessRate: toolSuccessRate + "%",
+      tokensUsed: totalTokensUsed,
+    },
+  };
 }
