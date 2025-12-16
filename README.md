@@ -80,6 +80,83 @@ Lumina Note 不仅仅是一个编辑器，它是一个集成了 LLM 能力的知
 | **Diff 预览**    | AI 修改内容前提供 Diff 对比视图，由你决定是否 Apply。                |
 | **RAG 语义搜索** | 内置 SQLite 向量库，基于语义理解检索你的本地知识库。                 |
 
+#### Agent 架构图
+
+系统采用 **意图驱动 + Agent 内自规划** 架构。Coordinator 分析意图后路由到专业 Agent，每个 Agent 内部拥有完整的 **规划→执行→监督** 循环。
+
+```mermaid
+flowchart TD
+    START((__start__))
+    
+    START --> COORD[coordinator<br/>意图分析]
+    
+    COORD -->|chat| REPORT[reporter]
+    COORD -->|edit| EDITOR
+    COORD -->|create| WRITER
+    COORD -->|search/complex| RESEARCHER
+    COORD -->|organize| ORGANIZER
+    
+    subgraph editor ["editor (自规划循环)"]
+        direction TB
+        E_PLAN[create_plan] --> E_EXEC[执行工具]
+        E_EXEC --> E_UPDATE[update_plan_progress]
+        E_UPDATE -->|未完成| E_EXEC
+        E_UPDATE -->|全部完成| E_COMPLETE[attempt_completion]
+    end
+    
+    subgraph writer ["writer (自规划循环)"]
+        direction TB
+        W_PLAN[create_plan] --> W_EXEC[执行工具]
+        W_EXEC --> W_UPDATE[update_plan_progress]
+        W_UPDATE -->|未完成| W_EXEC
+        W_UPDATE -->|全部完成| W_COMPLETE[attempt_completion]
+    end
+    
+    subgraph researcher ["researcher (自规划循环)"]
+        direction TB
+        R_PLAN[create_plan] --> R_EXEC[执行工具]
+        R_EXEC --> R_UPDATE[update_plan_progress]
+        R_UPDATE -->|未完成| R_EXEC
+        R_UPDATE -->|全部完成| R_COMPLETE[attempt_completion]
+    end
+    
+    subgraph organizer ["organizer (自规划循环)"]
+        direction TB
+        O_PLAN[create_plan] --> O_EXEC[执行工具]
+        O_EXEC --> O_UPDATE[update_plan_progress]
+        O_UPDATE -->|未完成| O_EXEC
+        O_UPDATE -->|全部完成| O_COMPLETE[attempt_completion]
+    end
+    
+    EDITOR --> E_PLAN
+    WRITER --> W_PLAN
+    RESEARCHER --> R_PLAN
+    ORGANIZER --> O_PLAN
+    
+    E_COMPLETE --> REPORT
+    W_COMPLETE --> REPORT
+    R_COMPLETE --> REPORT
+    O_COMPLETE --> REPORT
+    
+    REPORT --> END_((__end__))
+```
+
+**核心机制**：
+- **自规划**：Agent 接收任务后首先调用 `create_plan` 分解为 1-5 个步骤
+- **自执行**：循环调用工具执行每个步骤
+- **自监督**：`attempt_completion` 会检查计划完成度，未完成时**拒绝结束**并要求继续
+
+**Agent 工具集（17 个）**：
+
+| 类别       | 工具                                                                   |
+| :--------- | :--------------------------------------------------------------------- |
+| **读取**   | `read_note`, `read_outline`, `read_section`                            |
+| **写入**   | `edit_note`, `create_note`                                             |
+| **搜索**   | `list_notes`, `search_notes`, `grep_search`, `semantic_search`         |
+| **组织**   | `move_note`, `delete_note`                                             |
+| **数据库** | `query_database`, `add_database_row`                                   |
+| **其他**   | `get_backlinks`, `ask_user`, `attempt_completion`, `create_plan`, `update_plan_progress` |
+
 ### 🎬 B 站视频笔记
 
 边看视频边做笔记，通过弹幕同步实现精确时间戳记录。
