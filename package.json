@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest",
-    "test:run": "vitest --run"
+    "test:run": "vitest --run",
+    "test:agent-eval": "npx ts-node --esm tests/agent-eval/runner.ts",
+    "test:agent-eval:basic": "npx ts-node --esm tests/agent-eval/runner.ts --category=basic",
+    "test:agent-eval:complex": "npx ts-node --esm tests/agent-eval/runner.ts --category=complex"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.0",

@@ -30,6 +30,7 @@ import { TitleBar } from "@/components/layout/TitleBar";
 import { VoiceInputBall } from "@/components/ai/VoiceInputBall";
 import { enableDebugLogger } from "@/lib/debugLogger";
 import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
+import { AgentEvalPanel } from "@/tests/agent-eval/AgentEvalPanel";
 
 // 启用调试日志收集（开发模式下）
 if (import.meta.env.DEV) {
@@ -136,6 +137,7 @@ function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [isLoadingVault, setIsLoadingVault] = useState(false);
   const [createDbOpen, setCreateDbOpen] = useState(false);
+  const [evalPanelOpen, setEvalPanelOpen] = useState(false);
   
   // 首次启动时默认打开 AI Chat
   useEffect(() => {
@@ -365,13 +367,27 @@ function App() {
         setSearchOpen(true);
         return;
       }
+      
+      // Ctrl+Shift+E: Agent Eval Panel (Dev only)
+      if (import.meta.env.DEV && isCtrl && e.shiftKey && e.key === "E") {
+        e.preventDefault();
+        setEvalPanelOpen(true);
+        return;
+      }
+      
+      // Esc: Close eval panel
+      if (e.key === "Escape" && evalPanelOpen) {
+        e.preventDefault();
+        setEvalPanelOpen(false);
+        return;
+      }
     };
     
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [save, vaultPath, createNewFile]);
+  }, [save, vaultPath, createNewFile, evalPanelOpen]);
 
   // Open folder dialog
   const handleOpenVault = useCallback(async () => {
@@ -646,6 +662,21 @@ function App() {
 
     {/* Voice Input Floating Ball - 语音输入悬浮球 */}
     <VoiceInputBall />
+    
+    {/* Agent Eval Panel (Dev only) */}
+    {import.meta.env.DEV && evalPanelOpen && (
+      <div className="fixed inset-0 z-[100] bg-background">
+        <div className="absolute top-2 right-2 z-10">
+          <button
+            onClick={() => setEvalPanelOpen(false)}
+            className="px-4 py-2 bg-muted rounded hover:bg-muted/80"
+          >
+            ✕ 关闭 (Esc)
+          </button>
+        </div>
+        <AgentEvalPanel />
+      </div>
+    )}
     </div>
   );
 }
