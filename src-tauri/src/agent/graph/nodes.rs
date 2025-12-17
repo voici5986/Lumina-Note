@@ -939,12 +939,13 @@ fn build_agent_prompt(agent_name: &str, workspace: &str, context: &str, supports
         _ => "你是 Lumina 智能笔记助手。",
     };
 
+    // Windsurf 风格：单一 update_plan 工具
     let tools_info = match agent_name {
-        "editor" => "create_plan, update_plan_progress, read_note, edit_note, search_notes, grep_search, semantic_search, attempt_completion",
-        "researcher" => "create_plan, update_plan_progress, read_note, list_notes, search_notes, grep_search, semantic_search, get_backlinks, attempt_completion",
-        "writer" => "create_plan, update_plan_progress, read_note, create_note, edit_note, list_notes, search_notes, attempt_completion",
-        "organizer" => "create_plan, update_plan_progress, list_notes, move_note, delete_note, create_note, read_note, attempt_completion",
-        _ => "create_plan, update_plan_progress, read_note, edit_note, create_note, list_notes, search_notes, attempt_completion",
+        "editor" => "update_plan, read_note, edit_note, search_notes, grep_search, semantic_search, attempt_completion",
+        "researcher" => "update_plan, read_note, list_notes, search_notes, grep_search, semantic_search, get_backlinks, attempt_completion",
+        "writer" => "update_plan, read_note, create_note, edit_note, list_notes, search_notes, attempt_completion",
+        "organizer" => "update_plan, list_notes, move_note, delete_note, create_note, read_note, attempt_completion",
+        _ => "update_plan, read_note, edit_note, create_note, list_notes, search_notes, attempt_completion",
     };
 
     // FC 模式：不需要 XML 格式教学，工具调用由 API 层处理
@@ -1033,12 +1034,12 @@ fn build_agent_prompt(agent_name: &str, workspace: &str, context: &str, supports
 
 RULES
 
-1. **开始任务前必须先调用 create_plan 创建执行计划**
-   - 将任务拆解为 1-5 个具体步骤
-   - 每个步骤有唯一 ID 和清晰描述
-2. **完成每个步骤后必须立即调用 update_plan_progress 标记进度**
-   - step_id: 步骤 ID（数字字符串如 "1", "2", "3"）
-   - status: "completed" 或 "skipped"
+1. **对于非简单任务，先调用 update_plan 创建执行计划**
+   - 将任务拆解为简洁的步骤
+   - 每次只能有一个步骤处于 in_progress 状态
+2. **完成步骤后调用 update_plan 更新状态**
+   - 传递完整的 plan 数组，更新相应步骤的 status
+   - status: "pending" | "in_progress" | "completed"
 3. 所有文件路径必须相对于笔记库根目录
 4. **修改文件前必须先用 read_note 读取确认当前内容**
 5. 不要询问不必要的信息，直接根据上下文行动
