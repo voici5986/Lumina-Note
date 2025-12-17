@@ -109,6 +109,11 @@ fn main() {
             agent::agent_abort,
             agent::agent_get_status,
             agent::agent_continue_with_answer,
+            // Agent debug commands
+            agent::agent_enable_debug,
+            agent::agent_disable_debug,
+            agent::agent_is_debug_enabled,
+            agent::agent_get_debug_log_path,
             // Deep Research commands
             agent::deep_research_start,
             agent::deep_research_resume,

@@ -60,6 +60,13 @@ pub async fn agent_start_task(
         *is_running = true;
     }
 
+    // 调试日志：记录配置和任务
+    {
+        use crate::agent::debug_log as dbg;
+        dbg::log_config(&config.provider, &config.model, config.temperature);
+        dbg::log_task(&task);
+    }
+    
     // 构建初始状态（使用前端传入的历史消息）
     let initial_state = GraphState {
         messages: context.history.clone(),
@@ -501,4 +508,40 @@ pub async fn deep_research_is_running(
 ) -> Result<bool, String> {
     let is_running = state.is_running.lock().await;
     Ok(*is_running)
+}
+
+// ============ 调试命令 ============
+
+/// 启用 Agent 调试模式
+#[tauri::command]
+pub fn agent_enable_debug(workspace_path: String) -> Result<String, String> {
+    use crate::agent::debug_log;
+    
+    let path = debug_log::enable_debug(&workspace_path)?;
+    Ok(path.to_string_lossy().to_string())
+}
+
+/// 禁用 Agent 调试模式
+#[tauri::command]
+pub fn agent_disable_debug() -> Result<(), String> {
+    use crate::agent::debug_log;
+    
+    debug_log::disable_debug();
+    Ok(())
+}
+
+/// 检查调试模式是否启用
+#[tauri::command]
+pub fn agent_is_debug_enabled() -> bool {
+    use crate::agent::debug_log;
+    
+    debug_log::is_debug_enabled()
+}
+
+/// 获取当前调试日志路径
+#[tauri::command]
+pub fn agent_get_debug_log_path() -> Option<String> {
+    use crate::agent::debug_log;
+    
+    debug_log::get_debug_file_path().map(|p| p.to_string_lossy().to_string())
 }

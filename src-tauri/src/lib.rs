@@ -23,4 +23,6 @@ pub use vector_db::{
 pub use agent::{
     AgentState, agent_start_task, agent_abort, 
     agent_get_status, agent_continue_with_answer,
+    agent_enable_debug, agent_disable_debug, 
+    agent_is_debug_enabled, agent_get_debug_log_path,
 };
