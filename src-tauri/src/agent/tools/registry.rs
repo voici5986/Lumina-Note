@@ -3,6 +3,7 @@
 //! 管理工具的注册和执行
 
 use crate::agent::types::*;
+use crate::agent::tools::fast_search::FastSearch;
 use regex::Regex;
 use std::collections::HashMap;
 use std::path::Path;
@@ -28,6 +29,7 @@ impl ToolRegistry {
             "create_note" => self.create_note(&tool_call.params).await,
             "list_notes" => self.list_notes(&tool_call.params).await,
             "search_notes" => self.search_notes(&tool_call.params).await,
+            "fast_search" => self.fast_search(&tool_call.params).await,
             "grep_search" => self.grep_search(&tool_call.params).await,
             "semantic_search" => self.semantic_search(&tool_call.params).await,
             "move_note" => self.move_note(&tool_call.params).await,
@@ -63,6 +65,12 @@ impl ToolRegistry {
     fn get_full_path(&self, relative_path: &str) -> String {
         let base = Path::new(&self.workspace_path);
         let rel = relative_path.trim_start_matches('/').trim_start_matches('\\');
+        
+        // 如果是当前目录标识符，直接返回工作区路径
+        if rel.is_empty() || rel == "." {
+            return self.workspace_path.clone();
+        }
+        
         base.join(rel).to_string_lossy().to_string()
     }
 
@@ -100,6 +108,28 @@ impl ToolRegistry {
         for path_value in paths {
             let path = path_value.as_str().ok_or("Invalid path in array")?;
             let full_path = self.get_full_path(path);
+            let full_path_obj = Path::new(&full_path);
+            
+            // 如果是目录，列出目录下的 .md 文件
+            if full_path_obj.is_dir() {
+                let mut dir_files = Vec::new();
+                if let Ok(entries) = std::fs::read_dir(&full_path) {
+                    for entry in entries.filter_map(|e| e.ok()) {
+                        let entry_path = entry.path();
+                        if entry_path.extension().map(|e| e == "md").unwrap_or(false) {
+                            if let Some(name) = entry_path.file_name() {
+                                dir_files.push(format!("  📄 {}", name.to_string_lossy()));
+                            }
+                        }
+                    }
+                }
+                if dir_files.is_empty() {
+                    results.push(format!("📁 {} (空目录或无 .md 文件)\n", path));
+                } else {
+                    results.push(format!("📁 {} ({} 个文件)\n{}\n", path, dir_files.len(), dir_files.join("\n")));
+                }
+                continue;
+            }
             
             match tokio::fs::read_to_string(&full_path).await {
                 Ok(content) => {
@@ -489,10 +519,16 @@ impl ToolRegistry {
             Regex::new(pattern)
         } else {
             Regex::new(&format!("(?i){}", pattern))
-        }.map_err(|e| format!("Invalid regex pattern: {}", e))?;
+        }.map_err(|e| format!("Invalid regex pattern '{}': {}", pattern, e))?;
 
         let full_path = self.get_full_path(search_path);
         let mut results = Vec::new();
+        let mut files_scanned = 0;
+
+        // 检查路径是否存在
+        if !Path::new(&full_path).exists() {
+            return Ok(format!("Search path does not exist: {}", full_path));
+        }
 
         let walker = WalkDir::new(&full_path)
             .into_iter()
@@ -510,11 +546,17 @@ impl ToolRegistry {
                 continue;
             }
 
-            // 跳过隐藏文件
+            // 跳过隐藏文件和特殊目录
             let path_str = path.to_string_lossy();
             if path_str.contains("/.") || path_str.contains("\\.") {
                 continue;
             }
+            // 跳过 .obsidian 目录
+            if path_str.contains(".obsidian") || path_str.contains(".lumina") {
+                continue;
+            }
+
+            files_scanned += 1;
 
             if let Ok(content) = std::fs::read_to_string(path) {
                 let mut file_matches = Vec::new();
@@ -539,10 +581,31 @@ impl ToolRegistry {
         }
 
         if results.is_empty() {
-            Ok(format!("No matches found for pattern '{}'", pattern))
+            Ok(format!("No matches found for '{}' (scanned {} files in '{}', full_path='{}')", 
+                pattern, files_scanned, search_path, full_path))
         } else {
-            Ok(format!("Found {} files matching '{}':\n\n{}", results.len(), pattern, results.join("\n\n")))
+            Ok(format!("Found {} files matching '{}' (scanned {} files):\n\n{}", results.len(), pattern, files_scanned, results.join("\n\n")))
         }
+    }
+
+    /// 快速搜索（并行子代理）
+    async fn fast_search(&self, params: &HashMap<String, serde_json::Value>) -> Result<String, String> {
+        let keywords: Vec<String> = params.get("keywords")
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect())
+            .ok_or("Missing 'keywords' parameter (should be an array of strings)")?;
+
+        if keywords.is_empty() {
+            return Err("keywords array cannot be empty".to_string());
+        }
+
+        // 使用 FastSearch 子代理执行并行搜索
+        let searcher = FastSearch::new(&self.workspace_path);
+        let result = searcher.search_keywords(&keywords);
+        
+        Ok(result.format())
     }
 
     /// 语义搜索（向量搜索）

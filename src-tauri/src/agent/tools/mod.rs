@@ -5,6 +5,8 @@
 pub mod registry;
 pub mod definitions;
 pub mod executors;
+pub mod fast_search;
 
 pub use registry::*;
 pub use definitions::*;
+pub use fast_search::*;

@@ -51,6 +51,7 @@ pub fn get_tools_for_agent(agent: &str) -> Vec<Value> {
             read_outline_definition(),
             read_section_definition(),
             list_notes_definition(),
+            fast_search_definition(),  // 快速并行搜索 - 首选
             search_notes_definition(),
             grep_search_definition(),
             semantic_search_definition(),
@@ -365,6 +366,27 @@ fn grep_search_definition() -> Value {
                     }
                 },
                 "required": ["pattern"]
+            }
+        }
+    })
+}
+
+fn fast_search_definition() -> Value {
+    json!({
+        "type": "function",
+        "function": {
+            "name": "fast_search",
+            "description": "快速并行搜索工具。同时搜索多个关键词，按命中数排序返回结果。比 grep_search 更快（并行处理）且支持多关键词。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "keywords": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "要搜索的关键词列表，如 [\"二重积分\", \"错题\", \"极坐标\"]。文件命中的关键词越多排名越靠前。"
+                    }
+                },
+                "required": ["keywords"]
             }
         }
     })
