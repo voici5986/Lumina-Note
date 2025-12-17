@@ -494,12 +494,12 @@ impl LlmClient {
         }
         req = req.json(&body);
         
-        // 添加请求超时
+        // 添加请求超时（大请求需要更长时间）
         let response = tokio::time::timeout(
-            tokio::time::Duration::from_secs(30),
+            tokio::time::Duration::from_secs(120),
             req.send()
         ).await
-            .map_err(|_| "请求超时（30秒）".to_string())?
+            .map_err(|_| "请求超时（120秒）".to_string())?
             .map_err(|e| format!("Request failed: {}", e))?;
         
         if !response.status().is_success() {
