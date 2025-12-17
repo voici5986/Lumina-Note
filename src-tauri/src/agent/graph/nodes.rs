@@ -994,14 +994,14 @@ fn build_agent_prompt(agent_name: &str, workspace: &str, context: &str, supports
 <new_string>新内容</new_string>
 </edit_note>
 
-示例 - 创建执行计划（任务开始时必须调用）:
-<create_plan>
-<steps>[
-  {{"id": "1", "description": "扫描笔记库目录结构"}},
-  {{"id": "2", "description": "分析主要内容"}},
-  {{"id": "3", "description": "总结并报告结果"}}
-]</steps>
-</create_plan>
+示例 - 更新执行计划（仅复杂任务需要）:
+<update_plan>
+<explanation>任务需要多步执行</explanation>
+<plan>[
+  {{"step": "搜索相关笔记", "status": "in_progress"}},
+  {{"step": "分析内容", "status": "pending"}}
+]</plan>
+</update_plan>
 
 ✅ **可用工具**：{}"#, tools_info)
     };
@@ -1012,7 +1012,7 @@ fn build_agent_prompt(agent_name: &str, workspace: &str, context: &str, supports
 ❗❗❗ 重要警告 ❗❗❗
 你必须通过调用工具来完成任务，绝对禁止编造数据或虚构结果。
 每次响应必须包含至少一个工具调用。
-第一步必须调用 create_plan 创建执行计划。
+**简单任务直接执行，复杂任务才创建计划（见 RULES）**。
 
 你的专长：
 - 深入理解笔记内容和结构
@@ -1034,20 +1034,30 @@ fn build_agent_prompt(agent_name: &str, workspace: &str, context: &str, supports
 
 RULES
 
-1. **对于非简单任务，先调用 update_plan 创建执行计划**
-   - 将任务拆解为简洁的步骤
-   - 每次只能有一个步骤处于 in_progress 状态
-2. **完成步骤后调用 update_plan 更新状态**
-   - 传递完整的 plan 数组，更新相应步骤的 status
-   - status: "pending" | "in_progress" | "completed"
+# 计划触发判断（重要！）
+
+**简单任务（不创建计划，直接执行）**：
+- 单纯的搜索/查找任务 → 直接 fast_search/search_notes → attempt_completion
+- 读取单个文件 → 直接 read_note → attempt_completion
+- 简单问答 → 直接 attempt_completion
+- 预计 1-2 步就能完成的任务
+
+**复杂任务（需要创建计划）**：
+- 需要修改多个文件
+- 需要创建新笔记并填充内容
+- 需要搜索 + 分析 + 修改 的组合操作
+- 涉及文件整理/移动/重命名
+- 预计需要 3 步以上的任务
+
+# 执行规则
+
+1. **简单任务直接执行**，不调用 update_plan，完成后直接 attempt_completion
+2. **复杂任务先创建简洁计划**（2-4 步），每次只有一个步骤 in_progress
 3. 所有文件路径必须相对于笔记库根目录
 4. **修改文件前必须先用 read_note 读取确认当前内容**
 5. 不要询问不必要的信息，直接根据上下文行动
-6. **attempt_completion 只能在所有计划步骤都完成后调用**
-7. 每次工具调用后必须等待结果确认
-8. 如果遇到错误，尝试其他方法而不是放弃
-9. 保持输出简洁，避免冗长解释
-10. **可以连续多次调用工具**来完成复杂任务
+6. 如果遇到错误，尝试其他方法而不是放弃
+7. 保持输出简洁，避免冗长解释
 
 # 编辑 vs 创建文件
 
