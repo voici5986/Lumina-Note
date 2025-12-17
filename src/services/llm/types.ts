@@ -48,6 +48,7 @@ export interface ProviderMeta {
   description: string;
   defaultBaseUrl?: string;
   models: ModelMeta[];
+  supportsFunctionCalling: boolean; // 是否支持 Function Calling
 }
 
 export interface ModelMeta {
@@ -164,6 +165,7 @@ export const PROVIDER_REGISTRY: Record<LLMProviderType, ProviderMeta> = {
     label: "Anthropic",
     description: "Claude models",
     defaultBaseUrl: "https://api.anthropic.com",
+    supportsFunctionCalling: true,
     models: [
       { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", contextWindow: 200000, supportsVision: true },
       { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet", contextWindow: 200000, supportsVision: true },
@@ -177,6 +179,7 @@ export const PROVIDER_REGISTRY: Record<LLMProviderType, ProviderMeta> = {
     label: "OpenAI",
     description: "GPT models",
     defaultBaseUrl: "https://api.openai.com/v1",
+    supportsFunctionCalling: true,
     models: [
       { id: "gpt-4o", name: "GPT-4o", contextWindow: 128000, supportsVision: true },
       { id: "gpt-4o-mini", name: "GPT-4o Mini", contextWindow: 128000, supportsVision: true },
@@ -191,6 +194,7 @@ export const PROVIDER_REGISTRY: Record<LLMProviderType, ProviderMeta> = {
     label: "Google Gemini",
     description: "Gemini models",
     defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    supportsFunctionCalling: true,
     models: [
       { id: "gemini-2.5-pro-preview-06-05", name: "Gemini 2.5 Pro Preview", contextWindow: 1000000, supportsVision: true },
       { id: "gemini-2.5-flash-preview-05-20", name: "Gemini 2.5 Flash Preview", contextWindow: 1000000, supportsVision: true },
@@ -207,6 +211,7 @@ export const PROVIDER_REGISTRY: Record<LLMProviderType, ProviderMeta> = {
     label: "Moonshot",
     description: "Kimi models",
     defaultBaseUrl: "https://api.moonshot.cn/v1",
+    supportsFunctionCalling: true,
     models: [
       { id: "kimi-k2-0711-preview", name: "Kimi K2", contextWindow: 131072 },
       { id: "kimi-k2-thinking", name: "Kimi K2 Thinking", contextWindow: 131072, supportsThinking: true },
@@ -221,6 +226,7 @@ export const PROVIDER_REGISTRY: Record<LLMProviderType, ProviderMeta> = {
     label: "DeepSeek",
     description: "DeepSeek models",
     defaultBaseUrl: "https://api.deepseek.com/v1",
+    supportsFunctionCalling: true,
     models: [
       { id: "deepseek-chat", name: "DeepSeek Chat", contextWindow: 64000 },
       { id: "deepseek-reasoner", name: "DeepSeek R1", contextWindow: 64000, supportsThinking: true },
@@ -232,6 +238,7 @@ export const PROVIDER_REGISTRY: Record<LLMProviderType, ProviderMeta> = {
     label: "Groq",
     description: "Ultra-fast inference",
     defaultBaseUrl: "https://api.groq.com/openai/v1",
+    supportsFunctionCalling: true,
     models: [
       { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B", contextWindow: 128000 },
       { id: "llama-3.1-8b-instant", name: "Llama 3.1 8B", contextWindow: 128000 },
@@ -245,6 +252,7 @@ export const PROVIDER_REGISTRY: Record<LLMProviderType, ProviderMeta> = {
     label: "OpenRouter",
     description: "Multi-model gateway",
     defaultBaseUrl: "https://openrouter.ai/api/v1",
+    supportsFunctionCalling: true,
     models: [
       { id: "anthropic/claude-sonnet-4", name: "Claude Sonnet 4", contextWindow: 200000, supportsVision: true },
       { id: "openai/gpt-4o", name: "GPT-4o", contextWindow: 128000, supportsVision: true },
@@ -259,6 +267,7 @@ export const PROVIDER_REGISTRY: Record<LLMProviderType, ProviderMeta> = {
     label: "Ollama",
     description: "Local models",
     defaultBaseUrl: "http://localhost:11434/v1",
+    supportsFunctionCalling: false, // 本地模型 FC 支持不稳定，使用 XML 模式
     models: [
       { id: "llama3.2", name: "Llama 3.2", contextWindow: 128000 },
       { id: "llama3.2-vision", name: "Llama 3.2 Vision", contextWindow: 128000, supportsVision: true },

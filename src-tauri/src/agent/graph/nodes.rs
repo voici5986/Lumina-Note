@@ -309,7 +309,9 @@ async fn agent_worker_node(
     // ========== 使用 ChatChunks 分层构建消息 ==========
     
     // 1. 构建系统提示（身份 + 规则 + 基础格式提醒）
-    let base_system = build_agent_prompt(agent_name, &state.workspace_path, "");
+    // 根据 provider 是否支持 FC 决定是否包含 XML 格式教学
+    let supports_fc = llm.supports_fc();
+    let base_system = build_agent_prompt(agent_name, &state.workspace_path, "", supports_fc);
     let system_prompt = format!("{}\n{}", base_system, FORMAT_REMINDER);
     
     let mut chunks = ChatChunks::new(system_prompt);
@@ -408,15 +410,20 @@ async fn agent_worker_node(
             total_tokens: response.total_tokens,
         });
 
-        // 解析工具调用
-        let tool_calls = parse_tool_calls(&response.content);
-        
-        if tool_calls.is_none() || tool_calls.as_ref().map(|tc| tc.is_empty()).unwrap_or(true) {
-            // 没有工具调用，LLM 认为任务完成
-            break;
-        }
-        
-        let tool_calls = tool_calls.unwrap();
+        // 获取工具调用：优先使用 FC 模式的直接返回，否则回退到 XML 解析
+        let tool_calls = if let Some(fc_calls) = response.tool_calls {
+            // FC 模式：直接使用 LLM 返回的结构化工具调用
+            if fc_calls.is_empty() {
+                break; // 没有工具调用，任务完成
+            }
+            fc_calls
+        } else {
+            // XML 模式：从文本中解析工具调用
+            match parse_tool_calls(&response.content) {
+                Some(calls) if !calls.is_empty() => calls,
+                _ => break, // 没有工具调用，任务完成
+            }
+        };
         let mut should_complete = false;
         
         for tool_call in tool_calls {
@@ -987,7 +994,9 @@ fn parse_tool_calls(response: &str) -> Option<Vec<ToolCall>> {
     }
 }
 
-fn build_agent_prompt(agent_name: &str, workspace: &str, context: &str) -> String {
+/// 构建 Agent 提示词
+/// supports_fc: 是否支持 Function Calling（支持则不需要 XML 格式教学）
+fn build_agent_prompt(agent_name: &str, workspace: &str, context: &str, supports_fc: bool) -> String {
     let role_desc = match agent_name {
         "editor" => "你是 Lumina 的笔记编辑专家，擅长精确编辑和优化笔记内容。",
         "researcher" => "你是 Lumina 的研究专家，擅长深度搜索和分析笔记库中的信息。",
@@ -1004,31 +1013,25 @@ fn build_agent_prompt(agent_name: &str, workspace: &str, context: &str) -> Strin
         _ => "create_plan, update_plan_progress, read_note, edit_note, create_note, list_notes, search_notes, attempt_completion",
     };
 
-    format!(
-        r#"{role_desc}
+    // FC 模式：不需要 XML 格式教学，工具调用由 API 层处理
+    // XML 模式：需要详细的格式说明和示例
+    let tool_format_section = if supports_fc {
+        // FC 模式：简化提示词
+        format!(r#"TOOL USE
 
-❗❗❗ 重要警告 ❗❗❗
-你必须通过调用工具来完成任务，绝对禁止编造数据或虚构结果。
-每次响应必须包含至少一个工具调用。
-第一步必须调用 create_plan 创建执行计划。
+你可以使用一组工具来完成用户的任务。工具会通过 Function Calling 自动调用。
 
-你的专长：
-- 深入理解笔记内容和结构
-- 优化 Markdown 格式和排版
-- 整理和重构笔记组织
-- 发现笔记间的关联
+总体原则：
+- 只要任务可能影响笔记文件、目录结构或需要读取现有内容，就应该调用相应工具。
+- 即使仅凭思考也能回答，如果使用工具能让结果更完整，也应偏向使用工具。
+- 只有在任务**明确与笔记系统无关**时，才可以只用 attempt_completion 直接回答。
 
-====
+✅ **可用工具**：{}"#, tools_info)
+    } else {
+        // XML 模式：详细的格式说明
+        format!(r#"TOOL USE
 
-工作区路径：{workspace}
-
-{context}
-
-====
-
-TOOL USE
-
-你可以使用一组工具来完成用户的任务。**在任何涉及笔记内容、结构或文件操作的任务中，优先选择使用工具来完成，而不是仅在对话中给出结果。**
+你可以使用一组工具来完成用户的任务。**在任何涉及笔记内容、结构或文件操作的任务中，优先选择使用工具来完成。**
 
 总体原则：
 - 只要任务可能影响笔记文件、目录结构、数据库或需要读取现有内容，就应该调用相应工具。
@@ -1056,12 +1059,6 @@ TOOL USE
 <new_string>新内容</new_string>
 </edit_note>
 
-示例 - 列出目录（可递归）:
-<list_notes>
-<path>.</path>
-<recursive>true</recursive>
-</list_notes>
-
 示例 - 创建执行计划（任务开始时必须调用）:
 <create_plan>
 <steps>[
@@ -1071,13 +1068,32 @@ TOOL USE
 ]</steps>
 </create_plan>
 
-示例 - 更新步骤进度（完成一个步骤后调用）:
-<update_plan_progress>
-<step_id>1</step_id>
-<status>completed</status>
-</update_plan_progress>
+✅ **可用工具**：{}"#, tools_info)
+    };
 
-✅ **你可以使用的工具**：{tools_info}
+    format!(
+        r#"{role_desc}
+
+❗❗❗ 重要警告 ❗❗❗
+你必须通过调用工具来完成任务，绝对禁止编造数据或虚构结果。
+每次响应必须包含至少一个工具调用。
+第一步必须调用 create_plan 创建执行计划。
+
+你的专长：
+- 深入理解笔记内容和结构
+- 优化 Markdown 格式和排版
+- 整理和重构笔记组织
+- 发现笔记间的关联
+
+====
+
+工作区路径：{workspace}
+
+{context}
+
+====
+
+{tool_format_section}
 
 ====
 
@@ -1089,56 +1105,19 @@ RULES
 2. **完成每个步骤后必须立即调用 update_plan_progress 标记进度**
    - step_id: 步骤 ID（数字字符串如 "1", "2", "3"）
    - status: "completed" 或 "skipped"
-   - 执行顺序：执行步骤 → 立即标记该步骤完成 → 执行下一步骤
 3. 所有文件路径必须相对于笔记库根目录
 4. **修改文件前必须先用 read_note 读取确认当前内容**
 5. 不要询问不必要的信息，直接根据上下文行动
-6. 你的目标是完成任务，而不是进行对话
-7. **attempt_completion 只能在所有计划步骤都完成后调用**
-   - ❌ 禁止：还有未完成步骤时调用 attempt_completion
-   - ✅ 正确：每个步骤完成后调用 update_plan_progress，全部完成后再调用 attempt_completion
-   - 如果提前调用，系统会拒绝并要求你继续完成剩余步骤
-8. 禁止以 "好的"、"当然"、"没问题" 等寒暄开头
-9. 每次工具调用后必须等待结果确认
-10. 如果遇到错误，尝试其他方法而不是放弃
-11. 保持输出简洁，避免冗长解释
-12. **可以连续多次调用工具**来完成复杂任务，不要在第一次工具调用后就停止
-13. **禁止输出"自我提醒"或格式说明**，如"不要使用代码块..."等。直接输出内容，不要解释格式
+6. **attempt_completion 只能在所有计划步骤都完成后调用**
+7. 每次工具调用后必须等待结果确认
+8. 如果遇到错误，尝试其他方法而不是放弃
+9. 保持输出简洁，避免冗长解释
+10. **可以连续多次调用工具**来完成复杂任务
 
 # 编辑 vs 创建文件
 
-- **修改现有文件**：必须使用 edit_note，使用精确的 old_string/new_string
-  - 先 read_note 获取当前内容
-  - old_string 必须与原文完全匹配
-  - 只替换需要修改的部分
-  
-- **创建新文件**：使用 create_note
-  - 仅用于创建不存在的文件
-  
-- **禁止**：用 create_note 覆盖已存在的文件
-
-# 工具使用优先级
-
-1. **需要读/写/搜索笔记 → 必须使用工具**
-2. **创作类任务且与笔记相关 → 优先写入文件**
-3. **不确定是否需要工具时 → 先用 read_note / list_notes 探查**
-4. 宁可多一步只读类工具调用，也不要完全不使用工具
-
-====
-
-CAPABILITIES
-
-你可以：
-1. 读取笔记库中的任意 Markdown 文件
-2. 创建新的笔记文件
-3. 编辑现有笔记（精确的查找替换）
-4. 列出目录结构和文件（支持递归）
-5. 完成任务并提供总结
-
-你不能：
-1. 访问笔记库之外的文件
-2. 执行系统命令
-3. 访问网络资源
+- **修改现有文件**：必须使用 edit_note（old_string/new_string 必须精确匹配）
+- **创建新文件**：使用 create_note（仅用于创建不存在的文件）
 
 ====
 
@@ -1149,6 +1128,6 @@ OBJECTIVE
         role_desc = role_desc,
         workspace = workspace,
         context = if context.is_empty() { "(无上下文)" } else { context },
-        tools_info = tools_info
+        tool_format_section = tool_format_section
     )
 }

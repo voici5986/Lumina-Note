@@ -50,6 +50,7 @@ struct FunctionDefinition {
 #[derive(Debug, Clone)]
 pub struct LlmResponse {
     pub content: String,
+    pub tool_calls: Option<Vec<ToolCall>>,  // FC 模式下直接返回解析后的工具调用
     pub prompt_tokens: usize,
     pub completion_tokens: usize,
     pub total_tokens: usize,
@@ -93,6 +94,15 @@ impl LlmClient {
             "moonshot" => "https://api.moonshot.cn/v1".to_string(),
             "groq" => "https://api.groq.com/openai/v1".to_string(),
             _ => "https://api.openai.com/v1".to_string(),
+        }
+    }
+
+    /// 判断当前 provider 是否支持 Function Calling
+    pub fn supports_fc(&self) -> bool {
+        match self.config.provider.as_str() {
+            "openai" | "anthropic" | "deepseek" | "moonshot" | "gemini" | "groq" | "openrouter" => true,
+            "ollama" => false,  // 本地模型 FC 支持不稳定，使用 XML 模式
+            _ => false,  // 未知 provider 默认不支持
         }
     }
 
@@ -151,9 +161,15 @@ impl LlmClient {
             "stream": false,
         });
         
+        let has_tools = tools.is_some();
         if let Some(tools) = tools {
             body["tools"] = json!(tools);
         }
+        
+        println!("[LlmClient] 📤 发送请求到: {}", url);
+        println!("[LlmClient] 📤 模型: {}, 消息数: {}, 工具: {}", 
+            self.config.model, chat_messages.len(), has_tools);
+        let start_time = std::time::Instant::now();
         
         let mut req = self.client.post(&url);
         for (key, value) in headers {
@@ -162,7 +178,12 @@ impl LlmClient {
         req = req.json(&body);
         
         let response = req.send().await
-            .map_err(|e| format!("Request failed: {}", e))?;
+            .map_err(|e| {
+                println!("[LlmClient] ❌ 请求失败: {}", e);
+                format!("Request failed: {}", e)
+            })?;
+        
+        println!("[LlmClient] ✅ 收到响应，耗时: {:?}", start_time.elapsed());
         
         if !response.status().is_success() {
             let status = response.status();
@@ -182,34 +203,64 @@ impl LlmClient {
         let message = &json["choices"][0]["message"];
         
         // 检查是否有 tool_calls（Function Call）
-        if let Some(tool_calls) = message.get("tool_calls").and_then(|v| v.as_array()) {
-            // 将 tool_calls 转换为 XML 格式，保持与现有解析逻辑兼容
-            let mut xml_output = String::new();
-            for tc in tool_calls {
-                let name = tc["function"]["name"].as_str().unwrap_or("");
-                let args_str = tc["function"]["arguments"].as_str().unwrap_or("{}");
-                
-                // 解析参数 JSON
-                if let Ok(args) = serde_json::from_str::<Value>(args_str) {
-                    xml_output.push_str(&format!("<{}>\n", name));
-                    if let Some(obj) = args.as_object() {
-                        for (key, value) in obj {
-                            let val_str = match value {
-                                Value::String(s) => s.clone(),
-                                _ => value.to_string(),
-                            };
-                            xml_output.push_str(&format!("<{}>{}</{}>\n", key, val_str, key));
-                        }
-                    }
-                    xml_output.push_str(&format!("</{}>\n", name));
+        if let Some(fc_tool_calls) = message.get("tool_calls").and_then(|v| v.as_array()) {
+            if self.supports_fc() {
+                // FC 模式：直接解析 JSON 返回结构化工具调用
+                let mut parsed_calls = Vec::new();
+                for (idx, tc) in fc_tool_calls.iter().enumerate() {
+                    let name = tc["function"]["name"].as_str().unwrap_or("").to_string();
+                    let args_str = tc["function"]["arguments"].as_str().unwrap_or("{}");
+                    
+                    // 解析参数 JSON
+                    let params: HashMap<String, Value> = serde_json::from_str(args_str)
+                        .unwrap_or_default();
+                    
+                    parsed_calls.push(ToolCall {
+                        id: format!("call_{}", idx),
+                        name,
+                        params,
+                    });
                 }
+                
+                // 文本内容（如果有）
+                let content = message["content"].as_str().unwrap_or("").to_string();
+                
+                return Ok(LlmResponse {
+                    content,
+                    tool_calls: Some(parsed_calls),
+                    prompt_tokens,
+                    completion_tokens,
+                    total_tokens,
+                });
+            } else {
+                // XML 模式（Ollama 等不支持 FC 的 provider）：转换为 XML 格式
+                let mut xml_output = String::new();
+                for tc in fc_tool_calls {
+                    let name = tc["function"]["name"].as_str().unwrap_or("");
+                    let args_str = tc["function"]["arguments"].as_str().unwrap_or("{}");
+                    
+                    if let Ok(args) = serde_json::from_str::<Value>(args_str) {
+                        xml_output.push_str(&format!("<{}>\n", name));
+                        if let Some(obj) = args.as_object() {
+                            for (key, value) in obj {
+                                let val_str = match value {
+                                    Value::String(s) => s.clone(),
+                                    _ => value.to_string(),
+                                };
+                                xml_output.push_str(&format!("<{}>{}</{}>\n", key, val_str, key));
+                            }
+                        }
+                        xml_output.push_str(&format!("</{}>\n", name));
+                    }
+                }
+                return Ok(LlmResponse {
+                    content: xml_output,
+                    tool_calls: None,
+                    prompt_tokens,
+                    completion_tokens,
+                    total_tokens,
+                });
             }
-            return Ok(LlmResponse {
-                content: xml_output,
-                prompt_tokens,
-                completion_tokens,
-                total_tokens,
-            });
         }
         
         // 提取文本内容
@@ -220,6 +271,7 @@ impl LlmClient {
         
         Ok(LlmResponse {
             content,
+            tool_calls: None,
             prompt_tokens,
             completion_tokens,
             total_tokens,
