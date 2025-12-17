@@ -7,8 +7,7 @@ use serde_json::{json, Value};
 /// 获取所有工具定义
 pub fn get_all_tool_definitions() -> Vec<Value> {
     vec![
-        create_plan_definition(),
-        update_plan_progress_definition(),
+        update_plan_definition(),
         read_note_definition(),
         read_outline_definition(),
         read_section_definition(),
@@ -32,8 +31,7 @@ pub fn get_all_tool_definitions() -> Vec<Value> {
 pub fn get_tools_for_agent(agent: &str) -> Vec<Value> {
     match agent {
         "editor" => vec![
-            create_plan_definition(),
-            update_plan_progress_definition(),
+            update_plan_definition(),
             read_note_definition(),
             read_outline_definition(),
             read_section_definition(),
@@ -45,8 +43,7 @@ pub fn get_tools_for_agent(agent: &str) -> Vec<Value> {
             attempt_completion_definition(),
         ],
         "researcher" => vec![
-            create_plan_definition(),
-            update_plan_progress_definition(),
+            update_plan_definition(),
             read_note_definition(),
             read_outline_definition(),
             read_section_definition(),
@@ -60,8 +57,7 @@ pub fn get_tools_for_agent(agent: &str) -> Vec<Value> {
             attempt_completion_definition(),
         ],
         "writer" => vec![
-            create_plan_definition(),
-            update_plan_progress_definition(),
+            update_plan_definition(),
             read_note_definition(),
             create_note_definition(),
             edit_note_definition(),
@@ -70,8 +66,7 @@ pub fn get_tools_for_agent(agent: &str) -> Vec<Value> {
             attempt_completion_definition(),
         ],
         "organizer" => vec![
-            create_plan_definition(),
-            update_plan_progress_definition(),
+            update_plan_definition(),
             read_note_definition(),
             list_notes_definition(),
             move_note_definition(),
@@ -492,64 +487,43 @@ fn get_backlinks_definition() -> Value {
     })
 }
 
-fn create_plan_definition() -> Value {
+/// Windsurf 风格的 update_plan 工具定义
+/// 单一工具管理任务计划，支持创建和更新
+fn update_plan_definition() -> Value {
     json!({
         "type": "function",
         "function": {
-            "name": "create_plan",
-            "description": "在开始执行任务前，必须先调用此工具来创建执行计划。将任务拆解为具体步骤。",
+            "name": "update_plan",
+            "description": "管理任务计划。用于创建新计划或更新现有计划的步骤状态。每次调用传入完整的计划列表。同一时间只能有一个步骤处于 in_progress 状态。",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "steps": {
+                    "explanation": {
+                        "type": "string",
+                        "description": "可选的计划说明，解释为什么创建或更新计划"
+                    },
+                    "plan": {
                         "type": "array",
                         "description": "计划步骤列表",
                         "items": {
                             "type": "object",
                             "properties": {
-                                "id": {
+                                "step": {
                                     "type": "string",
-                                    "description": "步骤 ID，如 '1', '2', '3'"
+                                    "description": "步骤描述"
                                 },
-                                "description": {
+                                "status": {
                                     "type": "string",
-                                    "description": "步骤描述，具体说明要做什么"
+                                    "enum": ["pending", "in_progress", "completed"],
+                                    "description": "步骤状态：pending=待执行, in_progress=执行中, completed=已完成"
                                 }
                             },
-                            "required": ["id", "description"]
+                            "required": ["step", "status"],
+                            "additionalProperties": false
                         }
                     }
                 },
-                "required": ["steps"]
-            }
-        }
-    })
-}
-
-fn update_plan_progress_definition() -> Value {
-    json!({
-        "type": "function",
-        "function": {
-            "name": "update_plan_progress",
-            "description": "更新计划步骤的执行状态。完成一个步骤后调用此工具标记完成。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "step_id": {
-                        "type": "string",
-                        "description": "要更新的步骤 ID"
-                    },
-                    "status": {
-                        "type": "string",
-                        "enum": ["completed", "skipped", "failed"],
-                        "description": "步骤状态：completed=已完成, skipped=跳过, failed=失败"
-                    },
-                    "result": {
-                        "type": "string",
-                        "description": "步骤执行结果或跳过/失败的原因（可选）"
-                    }
-                },
-                "required": ["step_id", "status"]
+                "required": ["plan"]
             }
         }
     })

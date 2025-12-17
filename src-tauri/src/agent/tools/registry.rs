@@ -39,9 +39,8 @@ impl ToolRegistry {
             "get_backlinks" => self.get_backlinks(&tool_call.params).await,
             "ask_user" => self.ask_user(&tool_call.params).await,
             "attempt_completion" => self.attempt_completion(&tool_call.params).await,
-            // 这两个工具在 agent_worker_node 中特殊处理，这里只返回确认
-            "create_plan" => Ok("计划已创建".to_string()),
-            "update_plan_progress" => Ok("进度已更新".to_string()),
+            // update_plan 在 agent_worker_node 中特殊处理，这里只返回确认
+            "update_plan" => Ok("计划已更新".to_string()),
             _ => Err(format!("Unknown tool: {}", tool_call.name)),
         };
 

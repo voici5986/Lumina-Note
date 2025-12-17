@@ -209,11 +209,10 @@ pub async fn planner_node(
 
     // 解析计划
     if let Some(plan) = parse_plan(&response.content) {
-        let _ = app.emit("agent-event", AgentEvent::PlanCreated {
+        let _ = app.emit("agent-event", AgentEvent::PlanUpdated {
             plan: plan.clone(),
         });
         state.current_plan = Some(plan);
-        state.current_step_index = 0;
         state.goto = "executor".to_string();
     } else {
         // 无法解析计划，直接交给 reporter
@@ -229,38 +228,18 @@ pub async fn planner_node(
     })
 }
 
-/// 执行器节点 - 执行计划中的当前步骤
+/// 执行器节点 - 根据意图路由到对应的 agent (Windsurf 风格简化)
 pub async fn executor_node(
-    app: &AppHandle,
+    _app: &AppHandle,
     _llm: &LlmClient,
     mut state: GraphState,
 ) -> Result<NodeResult, String> {
-    let plan = state.current_plan.as_ref()
-        .ok_or("No plan found")?;
-    
-    if state.current_step_index >= plan.steps.len() {
-        // 所有步骤完成
-        state.goto = "reporter".to_string();
-        return Ok(NodeResult {
-            state,
-            next_node: Some("reporter".to_string()),
-        });
-    }
-
-    let step = &plan.steps[state.current_step_index];
-    
-    let _ = app.emit("agent-event", AgentEvent::StepStarted {
-        step: step.clone(),
-        index: state.current_step_index,
-    });
-
-    // 根据步骤的 agent 类型路由
-    let next_node = match step.agent {
-        AgentType::Editor => "editor",
-        AgentType::Researcher => "researcher",
-        AgentType::Writer => "writer",
-        AgentType::Organizer => "organizer",
-        _ => "reporter",
+    // Windsurf 风格：计划只是展示给用户的，实际执行根据 intent 决定
+    // 直接根据意图路由到合适的 agent
+    let next_node = match state.intent {
+        TaskIntent::Edit | TaskIntent::Create | TaskIntent::Organize => "editor",
+        TaskIntent::Search | TaskIntent::Complex => "researcher",
+        _ => "researcher", // 默认使用 researcher
     };
 
     state.goto = next_node.to_string();
@@ -484,51 +463,67 @@ async fn agent_worker_node(
                 result: result.clone(),
             });
 
-            // 处理 create_plan 工具
-            if tool_call.name == "create_plan" {
-                if let Some(steps_value) = tool_call.params.get("steps") {
-                    if let Some(steps_array) = steps_value.as_array() {
+            // 处理 update_plan 工具 (Windsurf 风格)
+            if tool_call.name == "update_plan" {
+                if let Some(plan_value) = tool_call.params.get("plan") {
+                    if let Some(plan_array) = plan_value.as_array() {
+                        let explanation = tool_call.params.get("explanation")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                        
                         let mut plan_steps = Vec::new();
-                        for step in steps_array {
-                            let id = step.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                            let description = step.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                            plan_steps.push(PlanStep {
-                                id,
-                                description,
-                                agent: agent_type.clone(),
-                                completed: false,
-                                result: None,
-                            });
+                        for step in plan_array {
+                            let step_text = step.get("step").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                            let status_str = step.get("status").and_then(|v| v.as_str()).unwrap_or("pending");
+                            let status = match status_str {
+                                "in_progress" => PlanStepStatus::InProgress,
+                                "completed" => PlanStepStatus::Completed,
+                                _ => PlanStepStatus::Pending,
+                            };
+                            plan_steps.push(PlanStep { step: step_text, status });
                         }
                         
                         let plan = Plan {
                             steps: plan_steps,
-                            current_step: 0,
+                            explanation,
                         };
                         
-                        // 发送计划创建事件
-                        let _ = app.emit("agent-event", AgentEvent::PlanCreated {
+                        // 发送计划更新事件
+                        let _ = app.emit("agent-event", AgentEvent::PlanUpdated {
                             plan: plan.clone(),
                         });
                         
-                        // 构建详细反馈
-                        let steps_list: Vec<String> = plan.steps.iter()
-                            .map(|s| format!("{}. {}", s.id, s.description))
+                        // 构建反馈
+                        let completed_count = plan.steps.iter()
+                            .filter(|s| s.status == PlanStepStatus::Completed)
+                            .count();
+                        let in_progress: Vec<String> = plan.steps.iter()
+                            .enumerate()
+                            .filter(|(_, s)| s.status == PlanStepStatus::InProgress)
+                            .map(|(i, s)| format!("{}. {}", i + 1, s.step))
                             .collect();
+                        let pending: Vec<String> = plan.steps.iter()
+                            .enumerate()
+                            .filter(|(_, s)| s.status == PlanStepStatus::Pending)
+                            .map(|(i, s)| format!("{}. {}", i + 1, s.step))
+                            .collect();
+                        
                         let feedback = format!(
-                            "✅ 计划已创建，共 {} 个步骤：\n{}\n\n请开始执行步骤 1。",
+                            "✅ 计划已更新 ({}/{})\n{}{}\n{}",
+                            completed_count,
                             plan.steps.len(),
-                            steps_list.join("\n")
+                            if let Some(ref exp) = plan.explanation { format!("说明: {}\n", exp) } else { String::new() },
+                            if !in_progress.is_empty() { format!("执行中: {}\n", in_progress.join("，")) } else { String::new() },
+                            if !pending.is_empty() { format!("待完成: {}", pending.join("，")) } else { "所有步骤已完成".to_string() }
                         );
                         
                         state.current_plan = Some(plan);
-                        state.current_step_index = 0;
                         
-                        // 添加详细反馈到消息历史
-                        state.observations.push(format!("[create_plan] {}", feedback));
+                        // 添加反馈到消息历史
+                        state.observations.push(format!("[update_plan] {}", feedback));
                         messages.push(Message {
                             role: MessageRole::User,
-                            content: format!("工具 create_plan 执行结果：\n{}", feedback),
+                            content: format!("工具 update_plan 执行结果：\n{}", feedback),
                             name: None,
                             tool_call_id: None,
                         });
@@ -536,129 +531,32 @@ async fn agent_worker_node(
                     }
                 }
             }
-            
-            // 处理 update_plan_progress 工具
-            if tool_call.name == "update_plan_progress" {
-                // step_id 可能是字符串 "1" 或数字 1，都要处理
-                let step_id = tool_call.params.get("step_id")
-                    .map(|v| match v {
-                        serde_json::Value::String(s) => s.clone(),
-                        serde_json::Value::Number(n) => n.to_string(),
-                        _ => String::new(),
-                    })
-                    .unwrap_or_default();
-                let status = tool_call.params.get("status").and_then(|v| v.as_str()).unwrap_or("completed");
-                
-                let mut feedback = String::new();
-                
-                if let Some(ref mut plan) = state.current_plan {
-                    // 检查步骤是否已经完成
-                    let already_completed = plan.steps.iter()
-                        .find(|s| s.id == step_id)
-                        .map(|s| s.completed)
-                        .unwrap_or(false);
-                    
-                    if already_completed {
-                        // 步骤已完成，返回警告
-                        let completed_count = plan.steps.iter().filter(|s| s.completed).count();
-                        let pending: Vec<String> = plan.steps.iter()
-                            .filter(|s| !s.completed)
-                            .map(|s| format!("{}. {}", s.id, s.description))
-                            .collect();
-                        
-                        feedback = format!(
-                            "⚠️ 步骤 {} 已经完成过了。\n当前进度：{}/{}\n{}",
-                            step_id,
-                            completed_count,
-                            plan.steps.len(),
-                            if pending.is_empty() { 
-                                "所有步骤已完成，请调用 attempt_completion 结束任务。".to_string()
-                            } else { 
-                                format!("待完成：{}", pending.join("，")) 
-                            }
-                        );
-                    } else {
-                        // 找到对应的步骤并更新
-                        for (index, step) in plan.steps.iter_mut().enumerate() {
-                            if step.id == step_id {
-                                step.completed = status == "completed" || status == "skipped";
-                                
-                                // 发送步骤完成事件
-                                let _ = app.emit("agent-event", AgentEvent::StepCompleted {
-                                    step: step.clone(),
-                                    index,
-                                });
-                                
-                                // 更新当前步骤索引
-                                if step.completed && index == plan.current_step {
-                                    plan.current_step = index + 1;
-                                }
-                                break;
-                            }
-                        }
-                        
-                        // 构建详细反馈
-                        let completed_count = plan.steps.iter().filter(|s| s.completed).count();
-                        let step_desc = plan.steps.iter()
-                            .find(|s| s.id == step_id)
-                            .map(|s| s.description.clone())
-                            .unwrap_or_default();
-                        let pending: Vec<String> = plan.steps.iter()
-                            .filter(|s| !s.completed)
-                            .map(|s| format!("{}. {}", s.id, s.description))
-                            .collect();
-                        
-                        feedback = format!(
-                            "✅ 步骤 {}「{}」已完成。\n当前进度：{}/{}\n{}",
-                            step_id,
-                            step_desc,
-                            completed_count,
-                            plan.steps.len(),
-                            if pending.is_empty() { 
-                                "所有步骤已完成，请调用 attempt_completion 结束任务。".to_string()
-                            } else { 
-                                format!("待完成：{}", pending.join("，")) 
-                            }
-                        );
-                    }
-                }
-                
-                // 用详细反馈替换简单的 result.content
-                // 直接添加到消息历史，跳过后面的默认处理
-                state.observations.push(format!("[update_plan_progress] {}", feedback));
-                messages.push(Message {
-                    role: MessageRole::User,
-                    content: format!("工具 update_plan_progress 执行结果：\n{}", feedback),
-                    name: None,
-                    tool_call_id: None,
-                });
-                continue; // 跳过默认的消息添加
-            }
 
             // 检查是否完成
             if tool_call.name == "attempt_completion" {
-                // 检查计划是否全部完成
+                // 检查计划是否全部完成 (Windsurf 风格)
                 let all_steps_completed = state.current_plan.as_ref()
-                    .map(|plan| plan.steps.iter().all(|s| s.completed))
+                    .map(|plan| plan.steps.iter().all(|s| s.status == PlanStepStatus::Completed))
                     .unwrap_or(true); // 没有计划则视为完成
                 
                 let incomplete_count = state.current_plan.as_ref()
-                    .map(|plan| plan.steps.iter().filter(|s| !s.completed).count())
+                    .map(|plan| plan.steps.iter().filter(|s| s.status != PlanStepStatus::Completed).count())
                     .unwrap_or(0);
                 
                 if !all_steps_completed && iteration < max_iterations - 1 {
                     // 还有未完成的步骤，且未达最大次数，拒绝结束
                     let pending: Vec<String> = state.current_plan.as_ref()
                         .map(|plan| plan.steps.iter()
-                            .filter(|s| !s.completed)
-                            .map(|s| format!("{}. {}", s.id, s.description))
+                            .enumerate()
+                            .filter(|(_, s)| s.status != PlanStepStatus::Completed)
+                            .map(|(i, s)| format!("{}. {}", i + 1, s.step))
                             .collect())
                         .unwrap_or_default();
                     
                     messages.push(Message {
                         role: MessageRole::User,
                         content: format!(
-                            "[系统提醒] ⚠️ 拒绝结束！计划中还有 {} 个步骤未完成：\n{}\n\n请继续执行这些步骤，每完成一个就调用 update_plan_progress 标记。全部完成后再调用 attempt_completion。",
+                            "[系统提醒] ⚠️ 拒绝结束！计划中还有 {} 个步骤未完成：\n{}\n\n请调用 update_plan 更新步骤状态后再调用 attempt_completion。",
                             incomplete_count,
                             pending.join("\n")
                         ),
@@ -667,18 +565,6 @@ async fn agent_worker_node(
                     });
                     // 跳过后续处理，继续循环
                     continue;
-                }
-                
-                // 全部完成，或达到最大次数，允许结束
-                if !all_steps_completed {
-                    // 标记未完成的步骤
-                    if let Some(ref mut plan) = state.current_plan {
-                        for step in plan.steps.iter_mut() {
-                            if !step.completed {
-                                step.result = Some("超时未完成".to_string());
-                            }
-                        }
-                    }
                 }
                 
                 if let Some(result_text) = tool_call.params.get("result").and_then(|v| v.as_str()) {
@@ -729,20 +615,11 @@ async fn agent_worker_node(
         }
     }
 
-    // 循环结束，检查并标记未完成的步骤
-    if let Some(ref mut plan) = state.current_plan {
-        for (index, step) in plan.steps.iter_mut().enumerate() {
-            if !step.completed {
-                // 标记为失败（未完成）
-                step.result = Some("未完成".to_string());
-                
-                // 发送步骤失败事件（前端可以显示为红色 X）
-                let _ = app.emit("agent-event", AgentEvent::StepCompleted {
-                    step: step.clone(),
-                    index,
-                });
-            }
-        }
+    // 循环结束，发送最终计划状态
+    if let Some(ref plan) = state.current_plan {
+        let _ = app.emit("agent-event", AgentEvent::PlanUpdated {
+            plan: plan.clone(),
+        });
     }
 
     // 工具调用循环结束后，去 reporter 汇报
@@ -917,34 +794,47 @@ fn parse_plan(response: &str) -> Option<Plan> {
     // 提取 JSON（可能被 Markdown 代码块包裹）
     let json_str = extract_json(response);
     
-    // 尝试解析 JSON
+    // 尝试解析 JSON (Windsurf 风格)
     if let Ok(json) = serde_json::from_str::<Value>(&json_str) {
+        // 尝试解析 plan 数组（新格式）
+        if let Some(plan_array) = json.get("plan").and_then(|v| v.as_array()) {
+            let plan_steps: Vec<PlanStep> = plan_array.iter()
+                .filter_map(|s| {
+                    let step = s.get("step").and_then(|v| v.as_str())?.to_string();
+                    let status_str = s.get("status").and_then(|v| v.as_str()).unwrap_or("pending");
+                    let status = match status_str {
+                        "in_progress" => PlanStepStatus::InProgress,
+                        "completed" => PlanStepStatus::Completed,
+                        _ => PlanStepStatus::Pending,
+                    };
+                    Some(PlanStep { step, status })
+                })
+                .collect();
+            
+            if !plan_steps.is_empty() {
+                let explanation = json.get("explanation")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                return Some(Plan {
+                    steps: plan_steps,
+                    explanation,
+                });
+            }
+        }
+        
+        // 兼容旧格式 steps 数组
         if let Some(steps) = json.get("steps").and_then(|v| v.as_array()) {
             let plan_steps: Vec<PlanStep> = steps.iter()
                 .filter_map(|s| {
-                    let id = s.get("id").and_then(|v| v.as_str()).unwrap_or("1").to_string();
-                    let description = s.get("description").and_then(|v| v.as_str())?.to_string();
-                    let agent_str = s.get("agent").and_then(|v| v.as_str()).unwrap_or("editor");
-                    let agent = match agent_str {
-                        "researcher" => AgentType::Researcher,
-                        "writer" => AgentType::Writer,
-                        "organizer" => AgentType::Organizer,
-                        _ => AgentType::Editor,
-                    };
-                    Some(PlanStep {
-                        id,
-                        description,
-                        agent,
-                        completed: false,
-                        result: None,
-                    })
+                    let step = s.get("description").and_then(|v| v.as_str())?.to_string();
+                    Some(PlanStep { step, status: PlanStepStatus::Pending })
                 })
                 .collect();
             
             if !plan_steps.is_empty() {
                 return Some(Plan {
                     steps: plan_steps,
-                    current_step: 0,
+                    explanation: None,
                 });
             }
         }
@@ -959,8 +849,8 @@ fn parse_tool_calls(response: &str) -> Option<Vec<ToolCall>> {
     
     // 所有工具名（必须包含全部工具）
     let tool_names = [
-        // 计划工具
-        "create_plan", "update_plan_progress",
+        // 计划工具 (Windsurf 风格)
+        "update_plan",
         // 笔记操作
         "read_note", "read_outline", "read_section",
         "edit_note", "create_note", "list_notes",

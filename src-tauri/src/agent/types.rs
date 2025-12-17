@@ -99,23 +99,34 @@ pub struct ToolResult {
     pub error: Option<String>,
 }
 
-/// 计划步骤
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlanStep {
-    pub id: String,
-    pub description: String,
-    pub agent: AgentType,
-    #[serde(default)]
-    pub completed: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub result: Option<String>,
+/// 计划步骤状态 (Windsurf 风格)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum PlanStepStatus {
+    Pending,
+    InProgress,
+    Completed,
 }
 
-/// 任务计划
+impl Default for PlanStepStatus {
+    fn default() -> Self {
+        PlanStepStatus::Pending
+    }
+}
+
+/// 计划步骤 (Windsurf 风格)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanStep {
+    pub step: String,
+    pub status: PlanStepStatus,
+}
+
+/// 任务计划 (Windsurf 风格)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Plan {
     pub steps: Vec<PlanStep>,
-    pub current_step: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub explanation: Option<String>,
 }
 
 /// RAG 搜索结果
@@ -262,12 +273,8 @@ pub enum AgentEvent {
     ToolCall { tool: ToolCall },
     /// 工具结果
     ToolResult { result: ToolResult },
-    /// 计划创建
-    PlanCreated { plan: Plan },
-    /// 步骤开始
-    StepStarted { step: PlanStep, index: usize },
-    /// 步骤完成
-    StepCompleted { step: PlanStep, index: usize },
+    /// 计划更新（Windsurf 风格：每次发送完整计划）
+    PlanUpdated { plan: Plan },
     /// Token 使用量
     TokenUsage { prompt_tokens: usize, completion_tokens: usize, total_tokens: usize },
     /// 任务完成
