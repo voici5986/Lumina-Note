@@ -1,4 +1,4 @@
-﻿/**
+/**
  * FlashcardView - 闪卡主视图
  *
  * 组合牌组列表和复习界面，并在文件树变化时自动刷新闪卡。
@@ -68,26 +68,28 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ deckId }) => {
 
   // 显示牌组列表（加载时保持组件挂载，用遮罩提示，以免展开状态丢失）
   return (
-    <div className="relative flex-1 overflow-auto">
-      {!hasLoadedOnce && isLoading && (
-        <div className="absolute inset-0 bg-background/60 backdrop-blur-[1px] flex items-center justify-center z-10">
-          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-        </div>
-      )}
+    <>
+      <div className="relative flex-1 overflow-auto">
+        {!hasLoadedOnce && isLoading && (
+          <div className="absolute inset-0 bg-background/60 backdrop-blur-[1px] flex items-center justify-center z-10">
+            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          </div>
+        )}
 
-      <DeckList 
-        onStartReview={handleStartReview}
-        onCreateCard={handleCreateCard}
-      />
+        <DeckList 
+          onStartReview={handleStartReview}
+          onCreateCard={handleCreateCard}
+        />
+      </div>
       
-      {/* 创建卡片对话框 - 简化版，后续可扩展 */}
+      {/* 创建卡片对话框 - 移到外层确保全屏遮罩 */}
       {showCreateCard && (
         <CreateCardDialog
           deckId={createDeckId}
           onClose={() => setShowCreateCard(false)}
         />
       )}
-    </div>
+    </>
   );
 };
 
@@ -126,7 +128,7 @@ const CreateCardDialog: React.FC<CreateCardDialogProps> = ({ deckId, onClose }) 
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-card border rounded-xl p-6 w-full max-w-md shadow-xl">
+      <div className="bg-white dark:bg-neutral-900 border rounded-xl p-6 w-full max-w-md shadow-xl">
         <h3 className="text-lg font-semibold mb-4">创建新卡片</h3>
         
         <div className="space-y-4">
