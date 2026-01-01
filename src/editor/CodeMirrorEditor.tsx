@@ -320,13 +320,6 @@ class TableWidget extends WidgetType {
   ignoreEvent() { return true; }
 }
 
-class HangingMarkWidget extends WidgetType {
-  constructor(readonly mark: string) { super(); }
-  eq(other: HangingMarkWidget) { return other.mark === this.mark; }
-  toDOM() { const s = document.createElement("span"); s.className = "cm-formatting-hanging"; s.textContent = this.mark; return s; }
-  ignoreEvent() { return true; }
-}
-
 class CodeBlockWidget extends WidgetType {
   constructor(readonly code: string, readonly language: string) { super(); }
   eq(other: CodeBlockWidget) { return other.code === this.code && other.language === this.language; }
@@ -529,7 +522,6 @@ const livePreviewPlugin = ViewPlugin.fromClass(class {
       const end = state.doc.lineAt(r.to).number;
       for(let l=start; l<=end; l++) activeLines.add(l);
     }
-    const lineHanging = new Map<number, boolean>();
     const isDrag = state.field(mouseSelectingField, false);
 
     syntaxTree(state).iterate({
