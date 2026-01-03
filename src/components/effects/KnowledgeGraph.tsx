@@ -172,7 +172,7 @@ const PhysicsEngine = {
       const distToCenter = Math.sqrt(dx * dx + dy * dy);
       // 圆形边界半径（取宽高最小值的一半，留一点边距）
       const boundaryRadius = Math.min(width, height) * 0.45;
-      
+
       // 如果超出边界，施加一个柔和的向心力（力度随超出程度增加）
       if (distToCenter > boundaryRadius) {
         const overflow = distToCenter - boundaryRadius;
@@ -270,12 +270,12 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
       displayNodes = nodes.filter(n => !n.isFolder);
       displayEdges = edges.filter(e => e.type === 'link'); // 只保留双链边
     }
-    
+
     if (isolatedNode) {
       // 找到目标节点的所有直接相连节点
       const connectedIds = new Set<string>();
       connectedIds.add(isolatedNode.id);
-      
+
       for (const edge of displayEdges) {
         if (edge.source === isolatedNode.id) {
           connectedIds.add(edge.target);
@@ -284,9 +284,9 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
           connectedIds.add(edge.source);
         }
       }
-      
+
       displayNodes = displayNodes.filter(n => connectedIds.has(n.id));
-      displayEdges = displayEdges.filter(e => 
+      displayEdges = displayEdges.filter(e =>
         connectedIds.has(e.source) && connectedIds.has(e.target)
       );
     }
@@ -296,7 +296,7 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
     const height = containerRef.current?.offsetHeight || 400;
     nodesRef.current = PhysicsEngine.init(displayNodes, width, height);
     edgesRef.current = displayEdges;
-    
+
     setDimensions({ width, height });
   }, [isolatedNode]);
 
@@ -352,10 +352,10 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
         } else if (!entry.is_dir && entry.name.endsWith(".md")) {
           // 文件节点
           const nodeName = entry.name.replace(".md", "");
-          
+
           // 获取文件所在文件夹的颜色（子层覆盖父层）
           let nodeColor = 'hsl(var(--muted-foreground))';
-          
+
           // 查找最近的父文件夹颜色，文件使用柔和色
           for (const [folderPath, colors] of folderColorMap.entries()) {
             if (entry.path.startsWith(folderPath)) {
@@ -396,34 +396,38 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
 
     // 读取文件内容，提取双链
     const { readFile } = await import("@/lib/tauri");
-    
-    for (const node of nodes) {
-      if (node.isFolder) continue; // 跳过文件夹
-      
-      try {
-        const content = await readFile(node.path);
-        const links = extractWikiLinks(content);
-        
-        for (const linkName of links) {
-          const targetNode = nodeMap.get(linkName.toLowerCase());
-          if (targetNode && targetNode.id !== node.id && !targetNode.isFolder) {
-            // 检查双链边是否已存在
-            const exists = edges.some(
-              (e) =>
-                e.type === 'link' &&
-                ((e.source === node.id && e.target === targetNode.id) ||
-                (e.source === targetNode.id && e.target === node.id))
-            );
-            if (!exists) {
-              edges.push({ source: node.id, target: targetNode.id, type: 'link' });
-              node.connections++;
-              targetNode.connections++;
+
+    // 限制并发读取数量，避免阻塞 RPC 通道
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < nodes.length; i += BATCH_SIZE) {
+      const batch = nodes.slice(i, i + BATCH_SIZE);
+      await Promise.all(batch.map(async (node) => {
+        if (node.isFolder) return;
+        try {
+          const content = await readFile(node.path);
+          const links = extractWikiLinks(content);
+
+          for (const linkName of links) {
+            const targetNode = nodeMap.get(linkName.toLowerCase());
+            if (targetNode && targetNode.id !== node.id && !targetNode.isFolder) {
+              // 检查双链边是否已存在
+              const exists = edges.some(
+                (e) =>
+                  e.type === 'link' &&
+                  ((e.source === node.id && e.target === targetNode.id) ||
+                    (e.source === targetNode.id && e.target === node.id))
+              );
+              if (!exists) {
+                edges.push({ source: node.id, target: targetNode.id, type: 'link' });
+                node.connections++;
+                targetNode.connections++;
+              }
             }
           }
+        } catch (error) {
+          // Skip files that can't be read
         }
-      } catch (error) {
-        // Skip files that can't be read
-      }
+      }));
     }
 
     // 保存到全局缓存
@@ -435,24 +439,24 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
     };
 
     applyGraphData(nodes, edges, showFolders);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileTree, applyGraphData]); // showFolders 变化时不需要重建，只需要 loadGraph 重新应用缓存
 
   // 使用缓存或构建新图
   const loadGraph = useCallback(async () => {
     const currentHash = computeFileTreeHash(fileTree);
-    
+
     // 如果有缓存且文件树没变，直接使用缓存
     if (graphCache && graphCache.fileTreeHash === currentHash) {
       console.log("[Graph] Using cached data");
       applyGraphData(graphCache.nodes, graphCache.edges, showFolders);
       return;
     }
-    
+
     // 否则重新构建
     console.log("[Graph] Building new graph...");
     await buildGraph();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileTree, buildGraph, applyGraphData]); // showFolders 由专门的 effect 处理
 
   // Build graph on mount and when file tree changes
@@ -467,7 +471,7 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
     if (graphCache) {
       applyGraphData(graphCache.nodes, graphCache.edges, showFolders);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showFolders]);
 
   // Handle resize
@@ -604,7 +608,7 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
       ctx.globalAlpha = hasSelection && !isHighlighted ? 0.15 : 1;
 
       // 使用对数缩放，限制最大尺寸
-      const baseRadius = node.isFolder 
+      const baseRadius = node.isFolder
         ? Math.max(8, 10 + Math.log((node.connections || 1) + 1) * 3)
         : Math.max(4, 5 + Math.log(node.connections + 1) * 4);
       const radius = Math.min(baseRadius * nodeSize, node.isFolder ? 30 : 25);
@@ -708,7 +712,7 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
   const handleMouseDown = (e: React.MouseEvent) => {
     // 右键点击不处理拖拽和节点点击（由 contextMenu 处理）
     if (e.button === 2) return;
-    
+
     const { x, y } = getScreenPos(e);
     const worldPos = getWorldPos(x, y);
 
@@ -758,7 +762,7 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
         if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
           hasDragged.current = true;
         }
-        
+
         node.x = worldPos.x;
         node.y = worldPos.y;
         node.vx = 0;
@@ -782,7 +786,7 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
     if (clickedNodeRef.current && !hasDragged.current && !clickedNodeRef.current.isFolder) {
       openFile(clickedNodeRef.current.path);
     }
-    
+
     if (isDraggingNode.current && draggedNodeId.current) {
       const node = nodesRef.current.find((n) => n.id === draggedNodeId.current);
       if (node) node.isDragging = false;
@@ -796,20 +800,20 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
   // 右键菜单处理
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    
+
     // 如果已经是孤立视图，不显示右键菜单
     if (isolatedNode) return;
-    
+
     const { x, y } = getScreenPos(e);
     const worldPos = getWorldPos(x, y);
-    
+
     // 查找右键点击的节点
     const clickedNode = nodesRef.current.find((n) => {
       const baseR = Math.max(4, 5 + Math.log(n.connections + 1) * 4);
       const r = Math.min(baseR * nodeSize, 25) + 8;
       return Math.hypot(n.x - worldPos.x, n.y - worldPos.y) < r;
     });
-    
+
     if (clickedNode) {
       setContextMenu({
         x: e.clientX,
@@ -824,7 +828,7 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
   // 处理孤立查看
   const handleIsolateView = () => {
     if (!contextMenu) return;
-    
+
     const node = contextMenu.node;
     openIsolatedGraphTab({
       id: node.id,
@@ -832,7 +836,7 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
       path: node.path,
       isFolder: node.isFolder || false,
     });
-    
+
     setContextMenu(null);
   };
 
@@ -890,7 +894,7 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
           {/* Physics */}
           <div className="space-y-4">
             <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t.knowledgeGraph.physics}</h4>
-            
+
             <div className="space-y-2">
               <div className="flex justify-between text-xs">
                 <span>{t.knowledgeGraph.nodeRepulsion}</span>
@@ -943,7 +947,7 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
           {/* Visual */}
           <div className="space-y-4">
             <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t.knowledgeGraph.visual}</h4>
-            
+
             <div className="space-y-2">
               <div className="flex justify-between text-xs">
                 <span>{t.knowledgeGraph.nodeSize}</span>
@@ -1030,59 +1034,59 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
 
         {/* Canvas */}
         <div ref={containerRef} className="flex-1 relative bg-muted/20 overflow-hidden">
-        <canvas
-          ref={canvasRef}
-          width={dimensions.width}
-          height={dimensions.height}
-          onMouseDown={(e) => {
-            setContextMenu(null); // 点击时关闭右键菜单
-            handleMouseDown(e);
-          }}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onContextMenu={handleContextMenu}
-          onDoubleClick={() => {
-            if (selectedNode) {
-              handleNodeClick(selectedNode);
-            }
-          }}
-          className="block w-full h-full cursor-crosshair active:cursor-move"
-        />
-        
-        {/* 右键菜单 */}
-        {contextMenu && (
-          <div
-            className="fixed z-50 bg-background border border-border rounded-md shadow-lg py-1 min-w-[140px]"
-            style={{ left: contextMenu.x, top: contextMenu.y }}
-          >
-            <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border mb-1">
-              {contextMenu.node.label}
-            </div>
-            <button
-              onClick={handleIsolateView}
-              className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent flex items-center gap-2"
+          <canvas
+            ref={canvasRef}
+            width={dimensions.width}
+            height={dimensions.height}
+            onMouseDown={(e) => {
+              setContextMenu(null); // 点击时关闭右键菜单
+              handleMouseDown(e);
+            }}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onContextMenu={handleContextMenu}
+            onDoubleClick={() => {
+              if (selectedNode) {
+                handleNodeClick(selectedNode);
+              }
+            }}
+            className="block w-full h-full cursor-crosshair active:cursor-move"
+          />
+
+          {/* 右键菜单 */}
+          {contextMenu && (
+            <div
+              className="fixed z-50 bg-background border border-border rounded-md shadow-lg py-1 min-w-[140px]"
+              style={{ left: contextMenu.x, top: contextMenu.y }}
             >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M12 2v4m0 12v4m10-10h-4M6 12H2" />
-              </svg>
-              {t.knowledgeGraph.isolateView}
-            </button>
-            {!contextMenu.node.isFolder && (
+              <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border mb-1">
+                {contextMenu.node.label}
+              </div>
               <button
-                onClick={() => {
-                  openFile(contextMenu.node.path);
-                  setContextMenu(null);
-                }}
+                onClick={handleIsolateView}
                 className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent flex items-center gap-2"
               >
-                <FileText className="w-4 h-4" />
-                {t.knowledgeGraph.openNote}
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M12 2v4m0 12v4m10-10h-4M6 12H2" />
+                </svg>
+                {t.knowledgeGraph.isolateView}
               </button>
-            )}
-          </div>
-        )}
+              {!contextMenu.node.isFolder && (
+                <button
+                  onClick={() => {
+                    openFile(contextMenu.node.path);
+                    setContextMenu(null);
+                  }}
+                  className="w-full px-3 py-1.5 text-sm text-left hover:bg-accent flex items-center gap-2"
+                >
+                  <FileText className="w-4 h-4" />
+                  {t.knowledgeGraph.openNote}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Node details */}

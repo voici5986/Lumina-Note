@@ -173,7 +173,7 @@ async fn collect_entries(
     }
 
     // 添加文件（限制数量）
-    let file_count = files.len();
+    let _file_count = files.len();
     let shown_files: Vec<_> = files.iter().take(config.max_files_per_dir).cloned().collect();
     let hidden_files: Vec<_> = files.iter().skip(config.max_files_per_dir).cloned().collect();
 

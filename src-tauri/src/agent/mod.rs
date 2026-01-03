@@ -14,6 +14,4 @@ pub mod messages;
 pub mod debug_log;
 pub mod workspace_layout;
 
-pub use types::*;
 pub use commands::*;
-pub use deep_research::{DeepResearchConfig, DeepResearchRequest, DeepResearchState};

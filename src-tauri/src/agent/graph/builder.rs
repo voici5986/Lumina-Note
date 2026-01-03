@@ -5,10 +5,10 @@
 use std::sync::Arc;
 use tauri::AppHandle;
 
-use crate::langgraph::prelude::{StateGraph, CompiledGraph, START, END, GraphError};
+use crate::langgraph::prelude::{StateGraph, CompiledGraph, GraphError};
 use crate::langgraph::error::GraphResult;
 use crate::agent::types::{
-    GraphState, AgentConfig, TaskIntent, AgentStatus, AgentType, AgentEvent,
+    GraphState, AgentConfig, TaskIntent,
 };
 use crate::agent::llm_client::LlmClient;
 use crate::agent::graph::nodes::*;

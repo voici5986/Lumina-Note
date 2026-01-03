@@ -1,9 +1,7 @@
 //! Fast Search 子代理 - 类似 Windsurf Fast Context
 //! 通过并行 grep 快速搜索笔记库，不经过 LLM
 
-use std::collections::HashMap;
 use std::path::Path;
-use regex::Regex;
 use walkdir::WalkDir;
 use rayon::prelude::*;
 

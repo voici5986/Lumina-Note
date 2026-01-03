@@ -30,16 +30,19 @@ export function LocalGraph({ className = "" }: LocalGraphProps) {
   const animationRef = useRef<number | null>(null);
   const nodesRef = useRef<LocalNode[]>([]);
   const edgesRef = useRef<LocalEdge[]>([]);
+  const backlinksCache = useRef<Map<string, LocalNode[]>>(new Map()); // 缓存每个文件的反向链接节点
+  const lastScannedFile = useRef<string | null>(null); // 上次完整扫描的文件
+  const buildTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { fileTree, currentFile, openFile, currentContent } = useFileStore();
-  
+
   const [dimensions, setDimensions] = useState({ width: 200, height: 150 });
   const [hoverNode, setHoverNode] = useState<string | null>(null);
 
   // 从文件树中查找文件路径
   const findFilePath = useCallback((name: string): string | null => {
     const searchName = name.toLowerCase();
-    
+
     const search = (entries: typeof fileTree): string | null => {
       for (const entry of entries) {
         if (entry.is_dir && entry.children) {
@@ -54,7 +57,7 @@ export function LocalGraph({ className = "" }: LocalGraphProps) {
       }
       return null;
     };
-    
+
     return search(fileTree);
   }, [fileTree]);
 
@@ -67,7 +70,7 @@ export function LocalGraph({ className = "" }: LocalGraphProps) {
   }, [currentFile]);
 
   // 构建局部图谱
-  const buildLocalGraph = useCallback(async () => {
+  const buildLocalGraph = useCallback(async (forceScanBacklinks: boolean = false) => {
     if (!currentFile || !currentFile.endsWith('.md')) {
       nodesRef.current = [];
       edgesRef.current = [];
@@ -84,7 +87,7 @@ export function LocalGraph({ className = "" }: LocalGraphProps) {
     // 1. 创建当前笔记节点（中心）
     const width = containerRef.current?.offsetWidth || 200;
     const height = containerRef.current?.offsetHeight || 150;
-    
+
     const currentNode: LocalNode = {
       id: currentName,
       label: currentName,
@@ -102,7 +105,7 @@ export function LocalGraph({ className = "" }: LocalGraphProps) {
     // 2. 提取出链（当前笔记中的 [[links]]）
     const content = currentContent || '';
     const outLinks = extractWikiLinks(content);
-    
+
     for (const linkName of outLinks) {
       const linkPath = findFilePath(linkName);
       if (linkPath && linkName.toLowerCase() !== currentName.toLowerCase()) {
@@ -125,20 +128,22 @@ export function LocalGraph({ className = "" }: LocalGraphProps) {
       }
     }
 
-    // 3. 扫描反向链接（引用当前笔记的其他笔记）
-    const scanBacklinks = async (entries: typeof fileTree) => {
-      for (const entry of entries) {
-        if (entry.is_dir && entry.children) {
-          await scanBacklinks(entry.children);
-        } else if (!entry.is_dir && entry.name.endsWith('.md') && entry.path !== currentFile) {
-          try {
-            const fileContent = await readFile(entry.path);
-            const links = extractWikiLinks(fileContent);
-            
-            if (links.some(l => l.toLowerCase() === currentName.toLowerCase())) {
-              const backLinkName = entry.name.replace('.md', '');
-              
-              if (!nodeMap.has(backLinkName.toLowerCase())) {
+    // 3. 处理反向链接
+    // 只有当文件改变或强制要求时才重新扫描磁盘
+    if (forceScanBacklinks || lastScannedFile.current !== currentFile) {
+      const backlinkNodes: LocalNode[] = [];
+
+      const scanBacklinks = async (entries: typeof fileTree) => {
+        for (const entry of entries) {
+          if (entry.is_dir && entry.children) {
+            await scanBacklinks(entry.children);
+          } else if (!entry.is_dir && entry.name.endsWith('.md') && entry.path !== currentFile) {
+            try {
+              const fileContent = await readFile(entry.path);
+              const links = extractWikiLinks(fileContent);
+
+              if (links.some(l => l.toLowerCase() === currentName.toLowerCase())) {
+                const backLinkName = entry.name.replace('.md', '');
                 const node: LocalNode = {
                   id: backLinkName,
                   label: backLinkName,
@@ -150,27 +155,35 @@ export function LocalGraph({ className = "" }: LocalGraphProps) {
                   isCurrent: false,
                   isBacklink: true,
                 };
-                nodes.push(node);
-                nodeMap.set(backLinkName.toLowerCase(), node);
-              } else {
-                // 如果节点已存在（作为出链），标记它也是反向链接
-                const existingNode = nodeMap.get(backLinkName.toLowerCase());
-                if (existingNode) existingNode.isBacklink = true;
+                backlinkNodes.push(node);
               }
-              
-              // 添加反向边（从其他笔记指向当前笔记）
-              if (!edges.some(e => e.source === backLinkName && e.target === currentName)) {
-                edges.push({ source: backLinkName, target: currentName });
-              }
+            } catch {
+              // 忽略读取失败的文件
             }
-          } catch {
-            // 忽略读取失败的文件
           }
         }
-      }
-    };
+      };
 
-    await scanBacklinks(fileTree);
+      await scanBacklinks(fileTree);
+      backlinksCache.current.set(currentFile, backlinkNodes);
+      lastScannedFile.current = currentFile;
+    }
+
+    // 从缓存中应用反向链接
+    const cachedBacklinks = backlinksCache.current.get(currentFile) || [];
+    for (const backNode of cachedBacklinks) {
+      if (!nodeMap.has(backNode.id.toLowerCase())) {
+        nodes.push({ ...backNode });
+        nodeMap.set(backNode.id.toLowerCase(), backNode);
+      } else {
+        const existingNode = nodeMap.get(backNode.id.toLowerCase());
+        if (existingNode) existingNode.isBacklink = true;
+      }
+
+      if (!edges.some(e => e.source === backNode.id && e.target === currentName)) {
+        edges.push({ source: backNode.id, target: currentName });
+      }
+    }
 
     // 4. 初始化节点位置（环形分布）
     const otherNodes = nodes.filter(n => !n.isCurrent);
@@ -187,10 +200,21 @@ export function LocalGraph({ className = "" }: LocalGraphProps) {
     edgesRef.current = edges;
   }, [currentFile, currentContent, fileTree, findFilePath, getCurrentFileName]);
 
-  // 当前文件或内容变化时重建图谱
+  // 当前文件或内容变化时重建图谱（带防抖）
   useEffect(() => {
-    buildLocalGraph();
-  }, [buildLocalGraph]);
+    if (buildTimeoutRef.current) clearTimeout(buildTimeoutRef.current);
+
+    // 内容变化时，如果不涉及文件切换，不强制扫描磁盘
+    const isFileChange = lastScannedFile.current !== currentFile;
+
+    buildTimeoutRef.current = setTimeout(() => {
+      buildLocalGraph(isFileChange);
+    }, isFileChange ? 50 : 300); // 切换文件快一点，打字慢一点
+
+    return () => {
+      if (buildTimeoutRef.current) clearTimeout(buildTimeoutRef.current);
+    };
+  }, [currentFile, currentContent, buildLocalGraph]);
 
   // 监听容器尺寸
   useEffect(() => {
@@ -200,13 +224,13 @@ export function LocalGraph({ className = "" }: LocalGraphProps) {
         setDimensions({ width: offsetWidth, height: offsetHeight });
       }
     };
-    
+
     updateSize();
     const observer = new ResizeObserver(updateSize);
     if (containerRef.current) {
       observer.observe(containerRef.current);
     }
-    
+
     return () => observer.disconnect();
   }, []);
 
@@ -230,12 +254,12 @@ export function LocalGraph({ className = "" }: LocalGraphProps) {
       if (nodes[i].isCurrent) continue;
       for (let j = i + 1; j < nodes.length; j++) {
         if (nodes[j].isCurrent) continue;
-        
+
         const dx = nodes[i].x - nodes[j].x;
         const dy = nodes[i].y - nodes[j].y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
         const force = 500 / (dist * dist);
-        
+
         nodes[i].vx += (dx / dist) * force * 0.1;
         nodes[i].vy += (dy / dist) * force * 0.1;
         nodes[j].vx -= (dx / dist) * force * 0.1;
@@ -268,7 +292,7 @@ export function LocalGraph({ className = "" }: LocalGraphProps) {
     // 更新位置
     nodes.forEach(node => {
       if (node.isCurrent) return;
-      
+
       node.x += node.vx;
       node.y += node.vy;
       node.vx *= 0.9;
@@ -313,8 +337,8 @@ export function LocalGraph({ className = "" }: LocalGraphProps) {
       ctx.beginPath();
       ctx.moveTo(u.x, u.y);
       ctx.lineTo(v.x, v.y);
-      ctx.strokeStyle = isHighlighted 
-        ? '#3b82f6' 
+      ctx.strokeStyle = isHighlighted
+        ? '#3b82f6'
         : 'rgba(128, 128, 128, 0.3)';
       ctx.lineWidth = isHighlighted ? 1.5 : 1;
       ctx.stroke();
@@ -348,7 +372,7 @@ export function LocalGraph({ className = "" }: LocalGraphProps) {
       // 节点圆
       ctx.beginPath();
       ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
-      
+
       if (node.isCurrent) {
         ctx.fillStyle = '#3b82f6'; // 蓝色 - 当前笔记
       } else if (node.isBacklink) {
@@ -389,7 +413,7 @@ export function LocalGraph({ className = "" }: LocalGraphProps) {
   const handleMouseMove = (e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
-    
+
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
@@ -407,7 +431,7 @@ export function LocalGraph({ className = "" }: LocalGraphProps) {
   const handleClick = (e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
-    
+
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 

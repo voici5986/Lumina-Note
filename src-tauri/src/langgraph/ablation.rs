@@ -3,10 +3,12 @@
 //! Provides tools for systematically evaluating the impact of individual
 //! nodes by masking (disabling) them and comparing results.
 
+#![allow(dead_code)]
+
 use std::collections::{HashMap, HashSet};
 use serde::{Serialize, Deserialize};
 
-use crate::langgraph::metrics::{AggregateStats, MetricsCollector, RunMetrics};
+use crate::langgraph::metrics::{AggregateStats, MetricsCollector};
 
 /// Configuration for an ablation experiment
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -352,7 +354,7 @@ impl AblationReport {
     }
 
     fn recommend_for_node(
-        importance: f64,
+        _importance: f64,
         latency_pct: f64,
         token_pct: f64,
         success_impact: f64,

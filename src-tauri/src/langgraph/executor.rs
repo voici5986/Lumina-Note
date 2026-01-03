@@ -7,7 +7,6 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use std::time::Instant;
 use serde::{Serialize, Deserialize};
 
 use crate::langgraph::constants::{START, END, MAX_ITERATIONS};
@@ -463,7 +462,7 @@ impl<S: GraphState> CompiledGraph<S> {
         &self,
         test_inputs: Vec<S>,
         configs: Vec<ExecutionConfig>,
-        mut state_factory: F,
+        _state_factory: F,
     ) -> Vec<(String, RunMetrics)>
     where
         F: FnMut() -> S,

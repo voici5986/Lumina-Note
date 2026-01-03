@@ -2,6 +2,8 @@
 //!
 //! 记录 Agent 执行的完整过程到文件
 
+#![allow(dead_code)]
+
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;

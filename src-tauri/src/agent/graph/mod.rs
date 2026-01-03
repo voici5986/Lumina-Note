@@ -8,4 +8,4 @@ pub mod executor;
 pub mod builder;
 
 pub use executor::GraphExecutor;
-pub use builder::{AgentContext, build_agent_graph, describe_graph};
+pub use builder::{AgentContext, build_agent_graph};

@@ -145,10 +145,10 @@ pub async fn generate_note_map(
     mentioned_notes: &[String],
     config: &NoteMapConfig,
 ) -> Result<String, String> {
-    use super::parser::build_note_meta;
+    
     use super::ranking::{rank_notes, RankingConfig};
-    use tokio::fs;
-    use std::path::Path;
+    
+    
     
     // 1. 扫描工作区中的所有 .md 文件
     let mut notes = Vec::new();
@@ -178,7 +178,7 @@ async fn scan_markdown_files(
     notes: &mut Vec<super::types::NoteMeta>,
 ) -> Result<(), String> {
     use tokio::fs;
-    use std::path::Path;
+    
     
     let mut entries = fs::read_dir(current_path)
         .await

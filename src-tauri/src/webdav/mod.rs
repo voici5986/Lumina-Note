@@ -11,6 +11,3 @@ pub mod sync;
 pub mod commands;
 
 // Re-exports for internal use
-pub(crate) use types::*;
-pub(crate) use client::WebDAVClient;
-pub(crate) use sync::SyncEngine;

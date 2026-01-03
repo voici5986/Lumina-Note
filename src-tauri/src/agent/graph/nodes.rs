@@ -320,7 +320,7 @@ async fn agent_worker_node(
     app: &AppHandle,
     llm: &LlmClient,
     mut state: GraphState,
-    agent_type: AgentType,
+    _agent_type: AgentType,
     agent_name: &str,
 ) -> Result<NodeResult, String> {
     use crate::agent::note_map::{generate_note_map, extract_mentioned_notes, NoteMapConfig};
