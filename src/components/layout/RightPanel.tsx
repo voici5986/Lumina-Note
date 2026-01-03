@@ -28,6 +28,7 @@ import {
 import { AgentPanel } from "../chat/AgentPanel";
 import { ConversationList } from "../chat/ConversationList";
 import { ChatPanel } from "../chat/ChatPanel";
+import { useConversationManager } from "@/hooks/useConversationManager";
 
 // Heading item in outline
 interface HeadingItem {
@@ -348,8 +349,6 @@ export function RightPanel() {
     config,
     setConfig,
     checkFirstLoad: checkChatFirstLoad,
-    currentSessionId: chatCurrentId,
-    deleteSession: deleteChatSession,
   } = useAIStore();
   useFileStore(); // Hook needed for store subscription
   const { 
@@ -369,9 +368,6 @@ export function RightPanel() {
   const autoApprove = USE_RUST_AGENT ? rustAgentStore.autoApprove : legacyAgentStore.autoApprove;
   const setAutoApprove = USE_RUST_AGENT ? rustAgentStore.setAutoApprove : legacyAgentStore.setAutoApprove;
   const checkAgentFirstLoad = legacyAgentStore.checkFirstLoad; // Rust Agent 暂不需要
-  
-  const agentCurrentId = USE_RUST_AGENT ? rustAgentStore.currentSessionId : legacyAgentStore.currentSessionId;
-  const deleteAgentSession = USE_RUST_AGENT ? rustAgentStore.deleteSession : legacyAgentStore.deleteSession;
 
   const [showSettings, setShowSettings] = useState(false);
   const [isDraggingAI, setIsDraggingAI] = useState(false);
@@ -499,17 +495,8 @@ export function RightPanel() {
     return () => window.removeEventListener('lumina-drop', handleLuminaDrop);
   }, [rightPanelTab, aiPanelMode, isMainAIActive]);
 
-  const handleDeleteCurrentSession = () => {
-    if (chatMode === "agent") {
-      if (agentCurrentId) {
-        deleteAgentSession(agentCurrentId);
-      }
-    } else {
-      if (chatCurrentId) {
-        deleteChatSession(chatCurrentId);
-      }
-    }
-  };
+  // 使用统一的会话管理 hook
+  const { handleDeleteCurrentSession: deleteCurrentSession } = useConversationManager();
 
   return (
     <aside 
@@ -618,7 +605,7 @@ export function RightPanel() {
             </div>
             <div className="flex gap-1">
               <button
-                onClick={handleDeleteCurrentSession}
+                onClick={deleteCurrentSession}
                 className="p-1 text-muted-foreground hover:text-foreground transition-colors"
                 title={t.conversationList.deleteConversation}
               >
