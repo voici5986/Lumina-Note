@@ -491,3 +491,9 @@ lumina-note/
 ## 许可证
 
 本项目基于 [Apache License 2.0](LICENSE) 开源。
+
+---
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=blueberrycongee/Lumina-Note&type=Date)](https://star-history.com/#blueberrycongee/Lumina-Note&Date)
