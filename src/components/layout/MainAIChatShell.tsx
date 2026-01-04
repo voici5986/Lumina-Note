@@ -189,11 +189,6 @@ export function MainAIChatShell() {
   const checkChatFirstLoad = useAIStore((state) => state.checkFirstLoad);
   const config = useAIStore((state) => state.config);
   const chatTotalTokens = useAIStore((state) => state.totalTokensUsed);
-  // agentTotalTokens 暂时未使用，保留以备后续功能
-  const _agentTotalTokens = useRustAgentStore((state) => {
-    const session = state.sessions.find((s) => s.id === state.currentSessionId);
-    return session?.totalTokensUsed ?? 0;
-  });
 
   useRAGStore();
 
