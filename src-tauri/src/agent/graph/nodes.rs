@@ -640,69 +640,46 @@ pub async fn reporter_node(
     }
 
     // 根据意图决定回复风格
-    let system_prompt = if state.intent == TaskIntent::Chat && state.observations.is_empty() {
+    let (system_prompt, user_prompt) = if state.intent == TaskIntent::Chat && state.observations.is_empty() {
         // 简单聊天模式 - 使用自然对话风格
-        format!(
-            r#"你是 Lumina，一个友好的笔记助手。请用自然、亲切的语言回复用户。
-不要使用"任务完成"之类的格式化语言，就像朋友聊天一样回复。
+        let sys = format!(
+            r#"你是 Lumina，一个友好的笔记助手。用自然亲切的语言回复，像朋友聊天一样。
 
 当前工作区：{}
-当前笔记：{}
-
-**重要**：输出时请确保：
-- 每个段落之间使用空行分隔
-- 使用 Markdown 格式（如 **粗体**、列表等）
-- 表格要正确格式化，每行独占一行
-"#,
+当前笔记：{}"#,
             state.workspace_path,
             state.active_note_path.as_deref().unwrap_or("无")
-        )
+        );
+        (sys, state.user_task.clone())
     } else {
-        // 任务完成模式 - 汇总执行结果
+        // 任务完成模式 - 简洁汇总
+        let sys = "你是 Lumina 笔记助手。根据执行结果，用一两句话简洁地告诉用户任务完成情况。直接说结果，不要复述格式要求。".to_string();
+        
+        // 构建用户消息：包含任务和执行结果
         let observations_text = state.observations.join("\n");
-        format!(
-            r#"你是任务报告专家。根据执行结果，向用户总结任务完成情况。
-
-用户任务：{}
-
-执行结果：
-{}
-
-请用友好的语言总结任务完成情况。
-
-**输出格式要求**：
-1. 使用 Markdown 格式输出
-2. 每个段落、标题、列表项之间必须有换行符分隔
-3. 表格格式示例：
-| 列1 | 列2 |
-|-----|-----|
-| 值1 | 值2 |
-4. 列表使用 - 或数字编号，每项独占一行
-5. 不要把所有内容挤在一行
-"#,
+        let user = format!(
+            "用户任务：{}\n\n执行结果：\n{}\n\n请简洁总结完成情况。",
             state.user_task,
             observations_text
-        )
+        );
+        (sys, user)
     };
 
-    let mut messages = vec![
+    // 始终包含 System + User 消息
+    let messages = vec![
         Message {
             role: MessageRole::System,
             content: system_prompt,
             name: None,
             tool_call_id: None,
         },
-    ];
-    
-    // 对于简单聊天，添加用户消息
-    if state.intent == TaskIntent::Chat {
-        messages.push(Message {
+        Message {
             role: MessageRole::User,
-            content: state.user_task.clone(),
+            content: user_prompt,
             name: None,
             tool_call_id: None,
-        });
-    }
+        },
+    ];
 
     let request_id = format!("reporter-{}", chrono::Utc::now().timestamp_millis());
     let response = llm.call_stream(
