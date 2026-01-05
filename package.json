@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "generate-latest": "ts-node scripts/generate_latest_json.ts",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
@@ -71,6 +72,7 @@
     "jsdom": "^27.2.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
+    "ts-node": "^10.9.2",
     "typescript": "^5.6.3",
     "vite": "^5.4.11",
     "vitest": "^1.6.1"

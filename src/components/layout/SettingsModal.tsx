@@ -17,6 +17,7 @@ import { X, Check, Plus, Trash2, Palette } from "lucide-react";
 import { LiquidGlassEffect } from "../effects/LiquidGlassEffect";
 import { ThemeEditor } from "../ai/ThemeEditor";
 import { WebDAVSettings } from "../settings/WebDAVSettings";
+import { UpdateChecker } from "../settings/UpdateChecker";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -29,7 +30,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { config } = useAIStore();
   const { hideAllWebViews, showAllWebViews } = useBrowserStore();
   const { vaultPath } = useFileStore();
-  
+
   const [showThemeEditor, setShowThemeEditor] = useState(false);
   const [editingTheme, setEditingTheme] = useState<Theme | undefined>();
   const [userThemes, setUserThemes] = useState<Theme[]>([]);
@@ -93,7 +94,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* 背景遮罩 - 液态玻璃效果 */}
-      <div 
+      <div
         className="absolute inset-0 bg-black/30 backdrop-blur-xl"
         onClick={onClose}
         style={{
@@ -104,9 +105,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         {/* 雨滴效果层 */}
         <LiquidGlassEffect />
       </div>
-      
+
       {/* 设置面板 - 液态玻璃风格 */}
-      <div 
+      <div
         className="relative w-[600px] max-h-[80vh] rounded-2xl shadow-2xl overflow-hidden border border-white/20"
         style={{
           background: "linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)",
@@ -120,14 +121,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         }}
       >
         {/* 顶部高光 */}
-        <div 
+        <div
           className="absolute inset-x-0 top-0 h-px"
           style={{
             background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)",
           }}
         />
         {/* 标题栏 - 液态玻璃风格 */}
-        <div 
+        <div
           className="relative flex items-center justify-between px-6 py-4"
           style={{
             borderBottom: "1px solid rgba(255,255,255,0.1)",
@@ -148,7 +149,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         </div>
 
         {/* 设置内容 - 带内容区域液态效果 */}
-        <div 
+        <div
           className="p-6 space-y-8 overflow-y-auto max-h-[calc(80vh-60px)]"
           style={{
             background: "linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.05) 100%)",
@@ -173,7 +174,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </button>
             </div>
             <p className="text-sm text-muted-foreground">{t.settingsModal.themeDescription}</p>
-            
+
             {/* 用户主题 */}
             {userThemes.length > 0 && (
               <>
@@ -182,19 +183,18 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   {userThemes.map((theme) => (
                     <div
                       key={theme.id}
-                      className={`relative p-3 rounded-xl transition-all text-left group ${
-                        themeId === theme.id
-                          ? "ring-2 ring-primary"
-                          : "hover:scale-[1.02]"
-                      }`}
+                      className={`relative p-3 rounded-xl transition-all text-left group ${themeId === theme.id
+                        ? "ring-2 ring-primary"
+                        : "hover:scale-[1.02]"
+                        }`}
                       style={{
-                        background: themeId === theme.id 
-                          ? "rgba(var(--primary-rgb), 0.15)" 
+                        background: themeId === theme.id
+                          ? "rgba(var(--primary-rgb), 0.15)"
                           : "rgba(255,255,255,0.05)",
                         border: "1px solid rgba(255,255,255,0.1)",
                         backdropFilter: "blur(10px)",
-                        boxShadow: themeId === theme.id 
-                          ? "0 4px 20px rgba(var(--primary-rgb), 0.2)" 
+                        boxShadow: themeId === theme.id
+                          ? "0 4px 20px rgba(var(--primary-rgb), 0.2)"
                           : "0 2px 10px rgba(0,0,0,0.1)",
                       }}
                     >
@@ -204,21 +204,21 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       >
                         {/* 颜色预览 */}
                         <div className="flex gap-1 mb-2">
-                          <div 
+                          <div
                             className="w-4 h-4 rounded-full border border-border"
                             style={{ backgroundColor: `hsl(${theme.light.primary})` }}
                           />
-                          <div 
+                          <div
                             className="w-4 h-4 rounded-full border border-border"
                             style={{ backgroundColor: `hsl(${theme.dark.primary})` }}
                           />
                         </div>
-                        
+
                         {/* 主题名称 */}
                         <p className="font-medium text-sm">{theme.name}</p>
                         <p className="text-xs text-muted-foreground">{theme.description}</p>
                       </button>
-                      
+
                       {/* 操作按钮 */}
                       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
@@ -236,7 +236,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                           <Trash2 size={12} />
                         </button>
                       </div>
-                      
+
                       {/* 选中标记 */}
                       {themeId === theme.id && (
                         <div className="absolute bottom-2 right-2">
@@ -248,7 +248,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </div>
               </>
             )}
-            
+
             {/* 官方主题 */}
             <p className="text-xs text-muted-foreground mt-4">{t.settingsModal.officialThemes}</p>
             <div className="grid grid-cols-3 gap-3">
@@ -256,34 +256,33 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <button
                   key={theme.id}
                   onClick={() => setThemeId(theme.id)}
-                  className={`relative p-3 rounded-xl transition-all text-left ${
-                    themeId === theme.id
-                      ? "ring-2 ring-primary"
-                      : "hover:scale-[1.02]"
-                  }`}
+                  className={`relative p-3 rounded-xl transition-all text-left ${themeId === theme.id
+                    ? "ring-2 ring-primary"
+                    : "hover:scale-[1.02]"
+                    }`}
                   style={{
-                    background: themeId === theme.id 
-                      ? "rgba(var(--primary-rgb), 0.15)" 
+                    background: themeId === theme.id
+                      ? "rgba(var(--primary-rgb), 0.15)"
                       : "rgba(255,255,255,0.05)",
                     border: "1px solid rgba(255,255,255,0.1)",
                     backdropFilter: "blur(10px)",
-                    boxShadow: themeId === theme.id 
-                      ? "0 4px 20px rgba(var(--primary-rgb), 0.2)" 
+                    boxShadow: themeId === theme.id
+                      ? "0 4px 20px rgba(var(--primary-rgb), 0.2)"
                       : "0 2px 10px rgba(0,0,0,0.1)",
                   }}
                 >
                   {/* 颜色预览 */}
                   <div className="flex gap-1 mb-2">
-                    <div 
+                    <div
                       className="w-4 h-4 rounded-full border border-border"
                       style={{ backgroundColor: `hsl(${theme.light.primary})` }}
                     />
-                    <div 
+                    <div
                       className="w-4 h-4 rounded-full border border-border"
                       style={{ backgroundColor: `hsl(${theme.dark.primary})` }}
                     />
                   </div>
-                  
+
                   {/* 主题名称 */}
                   <p className="font-medium text-sm">
                     {(t.settingsModal.themes as any)?.[theme.id]?.name || theme.name}
@@ -291,7 +290,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   <p className="text-xs text-muted-foreground">
                     {(t.settingsModal.themes as any)?.[theme.id]?.description || theme.description}
                   </p>
-                  
+
                   {/* 选中标记 */}
                   {themeId === theme.id && (
                     <div className="absolute top-2 right-2">
@@ -308,7 +307,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
               {t.settingsModal.editor}
             </h3>
-            
+
             {/* 编辑模式 */}
             <div className="flex items-center justify-between py-2">
               <div>
@@ -337,13 +336,13 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
               {t.settingsModal.aiAssistant}
             </h3>
-            
+
             <div className="flex items-center justify-between py-2">
               <div>
                 <p className="font-medium">{t.settingsModal.currentModel}</p>
                 <p className="text-sm text-muted-foreground">{t.settingsModal.configInRightPanel}</p>
               </div>
-              <span 
+              <span
                 className="text-sm text-foreground/70 px-3 py-1.5 rounded-lg"
                 style={{
                   background: "rgba(255,255,255,0.1)",
@@ -356,7 +355,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </section>
 
           {/* WebDAV 同步设置 */}
-          <section 
+          <section
             className="rounded-xl overflow-hidden"
             style={{
               background: "rgba(255,255,255,0.03)",
@@ -366,12 +365,17 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <WebDAVSettings compact />
           </section>
 
+          {/* 软件更新 */}
+          <section className="space-y-4">
+            <UpdateChecker />
+          </section>
+
           {/* 关于 */}
           <section className="space-y-4">
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
               {t.settingsModal.about}
             </h3>
-            
+
             <div className="flex items-center justify-between py-2">
               <div>
                 <p className="font-medium">Lumina Note</p>

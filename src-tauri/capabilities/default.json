@@ -26,6 +26,7 @@
     "fs:allow-read-dir",
     "fs:allow-copy-file",
     "updater:default",
+    "process:allow-restart",
     {
       "identifier": "fs:scope",
       "allow": [
