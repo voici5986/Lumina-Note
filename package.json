@@ -33,6 +33,7 @@
     "@tauri-apps/plugin-shell": "^2.0.0",
     "@types/diff": "^7.0.2",
     "clsx": "^2.1.1",
+    "codemirror-live-markdown": "^0.5.0-alpha.1",
     "diff": "^8.0.2",
     "framer-motion": "^12.23.25",
     "html2canvas": "^1.4.1",

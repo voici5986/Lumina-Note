@@ -7,7 +7,7 @@ import { useUIStore } from "@/stores/useUIStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 import { parseLuminaLink } from "@/services/pdf/annotations";
 import { writeBinaryFile, readBinaryFileBase64 } from "@/lib/tauri";
-import { EditorState, StateField, StateEffect, Compartment, Facet } from "@codemirror/state";
+import { EditorState, StateField, StateEffect, Compartment } from "@codemirror/state";
 import { slashCommandExtensions, placeholderExtension } from "./extensions/slashCommand";
 import { SlashMenu } from "./components/SlashMenu";
 import {
@@ -25,6 +25,13 @@ import { syntaxTree } from "@codemirror/language";
 import katex from "katex";
 import { common, createLowlight } from "lowlight";
 import mermaid from "mermaid";
+import {
+  livePreviewPlugin,
+  collapseOnSelectionFacet,
+  mouseSelectingField,
+  setMouseSelecting,
+  shouldShowSource
+} from "codemirror-live-markdown";
 
 // Initialize lowlight
 const lowlight = createLowlight(common);
@@ -45,23 +52,8 @@ const viewModeCompartment = new Compartment();
 const readOnlyCompartment = new Compartment();
 const themeCompartment = new Compartment();
 
-// Facet: 控制是否启用 Live Preview
-const collapseOnSelectionFacet = Facet.define<boolean, boolean>({
-  combine: values => values[0] ?? false
-});
-
 // ============ 2. 全局状态 ============
-
-const setMouseSelecting = StateEffect.define<boolean>();
-const mouseSelectingField = StateField.define<boolean>({
-  create: () => false,
-  update(value, tr) {
-    for (const effect of tr.effects) {
-      if (effect.is(setMouseSelecting)) return effect.value;
-    }
-    return value;
-  },
-});
+// mouseSelectingField 和 setMouseSelecting 从 codemirror-live-markdown 导入
 
 interface CodeMirrorEditorProps {
   content: string;
@@ -473,102 +465,10 @@ class ImageWidget extends WidgetType {
 }
 
 // ============ 5. 核心逻辑: Should Show Source? ============
-
-const shouldShowSource = (state: EditorState, from: number, to: number): boolean => {
-  const shouldCollapse = state.facet(collapseOnSelectionFacet);
-  if (!shouldCollapse) return false;
-  if (state.field(mouseSelectingField, false)) return false;
-
-  // 只要光标范围接触到目标区域（包含边界），就显示源码
-  for (const range of state.selection.ranges) {
-    if (range.from <= to && range.to >= from) return true;
-  }
-  return false;
-};
+// shouldShowSource 从 codemirror-live-markdown 导入
 
 // ============ 6. StateFields & Plugins ============
-
-/**
- * 实时预览动画插件：负责行内标记的展开/收起
- */
-const livePreviewPlugin = ViewPlugin.fromClass(class {
-  decorations: DecorationSet;
-  constructor(view: EditorView) { this.decorations = this.build(view); }
-  update(u: ViewUpdate) {
-    // 文档变化或视口变化：必须重建
-    if (u.docChanged || u.viewportChanged || u.transactions.some(t => t.reconfigured)) {
-      this.decorations = this.build(u.view);
-      return;
-    }
-
-    // 拖动状态变化
-    const isDragging = u.state.field(mouseSelectingField, false);
-    const wasDragging = u.startState.field(mouseSelectingField, false);
-
-    // 刚结束拖动：重建
-    if (wasDragging && !isDragging) {
-      this.decorations = this.build(u.view);
-      return;
-    }
-
-    // 正在拖动：跳过
-    if (isDragging) {
-      return;
-    }
-
-    // 普通选择变化：重建
-    if (u.selectionSet) {
-      this.decorations = this.build(u.view);
-    }
-  }
-  build(view: EditorView) {
-    const d: any[] = [];
-    const { state } = view;
-    // 获取所有活动行
-    const activeLines = new Set<number>();
-    for (const r of state.selection.ranges) {
-      const start = state.doc.lineAt(r.from).number;
-      const end = state.doc.lineAt(r.to).number;
-      for (let l = start; l <= end; l++) activeLines.add(l);
-    }
-    const isDrag = state.field(mouseSelectingField, false);
-
-    syntaxTree(state).iterate({
-      enter: (node) => {
-        if (!["HeaderMark", "EmphasisMark", "StrikethroughMark", "CodeMark", "ListMark", "QuoteMark"].includes(node.name)) return;
-
-        const isBlock = ["HeaderMark", "ListMark", "QuoteMark"].includes(node.name);
-        const lineNum = state.doc.lineAt(node.from).number;
-        const isActiveLine = activeLines.has(lineNum);
-
-        if (isBlock) {
-          // 标题/列表/引用标记逻辑
-          // 块级标记：始终用同一个基础类，活动时加 visible 类
-          const cls = (isActiveLine && !isDrag)
-            ? "cm-formatting-block cm-formatting-block-visible"
-            : "cm-formatting-block";
-          d.push(Decoration.mark({ class: cls }).range(node.from, node.to));
-        } else {
-          // 行内标记逻辑：光标接触时展开
-          if (node.from >= node.to) return;
-          // 判断光标是否接触该 Token
-          const isTouched = shouldShowSource(state, node.from, node.to);
-
-          const cls = (isTouched && !isDrag)
-            ? "cm-formatting-inline cm-formatting-inline-visible"
-            : "cm-formatting-inline";
-
-          d.push(Decoration.mark({ class: cls }).range(node.from, node.to));
-        }
-      }
-    });
-    return Decoration.set(d.sort((a, b) => a.from - b.from), true);
-  }
-  hide(state: EditorState, from: number, to: number, d: any[]) {
-    if (from >= to || state.doc.sliceString(from, to).includes('\n')) return;
-    d.push(Decoration.mark({ class: "cm-formatting-hidden" }).range(from, to));
-  }
-}, { decorations: v => v.decorations });
+// livePreviewPlugin 从 codemirror-live-markdown 导入
 
 // 缓存公式位置，避免每次选择变化都重新解析
 let mathPositionsCache: { from: number, to: number }[] = [];
