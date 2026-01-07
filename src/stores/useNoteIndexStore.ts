@@ -51,17 +51,17 @@ export interface TagInfo {
 interface NoteIndexState {
   // Index of all notes
   noteIndex: Map<string, NoteIndex>;
-  
+
   // Backlinks cache: targetName -> backlinks[]
   backlinksCache: Map<string, Backlink[]>;
-  
+
   // All tags
   allTags: TagInfo[];
-  
+
   // Loading state
   isIndexing: boolean;
   lastIndexTime: number;
-  
+
   // Actions
   buildIndex: (fileTree: FileEntry[]) => Promise<void>;
   getBacklinks: (noteName: string) => Backlink[];
@@ -92,11 +92,11 @@ export const useNoteIndexStore = create<NoteIndexState>((set, get) => ({
 
   buildIndex: async (fileTree: FileEntry[]) => {
     set({ isIndexing: true });
-    
+
     const noteIndex = new Map<string, NoteIndex>();
     const backlinksMap = new Map<string, Backlink[]>();
     const tagsMap = new Map<string, { count: number; files: string[] }>();
-    
+
     // Flatten file tree
     const allFiles: { path: string; name: string }[] = [];
     const flattenTree = (entries: FileEntry[]) => {
@@ -104,28 +104,28 @@ export const useNoteIndexStore = create<NoteIndexState>((set, get) => ({
         if (entry.is_dir && entry.children) {
           flattenTree(entry.children);
         } else if (!entry.is_dir && entry.name.endsWith(".md")) {
-          allFiles.push({ 
-            path: entry.path, 
-            name: entry.name.replace(".md", "") 
+          allFiles.push({
+            path: entry.path,
+            name: entry.name.replace(".md", "")
           });
         }
       }
     };
     flattenTree(fileTree);
-    
+
     // Build note name to path map for resolving links
     const nameToPath = new Map<string, string>();
     allFiles.forEach(f => {
       nameToPath.set(f.name.toLowerCase(), f.path);
     });
-    
+
     // Index each file
     for (const file of allFiles) {
       try {
         const content = await readFile(file.path);
         const outgoingLinks = extractWikiLinks(content);
         const tags = extractTags(content);
-        
+
         // Store note index
         noteIndex.set(file.path, {
           path: file.path,
@@ -134,7 +134,7 @@ export const useNoteIndexStore = create<NoteIndexState>((set, get) => ({
           tags,
           lastModified: Date.now(),
         });
-        
+
         // Build backlinks
         const lines = content.split("\n");
         for (const linkName of outgoingLinks) {
@@ -142,28 +142,28 @@ export const useNoteIndexStore = create<NoteIndexState>((set, get) => ({
           let contextLine = "";
           let lineNum = 0;
           for (let i = 0; i < lines.length; i++) {
-            if (lines[i].includes(`[[${linkName}`) || 
-                lines[i].toLowerCase().includes(`[[${linkName.toLowerCase()}`)) {
+            if (lines[i].includes(`[[${linkName}`) ||
+              lines[i].toLowerCase().includes(`[[${linkName.toLowerCase()}`)) {
               contextLine = lines[i].trim();
               lineNum = i + 1;
               break;
             }
           }
-          
+
           const backlink: Backlink = {
             path: file.path,
             name: file.name,
             context: contextLine,
             line: lineNum,
           };
-          
+
           const normalizedLinkName = linkName.toLowerCase();
           if (!backlinksMap.has(normalizedLinkName)) {
             backlinksMap.set(normalizedLinkName, []);
           }
           backlinksMap.get(normalizedLinkName)!.push(backlink);
         }
-        
+
         // Build tags index
         for (const tag of tags) {
           if (!tagsMap.has(tag)) {
@@ -177,12 +177,12 @@ export const useNoteIndexStore = create<NoteIndexState>((set, get) => ({
         console.error(`Failed to index ${file.path}:`, error);
       }
     }
-    
+
     // Convert tags map to sorted array
     const allTags: TagInfo[] = Array.from(tagsMap.entries())
       .map(([tag, info]) => ({ tag, count: info.count, files: info.files }))
       .sort((a, b) => b.count - a.count);
-    
+
     set({
       noteIndex,
       backlinksCache: backlinksMap,
@@ -190,8 +190,11 @@ export const useNoteIndexStore = create<NoteIndexState>((set, get) => ({
       isIndexing: false,
       lastIndexTime: Date.now(),
     });
-    
-    console.log(`[Index] Built index for ${noteIndex.size} notes, ${allTags.length} tags`);
+
+    // Debug log only in development
+    if (import.meta.env.DEV) {
+      console.log(`[Index] Built index for ${noteIndex.size} notes, ${allTags.length} tags`);
+    }
   },
 
   getBacklinks: (noteName: string) => {
@@ -207,10 +210,10 @@ export const useNoteIndexStore = create<NoteIndexState>((set, get) => ({
 
   searchContent: async (query: string, files: FileEntry[]) => {
     if (!query.trim()) return [];
-    
+
     const results: SearchResult[] = [];
     const pattern = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
-    
+
     const allFiles: { path: string; name: string }[] = [];
     const flattenTree = (entries: FileEntry[]) => {
       for (const entry of entries) {
@@ -222,13 +225,13 @@ export const useNoteIndexStore = create<NoteIndexState>((set, get) => ({
       }
     };
     flattenTree(files);
-    
+
     for (const file of allFiles) {
       try {
         const content = await readFile(file.path);
         const lines = content.split("\n");
         const matches: SearchMatch[] = [];
-        
+
         lines.forEach((line, lineIndex) => {
           let match;
           pattern.lastIndex = 0;
@@ -242,12 +245,12 @@ export const useNoteIndexStore = create<NoteIndexState>((set, get) => ({
             if (match[0].length === 0) break;
           }
         });
-        
+
         if (matches.length > 0) {
           // Score based on matches in title and content
           const titleMatch = file.name.toLowerCase().includes(query.toLowerCase());
           const score = (titleMatch ? 100 : 0) + matches.length;
-          
+
           results.push({
             path: file.path,
             name: file.name,
@@ -259,7 +262,7 @@ export const useNoteIndexStore = create<NoteIndexState>((set, get) => ({
         // Skip unreadable files
       }
     }
-    
+
     // Sort by score
     return results.sort((a, b) => b.score - a.score);
   },

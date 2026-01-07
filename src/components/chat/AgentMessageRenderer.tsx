@@ -223,7 +223,7 @@ function decodeHtmlEntities(str: string): string {
  */
 function collectToolResults(messages: Message[]): Map<string, { result: string; success: boolean }> {
   const toolResults = new Map<string, { result: string; success: boolean }>();
-  
+
   // 用于跟踪最近的工具调用（Rust Agent 格式）
   let lastToolCall: { name: string; params: string } | null = null;
 
@@ -238,7 +238,7 @@ function collectToolResults(messages: Message[]): Map<string, { result: string; 
       }
       return;
     }
-    
+
     // Rust Agent 格式：✅ 结果... 或 ❌ 错误...
     if (content.startsWith('✅') && lastToolCall) {
       const result = content.slice(1).trim();
@@ -527,12 +527,7 @@ export const AgentMessageRenderer = memo(function AgentMessageRenderer({
   llmRequestStartTime,
   onRetryTimeout,
 }: AgentMessageRendererProps) {
-  // 调试日志
-  console.log("[AgentMessageRenderer] messages:", messages.length, messages.map(m => ({
-    role: m.role,
-    content: getTextFromContent(m.content).slice(0, 50)
-  })));
-  
+
   // 使用可复用的超时检测 hook
   const { isTimeout: isLongRunning } = useTimeout(llmRequestStartTime ?? null, {
     threshold: TIMEOUT_THRESHOLD_MS,
@@ -581,7 +576,7 @@ export const AgentMessageRenderer = memo(function AgentMessageRenderer({
 
       assistantMessages.forEach((msg, msgIdx) => {
         const content = getTextFromContent(msg.content);
-        
+
         // 处理 Rust Agent 的工具调用消息（格式: 🔧 tool_name: {...}）
         if (content.startsWith('🔧')) {
           const match = content.match(/🔧\s*(\w+):\s*(.+)/);
@@ -600,22 +595,22 @@ export const AgentMessageRenderer = memo(function AgentMessageRenderer({
           }
           return;
         }
-        
+
         // 处理 Rust Agent 的工具结果消息（格式: ✅ 结果 或 ❌ 错误）
         if (content.startsWith('✅') || content.startsWith('❌')) {
           // 工具结果已经在 toolResults 中收集，这里跳过
           return;
         }
-        
+
         const parsed = parseAssistantMessage(content, toolResults);
         allThinkingBlocks.push(...parsed.thinkingBlocks);
         allToolCalls.push(...parsed.toolCalls);
-        
+
         // 优先使用 attempt_completion_result 或 attempt_completion 中的 result
         if (parsed.finalAnswer) {
           finalAnswer = parsed.finalAnswer;
         }
-        
+
         // 如果没有结构化的 finalAnswer，使用纯文本
         // 对于 Rust Agent，优先使用最后一条消息（reporter 的回复）
         if (parsed.rawTextBeforeCompletion) {
@@ -689,39 +684,40 @@ export const AgentMessageRenderer = memo(function AgentMessageRenderer({
                   {round.finalAnswer && (
                     <div
                       className="prose prose-sm dark:prose-invert max-w-none leading-relaxed"
-                      dangerouslySetInnerHTML={{ __html: (() => {
-                        let content = round.finalAnswer;
-                        
-                        // 如果内容换行符很少，尝试添加必要的换行
-                        const newlineCount = (content.match(/\n/g) || []).length;
-                        const contentLength = content.length;
-                        // 如果平均每 200 字符不到一个换行，说明换行符不足
-                        if (contentLength > 100 && newlineCount < contentLength / 200) {
-                          // 在 Markdown 标记前添加换行符
-                          content = content
-                            // 标题 (# ## ### 等)
-                            .replace(/(?<!^|\n)(#{1,6}\s)/g, '\n\n$1')
-                            // 表格行 (| xxx | xxx |)
-                            .replace(/(?<!^|\n)(\|[^|]+\|)/g, '\n$1')
-                            // 粗体段落开头 (**xxx**)
-                            .replace(/(?<!^|\n)(\*\*[^*]+\*\*)/g, '\n$1')
-                            // emoji 段落开头 (✅ 📊 💡 等)
-                            .replace(/(?<!^|\n)([\u{1F300}-\u{1F9FF}]\s)/gu, '\n\n$1')
-                            // 有序列表 (1. 2. 等)
-                            .replace(/(?<!^|\n)(\d+\.\s)/g, '\n$1')
-                            // 无序列表 (- 开头)
-                            .replace(/(?<!^|\n)(-\s+\*\*)/g, '\n$1')
-                            // 分隔线
-                            .replace(/(---)/g, '\n$1\n')
-                            // 清理多余换行
-                            .replace(/\n{3,}/g, '\n\n')
-                            .trim();
-                          console.log("[AgentMessageRenderer] Enhanced newlines, original:", newlineCount, "chars:", contentLength);
-                        }
-                        
-                        const html = parseMarkdown(content);
-                        return html;
-                      })() }}
+                      dangerouslySetInnerHTML={{
+                        __html: (() => {
+                          let content = round.finalAnswer;
+
+                          // 如果内容换行符很少，尝试添加必要的换行
+                          const newlineCount = (content.match(/\n/g) || []).length;
+                          const contentLength = content.length;
+                          // 如果平均每 200 字符不到一个换行，说明换行符不足
+                          if (contentLength > 100 && newlineCount < contentLength / 200) {
+                            // 在 Markdown 标记前添加换行符
+                            content = content
+                              // 标题 (# ## ### 等)
+                              .replace(/(?<!^|\n)(#{1,6}\s)/g, '\n\n$1')
+                              // 表格行 (| xxx | xxx |)
+                              .replace(/(?<!^|\n)(\|[^|]+\|)/g, '\n$1')
+                              // 粗体段落开头 (**xxx**)
+                              .replace(/(?<!^|\n)(\*\*[^*]+\*\*)/g, '\n$1')
+                              // emoji 段落开头 (✅ 📊 💡 等)
+                              .replace(/(?<!^|\n)([\u{1F300}-\u{1F9FF}]\s)/gu, '\n\n$1')
+                              // 有序列表 (1. 2. 等)
+                              .replace(/(?<!^|\n)(\d+\.\s)/g, '\n$1')
+                              // 无序列表 (- 开头)
+                              .replace(/(?<!^|\n)(-\s+\*\*)/g, '\n$1')
+                              // 分隔线
+                              .replace(/(---)/g, '\n$1\n')
+                              // 清理多余换行
+                              .replace(/\n{3,}/g, '\n\n')
+                              .trim();
+                          }
+
+                          const html = parseMarkdown(content);
+                          return html;
+                        })()
+                      }}
                     />
                   )}
                 </div>

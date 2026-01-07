@@ -41,7 +41,7 @@ if (import.meta.env.DEV) {
 function EditorWithGraph() {
   const { tabs, activeTabIndex } = useFileStore();
   const activeTab = activeTabIndex >= 0 ? tabs[activeTabIndex] : null;
-  
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background transition-colors duration-300">
       <TabBar />
@@ -65,22 +65,22 @@ function EditorWithGraph() {
 function DiffViewWrapper() {
   const { pendingDiff, setPendingDiff, clearPendingEdits, diffResolver } = useAIStore();
   const { openFile } = useFileStore();
-  
+
   const handleAccept = useCallback(async () => {
     if (!pendingDiff) return;
-    
+
     try {
       // Save to file first
       await saveFile(pendingDiff.filePath, pendingDiff.modified);
-      
+
       // Clear the diff and pending edits
       clearPendingEdits();
-      
+
       // Refresh the file in editor (forceReload = true)
       await openFile(pendingDiff.filePath, false, true);
-      
+
       console.log(`✅ 已应用修改到 ${pendingDiff.fileName}`);
-      
+
       // Resolve promise if exists
       if (diffResolver) {
         diffResolver(true);
@@ -90,20 +90,20 @@ function DiffViewWrapper() {
       alert(`❌ 应用修改失败: ${error}`);
     }
   }, [pendingDiff, clearPendingEdits, openFile, diffResolver]);
-  
+
   const handleReject = useCallback(() => {
     setPendingDiff(null);
     // Also clear pending edits so AI doesn't get confused
     clearPendingEdits();
-    
+
     // Resolve promise if exists
     if (diffResolver) {
       diffResolver(false);
     }
   }, [setPendingDiff, clearPendingEdits, diffResolver]);
-  
+
   if (!pendingDiff) return null;
-  
+
   return (
     <DiffView
       fileName={pendingDiff.fileName}
@@ -129,7 +129,7 @@ function App() {
   const { pendingDiff } = useAIStore();
   const { buildIndex } = useNoteIndexStore();
   const { initialize: initializeRAG, config: ragConfig } = useRAGStore();
-  
+
   // Get active tab
   const activeTab = activeTabIndex >= 0 ? tabs[activeTabIndex] : null;
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -138,14 +138,14 @@ function App() {
   const [isLoadingVault, setIsLoadingVault] = useState(false);
   const [createDbOpen, setCreateDbOpen] = useState(false);
   const [evalPanelOpen, setEvalPanelOpen] = useState(false);
-  
+
   // 首次启动时默认打开 AI Chat
   useEffect(() => {
     if (tabs.length === 0) {
       openAIMainTab();
     }
   }, []);
-  
+
   // 启动时自动加载保存的工作空间
   useEffect(() => {
     if (vaultPath && fileTree.length === 0 && !isLoadingVault) {
@@ -153,27 +153,29 @@ function App() {
       refreshFileTree().finally(() => setIsLoadingVault(false));
     }
   }, []);
-  
+
   // 启动文件监听器，自动刷新文件树
   useEffect(() => {
     if (!vaultPath) return;
-    
+
     let unlisten: (() => void) | null = null;
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    
+
     const setupWatcher = async () => {
       try {
         const { listen } = await import("@tauri-apps/api/event");
         const { startFileWatcher } = await import("@/lib/tauri");
-        
+
         // 启动后端文件监听
         await startFileWatcher(vaultPath);
         console.log("[FileWatcher] Started watching:", vaultPath);
-        
+
         // 监听文件变化事件（带防抖）
         unlisten = await listen("fs:change", (event) => {
-          console.log("[FileWatcher] File changed:", event.payload);
-          
+          if (import.meta.env.DEV) {
+            console.log("[FileWatcher] File changed:", event.payload);
+          }
+
           // 防抖：500ms 内多次变化只刷新一次
           if (debounceTimer) clearTimeout(debounceTimer);
           debounceTimer = setTimeout(() => {
@@ -184,9 +186,9 @@ function App() {
         console.warn("[FileWatcher] Failed to start:", error);
       }
     };
-    
+
     setupWatcher();
-    
+
     return () => {
       if (unlisten) unlisten();
       if (debounceTimer) clearTimeout(debounceTimer);
@@ -255,24 +257,24 @@ function App() {
   // 全局鼠标拖拽处理：模拟从文件树拖拽文件创建双链
   useEffect(() => {
     let dragIndicator: HTMLDivElement | null = null;
-    
+
     const handleMouseMove = (e: MouseEvent) => {
       const dragData = (window as any).__lumina_drag_data;
       if (!dragData) return;
-      
+
       // 检测是否开始拖拽（移动超过 5px）
       const dx = e.clientX - dragData.startX;
       const dy = e.clientY - dragData.startY;
-      
-      if (!dragData.isDragging && Math.sqrt(dx*dx + dy*dy) > 5) {
+
+      if (!dragData.isDragging && Math.sqrt(dx * dx + dy * dy) > 5) {
         dragData.isDragging = true;
-        
+
         // 创建拖拽指示器 - VS Code/Cursor 风格
         dragIndicator = document.createElement('div');
         dragIndicator.className = 'fixed pointer-events-none z-[9999] flex items-center gap-2 px-3 py-2 bg-popover/95 backdrop-blur-sm text-popover-foreground text-sm rounded-lg border border-border shadow-xl';
-        
+
         // 根据是文件还是文件夹显示不同图标
-        const icon = dragData.isFolder 
+        const icon = dragData.isFolder
           ? `<svg class="w-4 h-4 text-yellow-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
             </svg>`
@@ -280,30 +282,30 @@ function App() {
               <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
               <polyline points="14 2 14 8 20 8"/>
             </svg>`;
-        
+
         dragIndicator.innerHTML = `
           ${icon}
           <span class="truncate max-w-[200px]">${dragData.fileName.replace(/\.(md|db\.json)$/i, '')}</span>
         `;
         document.body.appendChild(dragIndicator);
       }
-      
+
       if (dragData.isDragging && dragIndicator) {
         dragIndicator.style.left = `${e.clientX - 8}px`;
         dragIndicator.style.top = `${e.clientY + 2}px`;
       }
     };
-    
+
     const handleMouseUp = (e: MouseEvent) => {
       const dragData = (window as any).__lumina_drag_data;
       if (!dragData) return;
-      
+
       // 清理拖拽指示器
       if (dragIndicator) {
         dragIndicator.remove();
         dragIndicator = null;
       }
-      
+
       if (dragData.isDragging) {
         // 检查是否放置在文件夹上
         const folderTarget = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-folder-path]');
@@ -324,7 +326,7 @@ function App() {
             return;
           }
         }
-        
+
         // 文件夹不能插入链接，只触发文件的 lumina-drop
         if (!dragData.isFolder) {
           // 触发自定义事件，让编辑器和 AI 对话框处理
@@ -340,14 +342,14 @@ function App() {
           window.dispatchEvent(dropEvent);
         }
       }
-      
+
       // 清理全局数据
       (window as any).__lumina_drag_data = null;
     };
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-    
+
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
@@ -359,14 +361,14 @@ function App() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isCtrl = e.ctrlKey || e.metaKey;
-      
+
       // Ctrl+S: Save
       if (isCtrl && e.key === "s") {
         e.preventDefault();
         save();
         return;
       }
-      
+
       // Ctrl+P: Command palette
       if (isCtrl && e.key === "p") {
         e.preventDefault();
@@ -374,7 +376,7 @@ function App() {
         setPaletteOpen(true);
         return;
       }
-      
+
       // Ctrl+O: Quick open file
       if (isCtrl && e.key === "o") {
         e.preventDefault();
@@ -382,7 +384,7 @@ function App() {
         setPaletteOpen(true);
         return;
       }
-      
+
       // Ctrl+N: New file
       if (isCtrl && e.key === "n") {
         e.preventDefault();
@@ -391,21 +393,21 @@ function App() {
         }
         return;
       }
-      
+
       // Ctrl+Shift+F: Global search
       if (isCtrl && e.shiftKey && e.key === "F") {
         e.preventDefault();
         setSearchOpen(true);
         return;
       }
-      
+
       // Ctrl+Shift+E: Agent Eval Panel (Dev only)
       if (import.meta.env.DEV && isCtrl && e.shiftKey && e.key === "E") {
         e.preventDefault();
         setEvalPanelOpen(true);
         return;
       }
-      
+
       // Esc: Close eval panel
       if (e.key === "Escape" && evalPanelOpen) {
         e.preventDefault();
@@ -413,7 +415,7 @@ function App() {
         return;
       }
     };
-    
+
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
@@ -452,10 +454,10 @@ function App() {
   // VS Code 风格：拖动可以折叠/展开面板
   const LEFT_MIN_WIDTH = 200;  // store 中的最小值
   const RIGHT_MIN_WIDTH = 280; // store 中的最小值
-  
+
   // 累计拖拽距离（用于折叠状态下展开）
   const dragAccumulatorRef = useRef(0);
-  
+
   const handleLeftResize = useCallback(
     (delta: number) => {
       if (!leftSidebarOpen) {
@@ -496,7 +498,7 @@ function App() {
 
   // Welcome screen when no vault is open
   const { t } = useLocaleStore();
-  
+
   if (!vaultPath) {
     return (
       <div className="h-full flex flex-col bg-background">
@@ -504,7 +506,7 @@ function App() {
         <div className="flex-1 flex items-center justify-center relative">
           {/* Language Selector - Top Right */}
           <LanguageSwitcher className="absolute top-4 right-4" />
-          
+
           <div className="text-center space-y-8">
             {/* Logo */}
             <div className="flex items-center justify-center gap-3">
@@ -544,170 +546,168 @@ function App() {
         {/* Left Ribbon (Icon Bar) */}
         <Ribbon />
 
-      {/* Left Sidebar (File Tree) */}
-      <div
-        className={`flex-shrink-0 transition-all duration-300 ease-out overflow-hidden ${
-          leftSidebarOpen ? "opacity-100" : "w-0 opacity-0"
-        }`}
-        style={{ width: leftSidebarOpen ? leftSidebarWidth : 0 }}
-      >
-        <Sidebar />
-      </div>
-
-      {/* Left Resize Handle - VS Code 风格，始终显示，可拖拽展开/折叠 */}
-      <div className="relative flex-shrink-0 h-full">
-        <ResizeHandle
-          direction="left"
-          onResize={handleLeftResize}
-          onDoubleClick={toggleLeftSidebar}
-        />
-      </div>
-
-      {/* Main content - switches between Editor, Graph, Split, Diff, VideoNote and AI Chat based on state */}
-      <main className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {pendingDiff ? (
-          // Show diff view when there's a pending AI edit
-          <DiffViewWrapper />
-        ) : activeTab?.type === "database" && activeTab.databaseId ? (
-          // 数据库标签页（支持分栏）
-          <div className="flex-1 flex flex-col overflow-hidden bg-background">
-            <TabBar />
-            {splitView ? (
-              // 数据库 + 分栏：左边数据库，右边笔记
-              <DatabaseSplitView dbId={activeTab.databaseId} />
-            ) : (
-              // 纯数据库
-              <DatabaseView dbId={activeTab.databaseId} className="flex-1" />
-            )}
-          </div>
-        ) : activeTab?.type === "video-note" ? (
-          // 视频笔记标签页
-          <div className="flex-1 flex flex-col overflow-hidden bg-background">
-            <TabBar />
-            <VideoNoteView 
-              initialUrl={activeTab.videoUrl}
-              initialNoteFile={activeTab.videoNoteData}
-              isActive={true}
-            />
-          </div>
-        ) : activeTab?.type === "webpage" ? (
-          // 网页浏览器标签页
-          <div className="flex-1 flex flex-col overflow-hidden bg-background">
-            <TabBar />
-            <BrowserView
-              tabId={activeTab.id}
-              initialUrl={activeTab.webpageUrl}
-              isActive={true}
-            />
-          </div>
-        ) : activeTab?.type === "pdf" && activeTab.path ? (
-        // PDF 标签页
-        <div className="flex-1 flex flex-col overflow-hidden bg-background">
-          <TabBar />
-          <PDFViewer filePath={activeTab.path} className="flex-1" />
+        {/* Left Sidebar (File Tree) */}
+        <div
+          className={`flex-shrink-0 transition-all duration-300 ease-out overflow-hidden ${leftSidebarOpen ? "opacity-100" : "w-0 opacity-0"
+            }`}
+          style={{ width: leftSidebarOpen ? leftSidebarWidth : 0 }}
+        >
+          <Sidebar />
         </div>
-        ) : activeTab?.type === "flashcard" ? (
-          // 闪卡复习标签页
-          <div className="flex-1 flex flex-col overflow-hidden bg-background">
-            <TabBar />
-            <FlashcardView deckId={activeTab.flashcardDeckId} />
-          </div>
-        ) : activeTab?.type === "cardflow" ? (
-          // 卡片流视图
-          <div className="flex-1 flex flex-col overflow-hidden bg-background">
-            <TabBar />
-            <CardFlowView />
-          </div>
-        ) : activeTab?.type === "ai-chat" ? (
-          // 主视图区 AI 聊天标签页，交给 Editor 内部根据 tab 类型渲染
-          <Editor />
-        ) : splitView && currentFile ? (
-          // Show split editor when enabled
-          <SplitEditor />
-        ) : activeTab?.type === "graph" || activeTab?.type === "isolated-graph" ? (
-          // 图谱标签页
-          <EditorWithGraph />
-        ) : currentFile ? (
-          // 文件编辑
-          <Editor />
-        ) : (
-          // 空状态或其他标签页类型 - 统一使用 EditorWithGraph 保持 TabBar 一致
-          <EditorWithGraph />
-        )}
-      </main>
 
-      {/* Right Resize Handle + Collapse Button */}
-      <div className="relative flex-shrink-0 h-full">
-        {rightSidebarOpen && (
+        {/* Left Resize Handle - VS Code 风格，始终显示，可拖拽展开/折叠 */}
+        <div className="relative flex-shrink-0 h-full">
           <ResizeHandle
-            direction="right"
-            onResize={handleRightResize}
-            onDoubleClick={toggleRightSidebar}
+            direction="left"
+            onResize={handleLeftResize}
+            onDoubleClick={toggleLeftSidebar}
           />
-        )}
-        {/* Right Collapse Button - 只在面板收起时显示 */}
-        {!rightSidebarOpen && (
-          <button
-            onClick={toggleRightSidebar}
-            className="absolute top-1/2 -translate-y-1/2 z-10 p-1 rounded-md bg-muted/80 hover:bg-accent border border-border shadow-sm transition-all right-1"
-            title="展开右侧栏"
-          >
-            <PanelRight className="w-4 h-4 text-muted-foreground" />
-          </button>
-        )}
-      </div>
-
-      {/* Right Sidebar */}
-      <div
-        className={`flex-shrink-0 transition-all duration-300 ease-out overflow-hidden ${
-          rightSidebarOpen ? "opacity-100" : "w-0 opacity-0"
-        }`}
-        style={{ width: rightSidebarOpen ? rightSidebarWidth : 0 }}
-      >
-        <RightPanel />
-      </div>
-    </div>
-    
-    {/* Command Palette */}
-    <CommandPalette
-      isOpen={paletteOpen}
-      mode={paletteMode}
-      onClose={() => setPaletteOpen(false)}
-      onModeChange={setPaletteMode}
-    />
-    
-    {/* Global Search */}
-    <GlobalSearch
-      isOpen={searchOpen}
-      onClose={() => setSearchOpen(false)}
-    />
-    
-    {/* Create Database Dialog */}
-    <CreateDatabaseDialog
-      isOpen={createDbOpen}
-      onClose={() => setCreateDbOpen(false)}
-    />
-    
-    {/* AI Floating Ball */}
-    <AIFloatingBall />
-
-    {/* Voice Input Floating Ball - 语音输入悬浮球 */}
-    <VoiceInputBall />
-    
-    {/* Agent Eval Panel (Dev only) */}
-    {import.meta.env.DEV && evalPanelOpen && (
-      <div className="fixed inset-0 z-[100] bg-background">
-        <div className="absolute top-2 right-2 z-10">
-          <button
-            onClick={() => setEvalPanelOpen(false)}
-            className="px-4 py-2 bg-muted rounded hover:bg-muted/80"
-          >
-            ✕ 关闭 (Esc)
-          </button>
         </div>
-        <AgentEvalPanel />
+
+        {/* Main content - switches between Editor, Graph, Split, Diff, VideoNote and AI Chat based on state */}
+        <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+          {pendingDiff ? (
+            // Show diff view when there's a pending AI edit
+            <DiffViewWrapper />
+          ) : activeTab?.type === "database" && activeTab.databaseId ? (
+            // 数据库标签页（支持分栏）
+            <div className="flex-1 flex flex-col overflow-hidden bg-background">
+              <TabBar />
+              {splitView ? (
+                // 数据库 + 分栏：左边数据库，右边笔记
+                <DatabaseSplitView dbId={activeTab.databaseId} />
+              ) : (
+                // 纯数据库
+                <DatabaseView dbId={activeTab.databaseId} className="flex-1" />
+              )}
+            </div>
+          ) : activeTab?.type === "video-note" ? (
+            // 视频笔记标签页
+            <div className="flex-1 flex flex-col overflow-hidden bg-background">
+              <TabBar />
+              <VideoNoteView
+                initialUrl={activeTab.videoUrl}
+                initialNoteFile={activeTab.videoNoteData}
+                isActive={true}
+              />
+            </div>
+          ) : activeTab?.type === "webpage" ? (
+            // 网页浏览器标签页
+            <div className="flex-1 flex flex-col overflow-hidden bg-background">
+              <TabBar />
+              <BrowserView
+                tabId={activeTab.id}
+                initialUrl={activeTab.webpageUrl}
+                isActive={true}
+              />
+            </div>
+          ) : activeTab?.type === "pdf" && activeTab.path ? (
+            // PDF 标签页
+            <div className="flex-1 flex flex-col overflow-hidden bg-background">
+              <TabBar />
+              <PDFViewer filePath={activeTab.path} className="flex-1" />
+            </div>
+          ) : activeTab?.type === "flashcard" ? (
+            // 闪卡复习标签页
+            <div className="flex-1 flex flex-col overflow-hidden bg-background">
+              <TabBar />
+              <FlashcardView deckId={activeTab.flashcardDeckId} />
+            </div>
+          ) : activeTab?.type === "cardflow" ? (
+            // 卡片流视图
+            <div className="flex-1 flex flex-col overflow-hidden bg-background">
+              <TabBar />
+              <CardFlowView />
+            </div>
+          ) : activeTab?.type === "ai-chat" ? (
+            // 主视图区 AI 聊天标签页，交给 Editor 内部根据 tab 类型渲染
+            <Editor />
+          ) : splitView && currentFile ? (
+            // Show split editor when enabled
+            <SplitEditor />
+          ) : activeTab?.type === "graph" || activeTab?.type === "isolated-graph" ? (
+            // 图谱标签页
+            <EditorWithGraph />
+          ) : currentFile ? (
+            // 文件编辑
+            <Editor />
+          ) : (
+            // 空状态或其他标签页类型 - 统一使用 EditorWithGraph 保持 TabBar 一致
+            <EditorWithGraph />
+          )}
+        </main>
+
+        {/* Right Resize Handle + Collapse Button */}
+        <div className="relative flex-shrink-0 h-full">
+          {rightSidebarOpen && (
+            <ResizeHandle
+              direction="right"
+              onResize={handleRightResize}
+              onDoubleClick={toggleRightSidebar}
+            />
+          )}
+          {/* Right Collapse Button - 只在面板收起时显示 */}
+          {!rightSidebarOpen && (
+            <button
+              onClick={toggleRightSidebar}
+              className="absolute top-1/2 -translate-y-1/2 z-10 p-1 rounded-md bg-muted/80 hover:bg-accent border border-border shadow-sm transition-all right-1"
+              title="展开右侧栏"
+            >
+              <PanelRight className="w-4 h-4 text-muted-foreground" />
+            </button>
+          )}
+        </div>
+
+        {/* Right Sidebar */}
+        <div
+          className={`flex-shrink-0 transition-all duration-300 ease-out overflow-hidden ${rightSidebarOpen ? "opacity-100" : "w-0 opacity-0"
+            }`}
+          style={{ width: rightSidebarOpen ? rightSidebarWidth : 0 }}
+        >
+          <RightPanel />
+        </div>
       </div>
-    )}
+
+      {/* Command Palette */}
+      <CommandPalette
+        isOpen={paletteOpen}
+        mode={paletteMode}
+        onClose={() => setPaletteOpen(false)}
+        onModeChange={setPaletteMode}
+      />
+
+      {/* Global Search */}
+      <GlobalSearch
+        isOpen={searchOpen}
+        onClose={() => setSearchOpen(false)}
+      />
+
+      {/* Create Database Dialog */}
+      <CreateDatabaseDialog
+        isOpen={createDbOpen}
+        onClose={() => setCreateDbOpen(false)}
+      />
+
+      {/* AI Floating Ball */}
+      <AIFloatingBall />
+
+      {/* Voice Input Floating Ball - 语音输入悬浮球 */}
+      <VoiceInputBall />
+
+      {/* Agent Eval Panel (Dev only) */}
+      {import.meta.env.DEV && evalPanelOpen && (
+        <div className="fixed inset-0 z-[100] bg-background">
+          <div className="absolute top-2 right-2 z-10">
+            <button
+              onClick={() => setEvalPanelOpen(false)}
+              className="px-4 py-2 bg-muted rounded hover:bg-muted/80"
+            >
+              ✕ 关闭 (Esc)
+            </button>
+          </div>
+          <AgentEvalPanel />
+        </div>
+      )}
     </div>
   );
 }
