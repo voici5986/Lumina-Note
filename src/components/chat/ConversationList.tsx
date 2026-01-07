@@ -1,14 +1,11 @@
 /**
  * 可折叠的对话历史列表组件
  * 参考设计：默认折叠显示图标，展开显示完整列表
+ * 
+ * 使用 useConversationManager hook 统一会话管理逻辑
  */
 
 import { useState } from "react";
-import { useUIStore } from "@/stores/useUIStore";
-import { useAIStore } from "@/stores/useAIStore";
-import { useAgentStore } from "@/stores/useAgentStore";
-import { useRustAgentStore } from "@/stores/useRustAgentStore";
-import { useDeepResearchStore } from "@/stores/useDeepResearchStore";
 import {
   Bot,
   MessageSquare,
@@ -20,9 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocaleStore } from "@/stores/useLocaleStore";
-
-// 使用 Rust Agent（与 MainAIChatShell 保持一致）
-const USE_RUST_AGENT = true;
+import { useConversationManager, type SessionType } from "@/hooks/useConversationManager";
 
 interface ConversationListProps {
   className?: string;
@@ -30,118 +25,22 @@ interface ConversationListProps {
 
 export function ConversationList({ className }: ConversationListProps) {
   const { t } = useLocaleStore();
-  const { chatMode } = useUIStore();
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Chat mode sessions
+  // 使用统一的会话管理 hook
   const {
-    sessions: chatSessions,
-    currentSessionId: chatCurrentId,
-    createSession: createChatSession,
-    deleteSession: deleteChatSession,
-    switchSession: switchChatSession,
-  } = useAIStore();
+    allSessions,
+    handleSwitchSession,
+    handleDeleteSession,
+    handleNewConversation,
+    handleClearHistory,
+    isCurrentSession,
+  } = useConversationManager();
 
-  // Agent mode sessions - 根据开关选择 store
-  const legacyAgentStore = useAgentStore();
-  const rustAgentStore = useRustAgentStore();
-  
-  const agentSessions = USE_RUST_AGENT ? rustAgentStore.sessions : legacyAgentStore.sessions;
-  const agentCurrentId = USE_RUST_AGENT ? rustAgentStore.currentSessionId : legacyAgentStore.currentSessionId;
-  const createAgentSession = USE_RUST_AGENT ? rustAgentStore.createSession : legacyAgentStore.createSession;
-  const deleteAgentSession = USE_RUST_AGENT ? rustAgentStore.deleteSession : legacyAgentStore.deleteSession;
-  const switchAgentSession = USE_RUST_AGENT ? rustAgentStore.switchSession : legacyAgentStore.switchSession;
-
-  // Deep Research sessions
-  const {
-    sessions: researchSessions,
-    selectedSessionId: researchSelectedId,
-    selectSession: selectResearchSession,
-    deleteSession: deleteResearchSession,
-  } = useDeepResearchStore();
-
-  // 合并所有会话并标记类型，按更新时间排序
-  const allSessions = [
-    ...agentSessions.map((s) => ({ ...s, type: "agent" as const })),
-    ...chatSessions.map((s) => ({ ...s, type: "chat" as const })),
-    ...researchSessions.map((s) => ({ 
-      ...s, 
-      type: "research" as const,
-      // 统一时间戳格式（Research 用 Date，其他用 number）
-      updatedAt: (s.completedAt || s.startedAt).getTime(),
-    })),
-  ].sort((a, b) => b.updatedAt - a.updatedAt);
-
-  const handleNewConversation = () => {
-    if (chatMode === "agent") {
-      // 获取当前 agent session
-      const currentSession = agentSessions.find(s => s.id === agentCurrentId);
-      // 如果当前 session 是空的，不做任何事
-      if (currentSession && currentSession.messages.length === 0) {
-        return;
-      }
-      // 找一个空的 agent session
-      const emptySession = agentSessions.find(s => s.messages.length === 0);
-      if (emptySession) {
-        // 切换到空 session
-        switchAgentSession(emptySession.id);
-      } else {
-        // 创建新 session
-        createAgentSession();
-      }
-    } else {
-      // Chat mode
-      const currentSession = chatSessions.find(s => s.id === chatCurrentId);
-      if (currentSession && currentSession.messages.length === 0) {
-        return;
-      }
-      const emptySession = chatSessions.find(s => s.messages.length === 0);
-      if (emptySession) {
-        switchChatSession(emptySession.id);
-      } else {
-        createChatSession();
-      }
-    }
-  };
-
-  const handleSwitchSession = (id: string, type: "agent" | "chat" | "research") => {
-    if (type === "agent") {
-      switchAgentSession(id);
-      // 如果当前不是 agent 模式，切换过去
-      if (chatMode !== "agent") {
-        useUIStore.getState().setChatMode("agent");
-      }
-    } else if (type === "research") {
-      // Deep Research - 选中会话后可以查看详情
-      selectResearchSession(id);
-      // TODO: 可以在这里触发显示研究详情的 UI
-    } else {
-      switchChatSession(id);
-      if (chatMode !== "chat") {
-        useUIStore.getState().setChatMode("chat");
-      }
-    }
-  };
-
-  const handleDeleteSession = (e: React.MouseEvent, id: string, type: "agent" | "chat" | "research") => {
+  // 删除会话（阻止事件冒泡）
+  const onDeleteSession = (e: React.MouseEvent, id: string, type: SessionType) => {
     e.stopPropagation();
-    if (type === "agent") {
-      deleteAgentSession(id);
-    } else if (type === "research") {
-      deleteResearchSession(id);
-    } else {
-      deleteChatSession(id);
-    }
-  };
-
-  const isCurrentSession = (id: string, type: "agent" | "chat" | "research") => {
-    if (type === "agent") {
-      return chatMode === "agent" && agentCurrentId === id;
-    }
-    if (type === "research") {
-      return researchSelectedId === id;
-    }
-    return chatMode === "chat" && chatCurrentId === id;
+    handleDeleteSession(id, type);
   };
 
   return (
@@ -183,16 +82,14 @@ export function ConversationList({ className }: ConversationListProps) {
       <div className="flex-1 overflow-y-auto py-2">
         {allSessions.map((session) => {
           const isActive = isCurrentSession(session.id, session.type);
+          
           // 根据类型选择图标
           const Icon = session.type === "agent" 
             ? Bot 
             : session.type === "research" 
               ? Microscope 
               : MessageSquare;
-          // 获取显示标题（research 用 topic）
-          const displayTitle = session.type === "research" 
-            ? (session as typeof researchSessions[0] & { type: "research" }).topic 
-            : (session as { title: string }).title;
+          
           // 图标颜色
           const iconColor = session.type === "agent" 
             ? "text-purple-500" 
@@ -210,7 +107,7 @@ export function ConversationList({ className }: ConversationListProps) {
                   ? "border-primary bg-background shadow-sm"
                   : "border-transparent hover:bg-background/50 hover:shadow-sm"
               )}
-              title={displayTitle}
+              title={session.title}
             >
               {/* 图标 */}
               <div className="min-w-[32px] flex justify-center">
@@ -233,7 +130,7 @@ export function ConversationList({ className }: ConversationListProps) {
                         isActive ? "text-foreground font-medium" : "text-muted-foreground"
                       )}
                     >
-                      {displayTitle}
+                      {session.title}
                     </p>
                     {/* 类型标签 */}
                     {session.type === "agent" && (
@@ -250,7 +147,7 @@ export function ConversationList({ className }: ConversationListProps) {
 
                   {/* 删除按钮 */}
                   <button
-                    onClick={(e) => handleDeleteSession(e, session.id, session.type)}
+                    onClick={(e) => onDeleteSession(e, session.id, session.type)}
                     className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive p-1 transition-opacity"
                     title={t.conversationList.deleteConversation}
                   >
@@ -277,18 +174,7 @@ export function ConversationList({ className }: ConversationListProps) {
       {isExpanded && allSessions.length > 0 && (
         <div className="p-2 border-t border-border">
           <button
-            onClick={() => {
-              // 清空当前模式的所有会话，保留一个空会话
-              if (chatMode === "agent") {
-                agentSessions.forEach((s) => {
-                  if (s.id !== agentCurrentId) deleteAgentSession(s.id);
-                });
-              } else {
-                chatSessions.forEach((s) => {
-                  if (s.id !== chatCurrentId) deleteChatSession(s.id);
-                });
-              }
-            }}
+            onClick={handleClearHistory}
             className="text-xs text-muted-foreground hover:text-foreground flex items-center justify-center gap-1 w-full py-1 rounded hover:bg-accent transition-colors"
           >
             <Trash2 size={12} />

@@ -43,6 +43,12 @@ export interface ToolCall {
   params: Record<string, unknown>;
 }
 
+/// 等待审批的工具信息
+export interface PendingToolApproval {
+  tool: ToolCall;
+  requestId: string;
+}
+
 export interface RustAgentSession {
   id: string;
   title: string;
@@ -134,11 +140,29 @@ interface RustAgentState {
   debugEnabled: boolean;
   debugLogPath: string | null;
   
+  // 工具审批（新增）
+  pendingTool: PendingToolApproval | null;
+  
+  // LLM 请求超时检测（新增）
+  llmRequestStartTime: number | null;
+  llmRequestId: string | null;
+  
+  // 心跳监控（新增）
+  lastHeartbeat: number | null;
+  connectionStatus: "connected" | "disconnected" | "unknown";
+  
   // 操作
   startTask: (task: string, context: TaskContext) => Promise<void>;
   abort: () => Promise<void>;
   clearChat: () => void;
   setAutoApprove: (value: boolean) => void;
+  
+  // 工具审批操作（新增）
+  approveTool: () => Promise<void>;
+  rejectTool: () => Promise<void>;
+  
+  // 超时重试（新增）
+  retryTimeout: () => Promise<void>;
   
   // 调试操作
   enableDebug: (workspacePath: string) => Promise<void>;
@@ -199,6 +223,17 @@ export const useRustAgentStore = create<RustAgentState>()(
       // 调试模式初始状态
       debugEnabled: false,
       debugLogPath: null,
+      
+      // 工具审批初始状态（新增）
+      pendingTool: null,
+      
+      // LLM 请求超时检测初始状态（新增）
+      llmRequestStartTime: null,
+      llmRequestId: null,
+      
+      // 心跳监控初始状态（新增）
+      lastHeartbeat: null,
+      connectionStatus: "unknown",
 
       // 启动任务
       startTask: async (task: string, context: TaskContext) => {
@@ -308,6 +343,51 @@ export const useRustAgentStore = create<RustAgentState>()(
         set({ autoApprove: value });
       },
       
+      // 审批工具调用（新增）
+      approveTool: async () => {
+        const { pendingTool } = get();
+        if (!pendingTool) {
+          console.warn("[RustAgent] No pending tool to approve");
+          return;
+        }
+        
+        try {
+          await invoke("agent_approve_tool", {
+            requestId: pendingTool.requestId,
+            approved: true,
+          });
+          set({ pendingTool: null });
+        } catch (e) {
+          console.error("[RustAgent] Failed to approve tool:", e);
+        }
+      },
+      
+      // 拒绝工具调用（新增）
+      rejectTool: async () => {
+        const { pendingTool } = get();
+        if (!pendingTool) {
+          console.warn("[RustAgent] No pending tool to reject");
+          return;
+        }
+        
+        try {
+          await invoke("agent_approve_tool", {
+            requestId: pendingTool.requestId,
+            approved: false,
+          });
+          set({ pendingTool: null });
+        } catch (e) {
+          console.error("[RustAgent] Failed to reject tool:", e);
+        }
+      },
+      
+      // 超时重试（新增）
+      retryTimeout: async () => {
+        // TODO: 实现超时重试逻辑
+        // 目前 Rust 端还没有实现重试机制
+        console.log("[RustAgent] Retry timeout - not implemented yet");
+      },
+      
       // 启用调试模式
       enableDebug: async (workspacePath: string) => {
         try {
@@ -333,10 +413,10 @@ export const useRustAgentStore = create<RustAgentState>()(
 
       // 创建新会话
       createSession: (title?: string) => {
-        const state = get();
-        // 先保存当前会话
-        state._saveCurrentSession();
-        
+        // 先保存当前会话，再基于最新 sessions 追加一个全新会话
+        get()._saveCurrentSession();
+        const sessions = get().sessions;
+
         const id = `rust-session-${Date.now()}`;
         const newSession: RustAgentSession = {
           id,
@@ -346,9 +426,9 @@ export const useRustAgentStore = create<RustAgentState>()(
           updatedAt: Date.now(),
           totalTokensUsed: 0,
         };
-        
+
         set({
-          sessions: [...state.sessions, newSession],
+          sessions: [...sessions, newSession],
           currentSessionId: id,
           messages: [],
           totalTokensUsed: 0,
@@ -362,23 +442,23 @@ export const useRustAgentStore = create<RustAgentState>()(
 
       // 切换会话
       switchSession: (id: string) => {
-        const state = get();
-        // 先保存当前会话
-        state._saveCurrentSession();
-        
-        const session = state.sessions.find(s => s.id === id);
-        if (session) {
-          set({
-            currentSessionId: id,
-            messages: session.messages,
-            totalTokensUsed: session.totalTokensUsed,
-            status: "idle",
-            error: null,
-            currentPlan: null,
-            lastIntent: null,
-            streamingContent: "",
-          });
-        }
+        // 保存当前会话，再切换到目标会话（使用最新 sessions）
+        get()._saveCurrentSession();
+        const sessions = get().sessions;
+        const session = sessions.find(s => s.id === id);
+        if (!session) return;
+
+        set({
+          sessions,
+          currentSessionId: id,
+          messages: session.messages,
+          totalTokensUsed: session.totalTokensUsed,
+          status: "idle",
+          error: null,
+          currentPlan: null,
+          lastIntent: null,
+          streamingContent: "",
+        });
       },
 
       // 删除会话
@@ -429,24 +509,24 @@ export const useRustAgentStore = create<RustAgentState>()(
 
       // 保存当前会话
       _saveCurrentSession: () => {
-        const state = get();
-        if (!state.currentSessionId) return;
-        
-        set({
-          sessions: state.sessions.map(s =>
-            s.id === state.currentSessionId
-              ? {
-                  ...s,
-                  messages: state.messages,
-                  totalTokensUsed: state.totalTokensUsed,
-                  updatedAt: Date.now(),
-                  // 根据第一条用户消息生成标题
-                  title: s.title === "新对话" && state.messages.length > 0
-                    ? state.messages.find(m => m.role === "user")?.content.slice(0, 20) + "..." || s.title
-                    : s.title,
-                }
-              : s
-          ),
+        set((state) => {
+          if (!state.currentSessionId) return state;
+
+          return {
+            sessions: state.sessions.map(s =>
+              s.id === state.currentSessionId
+                ? {
+                    ...s,
+                    messages: state.messages,
+                    totalTokensUsed: state.totalTokensUsed,
+                    updatedAt: Date.now(),
+                    title: s.title === "新对话" && state.messages.length > 0
+                      ? state.messages.find(m => m.role === "user")?.content.slice(0, 20) || s.title
+                      : s.title,
+                  }
+                : s
+            ),
+          };
         });
       },
 
@@ -647,6 +727,56 @@ export const useRustAgentStore = create<RustAgentState>()(
                 failedTasks: stats.failedTasks + 1,
               },
             });
+            break;
+          }
+          
+          // 新增：等待工具审批事件
+          case "waiting_approval": {
+            const { tool, request_id } = event.data as { 
+              tool: ToolCall; 
+              request_id: string;
+            };
+            console.log("[RustAgent] waiting_approval:", { tool, request_id });
+            set({
+              status: "waiting_approval",
+              pendingTool: {
+                tool,
+                requestId: request_id,
+              },
+            });
+            break;
+          }
+          
+          // 新增：LLM 请求开始事件
+          case "llm_request_start": {
+            const { request_id, timestamp } = event.data as { 
+              request_id: string; 
+              timestamp: number;
+            };
+            set({
+              llmRequestStartTime: timestamp,
+              llmRequestId: request_id,
+            });
+            break;
+          }
+          
+          // 新增：LLM 请求结束事件
+          case "llm_request_end": {
+            set({
+              llmRequestStartTime: null,
+              llmRequestId: null,
+            });
+            break;
+          }
+          
+          // 新增：心跳事件（用于连接状态监控）
+          case "heartbeat": {
+            const { timestamp } = event.data as { timestamp: number };
+            set({
+              lastHeartbeat: timestamp,
+              connectionStatus: "connected",
+            });
+            console.log("[RustAgent] heartbeat received:", timestamp);
             break;
           }
         }

@@ -92,6 +92,7 @@ function generateTitleFromAssistantContent(content: string, fallback: string = "
 interface AIState {
   // Config
   config: AIConfig;
+  encryptedApiKey?: string;
   setConfig: (config: Partial<AIConfig>) => void | Promise<void>;
 
   // Chat
@@ -152,6 +153,7 @@ export const useAIStore = create<AIState>()(
     (set, get) => ({
       // Config
       config: getAIConfig(),
+      encryptedApiKey: undefined,
       setConfig: async (newConfig) => {
         // 如果有新的 apiKey，先加密
         if (newConfig.apiKey !== undefined) {
@@ -159,7 +161,10 @@ export const useAIStore = create<AIState>()(
           newConfig = { ...newConfig, apiKey: newConfig.apiKey }; // 内存中保持明文
           setAIConfig(newConfig);
           // 存储时使用加密的 key
-          set({ config: { ...getAIConfig(), apiKey: encryptedKey } });
+          set({ 
+            config: { ...getAIConfig() }, 
+            encryptedApiKey: encryptedKey 
+          });
         } else {
           setAIConfig(newConfig);
           set({ config: getAIConfig() });
@@ -751,19 +756,32 @@ export const useAIStore = create<AIState>()(
     }),
     {
       name: "lumina-ai",
-      partialize: (state) => ({
-        config: state.config,
-        sessions: state.sessions,
-        currentSessionId: state.currentSessionId,
-      }),
+      partialize: (state) => {
+        const persistedConfig = state.config.apiKey
+          ? { ...state.config, apiKey: state.encryptedApiKey || state.config.apiKey }
+          : state.config;
+
+        return {
+          config: persistedConfig,
+          sessions: state.sessions,
+          currentSessionId: state.currentSessionId,
+          encryptedApiKey: state.encryptedApiKey,
+        };
+      },
       onRehydrateStorage: () => async (state) => {
         // 恢复数据后，解密 apiKey 并同步 config 到内存
         if (state?.config) {
           try {
-            const decryptedKey = await decryptApiKey(state.config.apiKey || "");
+            const storedEncryptedKey = state.encryptedApiKey ?? state.config.apiKey ?? "";
+            const decryptedKey = storedEncryptedKey
+              ? await decryptApiKey(storedEncryptedKey)
+              : "";
             const decryptedConfig = { ...state.config, apiKey: decryptedKey };
             setAIConfig(decryptedConfig);
-            useAIStore.setState({ config: decryptedConfig });
+            useAIStore.setState({ 
+              config: decryptedConfig,
+              encryptedApiKey: storedEncryptedKey 
+            });
           } catch (error) {
             console.error('Failed to decrypt API key:', error);
           }

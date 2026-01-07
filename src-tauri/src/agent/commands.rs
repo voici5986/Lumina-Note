@@ -17,6 +17,83 @@ use tauri::{AppHandle, Emitter, State};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+/// 工具审批响应
+#[derive(Debug, Clone)]
+pub struct ToolApprovalResponse {
+    pub approved: bool,
+}
+
+/// 全局审批通道管理器
+/// 使用 lazy_static 实现全局单例
+use once_cell::sync::Lazy;
+
+static APPROVAL_MANAGER: Lazy<ApprovalManager> = Lazy::new(ApprovalManager::new);
+
+/// 审批管理器
+pub struct ApprovalManager {
+    /// 工具审批通道：用于等待用户审批
+    approval_sender: Arc<Mutex<Option<tokio::sync::oneshot::Sender<ToolApprovalResponse>>>>,
+    /// 当前等待审批的请求 ID
+    pending_approval_id: Arc<Mutex<Option<String>>>,
+}
+
+impl ApprovalManager {
+    pub fn new() -> Self {
+        Self {
+            approval_sender: Arc::new(Mutex::new(None)),
+            pending_approval_id: Arc::new(Mutex::new(None)),
+        }
+    }
+    
+    /// 获取全局实例
+    pub fn global() -> &'static ApprovalManager {
+        &APPROVAL_MANAGER
+    }
+    
+    /// 设置审批通道
+    pub async fn set_approval_channel(
+        &self,
+        request_id: String,
+        sender: tokio::sync::oneshot::Sender<ToolApprovalResponse>,
+    ) {
+        let mut approval_sender = self.approval_sender.lock().await;
+        let mut pending_id = self.pending_approval_id.lock().await;
+        *approval_sender = Some(sender);
+        *pending_id = Some(request_id);
+    }
+    
+    /// 发送审批响应
+    pub async fn send_approval(&self, request_id: &str, approved: bool) -> Result<(), String> {
+        let mut approval_sender = self.approval_sender.lock().await;
+        let mut pending_id = self.pending_approval_id.lock().await;
+        
+        // 验证请求 ID
+        if pending_id.as_deref() != Some(request_id) {
+            return Err(format!(
+                "Request ID mismatch: expected {:?}, got {}",
+                *pending_id, request_id
+            ));
+        }
+        
+        if let Some(sender) = approval_sender.take() {
+            sender.send(ToolApprovalResponse { approved })
+                .map_err(|_| "Failed to send approval response".to_string())?;
+            *pending_id = None;
+            Ok(())
+        } else {
+            Err("No pending approval".to_string())
+        }
+    }
+    
+    /// 清除审批状态
+    pub async fn clear_approval(&self) {
+        let mut approval_sender = self.approval_sender.lock().await;
+        let mut pending_id = self.pending_approval_id.lock().await;
+        *approval_sender = None;
+        *pending_id = None;
+    }
+}
+
 /// Agent 状态管理
 pub struct AgentState {
     current_state: Arc<Mutex<Option<GraphState>>>,
@@ -167,6 +244,9 @@ pub async fn agent_abort(
     app: AppHandle,
     state: State<'_, AgentState>,
 ) -> Result<(), String> {
+    // 清除审批状态
+    ApprovalManager::global().clear_approval().await;
+    
     {
         let mut is_running = state.is_running.lock().await;
         if !*is_running {
@@ -180,6 +260,27 @@ pub async fn agent_abort(
         status: AgentStatus::Aborted,
     });
 
+    Ok(())
+}
+
+/// 审批工具调用
+#[tauri::command]
+pub async fn agent_approve_tool(
+    app: AppHandle,
+    _state: State<'_, AgentState>,
+    request_id: String,
+    approved: bool,
+) -> Result<(), String> {
+    println!("[Agent] 收到审批响应: request_id={}, approved={}", request_id, approved);
+    
+    // 发送审批响应
+    ApprovalManager::global().send_approval(&request_id, approved).await?;
+    
+    // 更新状态
+    let _ = app.emit("agent-event", AgentEvent::StatusChange {
+        status: AgentStatus::Running,
+    });
+    
     Ok(())
 }
 

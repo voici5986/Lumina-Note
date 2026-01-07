@@ -35,6 +35,8 @@ fn main() {
             commands::create_dir,
             commands::delete_file,
             commands::rename_file,
+            commands::move_file,
+            commands::move_folder,
             commands::show_in_explorer,
             commands::open_video_window,
             commands::close_video_window,
@@ -110,6 +112,7 @@ fn main() {
             // Agent commands
             agent::agent_start_task,
             agent::agent_abort,
+            agent::agent_approve_tool,
             agent::agent_get_status,
             agent::agent_continue_with_answer,
             // Agent debug commands

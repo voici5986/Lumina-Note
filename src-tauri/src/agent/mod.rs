@@ -15,3 +15,4 @@ pub mod debug_log;
 pub mod workspace_layout;
 
 pub use commands::*;
+pub use commands::ApprovalManager;

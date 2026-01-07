@@ -1,6 +1,6 @@
 [package]
 name = "lumina-note"
-version = "0.4.4"
+version = "0.4.2"
 description = "A local-first AI-powered note-taking app"
 authors = ["Lumina Note Contributors"]
 edition = "2021"
@@ -51,6 +51,7 @@ flate2 = "1.0"
 chrono = "0.4"
 rand = "0.8"
 uuid = { version = "1.0", features = ["v4"] }
+once_cell = "1.19"
 
 [profile.dev]
 incremental = true

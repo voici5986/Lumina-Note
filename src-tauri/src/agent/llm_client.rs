@@ -1,13 +1,20 @@
 //! LLM 客户端封装
 //! 
 //! 封装 LLM API 调用，支持多种提供商
+//! 
+//! ## SSE 稳定性增强
+//! - 心跳机制：定期发送心跳事件，检测连接状态
+//! - 指数退避重试：网络错误时自动重试
+//! - 超时检测：检测流式响应假死
 
 use crate::agent::types::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter};
 use futures_util::StreamExt;
+use tokio::time::interval;
 
 /// OpenAI 格式的请求
 #[derive(Debug, Serialize)]
@@ -142,7 +149,7 @@ impl LlmClient {
         }).collect()
     }
 
-    /// 非流式调用
+    /// 非流式调用（带重试机制）
     pub async fn call(
         &self,
         messages: &[Message],
@@ -169,31 +176,69 @@ impl LlmClient {
         println!("[LlmClient] 📤 发送请求到: {}", url);
         println!("[LlmClient] 📤 模型: {}, 消息数: {}, 工具: {}", 
             self.config.model, chat_messages.len(), has_tools);
-        let start_time = std::time::Instant::now();
         
-        let mut req = self.client.post(&url);
-        for (key, value) in headers {
-            req = req.header(&key, &value);
+        // 重试机制
+        let max_retries = 2;
+        let mut last_error = String::new();
+        
+        for attempt in 0..=max_retries {
+            if attempt > 0 {
+                // 重试前等待，指数退避
+                let wait_secs = 1u64 << (attempt - 1); // 1s, 2s
+                println!("[LlmClient] ⏳ 重试 {} (等待 {}s)，上次错误: {}", attempt, wait_secs, last_error);
+                tokio::time::sleep(std::time::Duration::from_secs(wait_secs)).await;
+            }
+            
+            let start_time = std::time::Instant::now();
+            
+            // 每次重试都重新构建请求（避免连接复用问题）
+            let mut req = self.client.post(&url);
+            for (key, value) in &headers {
+                req = req.header(key, value);
+            }
+            req = req.json(&body);
+            
+            match req.send().await {
+                Ok(response) => {
+                    println!("[LlmClient] ✅ 收到响应，耗时: {:?}", start_time.elapsed());
+                    
+                    if !response.status().is_success() {
+                        let status = response.status();
+                        let text = response.text().await.unwrap_or_default();
+                        last_error = format!("HTTP {}: {}", status, text);
+                        
+                        // 5xx 错误可以重试，4xx 错误不重试
+                        if status.is_server_error() {
+                            continue;
+                        }
+                        return Err(last_error);
+                    }
+                    
+                    let json: Value = match response.json().await {
+                        Ok(j) => j,
+                        Err(e) => {
+                            last_error = format!("Failed to parse response: {}", e);
+                            continue;
+                        }
+                    };
+                    
+                    // 成功，解析响应
+                    return self.parse_llm_response(json);
+                }
+                Err(e) => {
+                    println!("[LlmClient] ❌ 请求失败: {}", e);
+                    last_error = format!("Request failed: {}", e);
+                    // 继续重试
+                }
+            }
         }
-        req = req.json(&body);
         
-        let response = req.send().await
-            .map_err(|e| {
-                println!("[LlmClient] ❌ 请求失败: {}", e);
-                format!("Request failed: {}", e)
-            })?;
-        
-        println!("[LlmClient] ✅ 收到响应，耗时: {:?}", start_time.elapsed());
-        
-        if !response.status().is_success() {
-            let status = response.status();
-            let text = response.text().await.unwrap_or_default();
-            return Err(format!("HTTP {}: {}", status, text));
-        }
-        
-        let json: Value = response.json().await
-            .map_err(|e| format!("Failed to parse response: {}", e))?;
-        
+        // 所有重试都失败
+        Err(last_error)
+    }
+    
+    /// 解析 LLM 响应
+    fn parse_llm_response(&self, json: Value) -> Result<LlmResponse, String> {
         // 提取 token 使用量
         let usage = &json["usage"];
         let prompt_tokens = usage["prompt_tokens"].as_u64().unwrap_or(0) as usize;
@@ -278,8 +323,92 @@ impl LlmClient {
         })
     }
 
-    /// 流式调用
+    /// 流式调用（带心跳和超时检测）
     pub async fn call_stream(
+        &self,
+        app: &AppHandle,
+        request_id: &str,
+        messages: &[Message],
+        tools: Option<&[Value]>,
+        current_agent: AgentType,
+    ) -> Result<String, String> {
+        // 发送 LLM 请求开始事件
+        let start_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+        
+        let _ = app.emit("agent-event", AgentEvent::LlmRequestStart {
+            request_id: request_id.to_string(),
+            timestamp: start_timestamp,
+        });
+        
+        // 使用带重试的流式调用
+        let result = self.call_stream_with_retry(app, request_id, messages, tools, current_agent).await;
+        
+        // 发送 LLM 请求结束事件
+        let _ = app.emit("agent-event", AgentEvent::LlmRequestEnd {
+            request_id: request_id.to_string(),
+        });
+        
+        result
+    }
+    
+    /// 流式调用（带指数退避重试）
+    async fn call_stream_with_retry(
+        &self,
+        app: &AppHandle,
+        request_id: &str,
+        messages: &[Message],
+        tools: Option<&[Value]>,
+        current_agent: AgentType,
+    ) -> Result<String, String> {
+        let max_retries = 3;
+        let base_delay = Duration::from_secs(1);
+        let mut last_error = String::new();
+        
+        for attempt in 0..max_retries {
+            if attempt > 0 {
+                // 指数退避 + 随机抖动
+                let delay_secs = base_delay.as_secs() * 2u64.pow(attempt as u32);
+                let jitter_ms = rand::random::<u64>() % 500;
+                let delay = Duration::from_secs(delay_secs) + Duration::from_millis(jitter_ms);
+                
+                println!("[LlmClient] ⏳ 流式调用重试 {} (等待 {:?})，上次错误: {}", 
+                    attempt, delay, last_error);
+                tokio::time::sleep(delay).await;
+            }
+            
+            match self.call_stream_inner(app, request_id, messages, tools, current_agent.clone()).await {
+                Ok(content) => return Ok(content),
+                Err(e) => {
+                    last_error = e.clone();
+                    // 判断是否可重试
+                    if !Self::is_retryable_error(&e) {
+                        return Err(e);
+                    }
+                    println!("[LlmClient] ❌ 流式调用失败 (attempt {}): {}", attempt + 1, e);
+                }
+            }
+        }
+        
+        Err(format!("流式调用失败，已重试 {} 次: {}", max_retries, last_error))
+    }
+    
+    /// 判断错误是否可重试
+    fn is_retryable_error(error: &str) -> bool {
+        let error_lower = error.to_lowercase();
+        error_lower.contains("timeout") ||
+        error_lower.contains("connection") ||
+        error_lower.contains("reset") ||
+        error_lower.contains("broken pipe") ||
+        error_lower.contains("stream error") ||
+        error_lower.contains("no data") ||
+        error.contains("5") && error.contains("HTTP")  // 5xx 错误
+    }
+    
+    /// 流式调用内部实现（带心跳）
+    async fn call_stream_inner(
         &self,
         app: &AppHandle,
         _request_id: &str,
@@ -319,7 +448,7 @@ impl LlmClient {
             return Err(format!("HTTP {}: {}", status, text));
         }
         
-        // 流式读取
+        // 流式读取（带心跳和超时检测）
         let mut stream = response.bytes_stream();
         let mut buffer = String::new();
         let mut full_content = String::new();
@@ -327,81 +456,117 @@ impl LlmClient {
         // 用于累积 tool_calls
         let mut tool_calls: Vec<(String, String)> = Vec::new(); // (name, arguments)
         
-        while let Some(chunk_result) = stream.next().await {
-            let bytes = chunk_result.map_err(|e| format!("Stream error: {}", e))?;
-            let text = String::from_utf8_lossy(&bytes);
-            buffer.push_str(&text);
-            
-            // 按行处理 SSE
-            while let Some(newline_pos) = buffer.find('\n') {
-                let line = buffer[..newline_pos].trim().to_string();
-                buffer = buffer[newline_pos + 1..].to_string();
-                
-                if line.is_empty() || line.starts_with(": ") {
-                    continue;
+        // 心跳和超时配置
+        let heartbeat_interval = Duration::from_secs(15);
+        let stream_timeout = Duration::from_secs(60);
+        let mut last_data_time = Instant::now();
+        let mut heartbeat_timer = interval(heartbeat_interval);
+        
+        loop {
+            tokio::select! {
+                // 处理流数据
+                chunk_result = stream.next() => {
+                    match chunk_result {
+                        Some(Ok(bytes)) => {
+                            last_data_time = Instant::now();
+                            let text = String::from_utf8_lossy(&bytes);
+                            buffer.push_str(&text);
+                            
+                            // 按行处理 SSE
+                            while let Some(newline_pos) = buffer.find('\n') {
+                                let line = buffer[..newline_pos].trim().to_string();
+                                buffer = buffer[newline_pos + 1..].to_string();
+                                
+                                if line.is_empty() || line.starts_with(": ") {
+                                    continue;
+                                }
+                                
+                                if line.starts_with("data: ") {
+                                    let data = &line[6..];
+                                    
+                                    if data == "[DONE]" {
+                                        // 流正常结束
+                                        return self.finalize_stream_result(full_content, tool_calls);
+                                    }
+                                    
+                                    if let Ok(json) = serde_json::from_str::<Value>(data) {
+                                        let delta = &json["choices"][0]["delta"];
+                                        
+                                        // 处理 tool_calls（Function Call 流式响应）
+                                        if let Some(tc_array) = delta.get("tool_calls").and_then(|v| v.as_array()) {
+                                            for tc in tc_array {
+                                                let idx = tc["index"].as_u64().unwrap_or(0) as usize;
+                                                
+                                                // 确保 tool_calls 数组足够大
+                                                while tool_calls.len() <= idx {
+                                                    tool_calls.push((String::new(), String::new()));
+                                                }
+                                                
+                                                // 累积函数名
+                                                if let Some(name) = tc["function"]["name"].as_str() {
+                                                    tool_calls[idx].0.push_str(name);
+                                                }
+                                                
+                                                // 累积参数
+                                                if let Some(args) = tc["function"]["arguments"].as_str() {
+                                                    tool_calls[idx].1.push_str(args);
+                                                }
+                                            }
+                                        }
+                                        
+                                        // 处理普通文本内容
+                                        if let Some(content) = delta["content"].as_str() {
+                                            // 跳过空内容
+                                            if content.is_empty() {
+                                                continue;
+                                            }
+                                            
+                                            full_content.push_str(content);
+                                            
+                                            // 发送事件到前端
+                                            let _ = app.emit("agent-event", AgentEvent::MessageChunk {
+                                                content: content.to_string(),
+                                                agent: current_agent.clone(),
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Some(Err(e)) => {
+                            return Err(format!("Stream error: {}", e));
+                        }
+                        None => {
+                            // 流结束
+                            return self.finalize_stream_result(full_content, tool_calls);
+                        }
+                    }
                 }
                 
-                if line.starts_with("data: ") {
-                    let data = &line[6..];
+                // 定期发送心跳
+                _ = heartbeat_timer.tick() => {
+                    let timestamp = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_millis() as u64;
                     
-                    if data == "[DONE]" {
-                        break;
-                    }
+                    let _ = app.emit("agent-event", AgentEvent::Heartbeat { timestamp });
                     
-                    if let Ok(json) = serde_json::from_str::<Value>(data) {
-                        let delta = &json["choices"][0]["delta"];
-                        
-                        // 处理 tool_calls（Function Call 流式响应）
-                        if let Some(tc_array) = delta.get("tool_calls").and_then(|v| v.as_array()) {
-                            for tc in tc_array {
-                                let idx = tc["index"].as_u64().unwrap_or(0) as usize;
-                                
-                                // 确保 tool_calls 数组足够大
-                                while tool_calls.len() <= idx {
-                                    tool_calls.push((String::new(), String::new()));
-                                }
-                                
-                                // 累积函数名
-                                if let Some(name) = tc["function"]["name"].as_str() {
-                                    tool_calls[idx].0.push_str(name);
-                                }
-                                
-                                // 累积参数
-                                if let Some(args) = tc["function"]["arguments"].as_str() {
-                                    tool_calls[idx].1.push_str(args);
-                                }
-                            }
-                        }
-                        
-                        // 处理普通文本内容
-                        if let Some(content) = delta["content"].as_str() {
-                            // 跳过空内容
-                            if content.is_empty() {
-                                continue;
-                            }
-                            
-                            full_content.push_str(content);
-                            
-                            // 调试日志 - 检查是否有换行符
-                            #[cfg(debug_assertions)]
-                            {
-                                let has_newline = content.contains('\n');
-                                if has_newline {
-                                    println!("[LLM Stream] chunk with newline: {:?}", content);
-                                }
-                            }
-                            
-                            // 发送事件到前端
-                            let _ = app.emit("agent-event", AgentEvent::MessageChunk {
-                                content: content.to_string(),
-                                agent: current_agent.clone(),
-                            });
-                        }
+                    // 检测假死（超时无数据）
+                    if last_data_time.elapsed() > stream_timeout {
+                        return Err(format!("Stream timeout: no data for {} seconds", stream_timeout.as_secs()));
                     }
                 }
             }
         }
-        
+    }
+    
+    /// 处理流式结果
+    fn finalize_stream_result(
+        &self,
+        full_content: String,
+        tool_calls: Vec<(String, String)>,
+    ) -> Result<String, String> {
         // 如果有 tool_calls，转换为 XML 格式
         if !tool_calls.is_empty() {
             let mut xml_output = String::new();

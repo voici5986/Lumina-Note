@@ -4,20 +4,29 @@
 
 # Lumina Note
 
-**本地优先 · AI 驱动 · 现代知识库**
+**本地优先的 AI 笔记应用**
 
-构建属于你的第二大脑，支持 Agent 自动化的 Markdown 笔记应用。
+你的笔记数据完全存储在本地，AI Agent 帮你自动整理、搜索、编辑。
 
-[![Tauri](https://img.shields.io/badge/Tauri-v2-24C8DB?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
-[![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
-[![Rust](https://img.shields.io/badge/Rust-Backend-dea584?style=flat-square&logo=rust&logoColor=black)](https://www.rust-lang.org/)
+[![GitHub Release](https://img.shields.io/github/v/release/blueberrycongee/Lumina-Note?style=flat-square)](https://github.com/blueberrycongee/Lumina-Note/releases)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square)](LICENSE)
+[![Tauri](https://img.shields.io/badge/Tauri-v2-24C8DB?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
 
 **Language**: 简体中文 · [English](./README.en.md) · [日本語](./README.ja.md)
 
-[快速开始](#快速开始) · [功能特性](#核心特性) · [使用指南](#使用指南) · [技术架构](#技术架构)
-
 </div>
+
+---
+
+## 下载安装
+
+前往 [Releases](https://github.com/blueberrycongee/Lumina-Note/releases) 下载最新版本：
+
+| 平台 | 下载 |
+|------|------|
+| Windows | `.msi` 或 `.exe` |
+| macOS (Intel) | `x64.dmg` |
+| macOS (Apple Silicon) | `aarch64.dmg` |
 
 ---
 
@@ -25,458 +34,80 @@
 
 <p align="center">
   <img src="docs/screenshots/ai-agent.png" alt="AI Agent" width="800" />
-  <br/>
-  <em>AI Agent - 深度搜索与笔记总结</em>
 </p>
 
 <p align="center">
   <img src="docs/screenshots/knowledge-graph.png" alt="知识图谱" width="800" />
-  <br/>
-  <em>知识图谱 - 可视化笔记关联</em>
 </p>
 
 <p align="center">
   <img src="docs/screenshots/editor-latex.png" alt="编辑器" width="800" />
-  <br/>
-  <em>编辑器 - LaTeX 公式与反向链接</em>
 </p>
 
 ---
 
 ## 核心特性
 
-Lumina Note 不仅仅是一个编辑器，它是一个集成了 LLM 能力的知识生产环境。
+### AI Agent
+- 理解你的意图，自动执行读取、编辑、搜索等任务
+- 支持 8 家模型提供商：OpenAI / Claude / DeepSeek / Gemini / Moonshot / Groq / OpenRouter / Ollama
+- 内置 RAG 语义搜索，基于你的笔记库回答问题
 
-### 沉浸式编辑体验
-
-- **多模式切换**：无缝切换源码 / 实时预览 / 阅读模式
-- **双向链接**：使用 `[[WikiLinks]]` 构建网状知识图谱，支持从文件树拖拽创建链接
-- **专业排版**：原生支持 LaTeX 数学公式、Mermaid 图表及 Obsidian 风格 `> [!info]` 提示块
-- **语法高亮**：基于 CodeMirror 6，支持上百种语言的代码高亮
-- **分栏编辑**：水平/垂直分栏，可拖拽调整大小，活动面板自动接收新文件
-- **图片粘贴**：截图或复制图片后直接 `Ctrl+V` 粘贴，自动保存到笔记库
+### 编辑器
+- 源码 / 实时预览 / 阅读三种模式
+- 双向链接 `[[WikiLinks]]`，构建知识网络
+- LaTeX 公式、Mermaid 图表、代码高亮
+- 分栏编辑，图片粘贴
 
 ### 知识图谱
+- 可视化笔记间的关联关系
+- 文件夹层级、双向链接自动解析
+- 物理引擎驱动，支持拖拽和缩放
 
-基于 Canvas 的高性能可视化引擎，直观展示笔记间的关联关系。
+### PDF 阅读器
+- 高亮、下划线、笔记批注
+- 批注自动保存为 Markdown
+- 选中内容发送给 AI 对话
 
-- **文件夹层级**：文件夹作为节点显示（带刺圆球样式），父子关系带箭头连线
-- **颜色分区**：按文件夹自动分配颜色，子节点继承父文件夹颜色
-- **双向链接**：`[[WikiLinks]]` 自动解析为节点间的连线
-- **右键孤立查看**：右键点击任意节点，可在新标签页中查看该节点及其直接关联的节点
-- **物理引擎**：可调节的斥力、弹力、向心力参数，支持拖拽节点和画布缩放
-
-### AI Agent 系统
-
-- **Agent 模式**：能够理解意图，自动执行读取、编辑、搜索笔记等复杂任务链
-- **AI 悬浮球**：随时唤起的助手，支持拖拽，不打断当前心流
-- **语音输入**：基于 Web Speech API 的语音转文字，支持流式显示、自动停止、录音动画
-- **Diff 预览**：AI 修改内容前提供 Diff 对比视图，由你决定是否 Apply
-- **RAG 语义搜索**：内置 SQLite 向量库，基于语义理解检索你的本地知识库
-
-#### Agent 架构
-
-系统采用意图驱动 + Agent 内自规划架构。Coordinator 分析意图后路由到专业 Agent，每个 Agent 内部拥有完整的规划-执行-监督循环。
-
-```mermaid
-flowchart TD
-    START((__start__))
-    
-    START --> COORD[coordinator<br/>意图分析]
-    
-    COORD -->|chat| REPORT[reporter]
-    COORD -->|edit| EDITOR
-    COORD -->|create| WRITER
-    COORD -->|search/complex| RESEARCHER
-    COORD -->|organize| ORGANIZER
-    
-    subgraph editor ["editor (自规划循环)"]
-        direction TB
-        E_PLAN[create_plan] --> E_EXEC[执行工具]
-        E_EXEC --> E_UPDATE[update_plan_progress]
-        E_UPDATE -->|未完成| E_EXEC
-        E_UPDATE -->|全部完成| E_COMPLETE[attempt_completion]
-    end
-    
-    subgraph writer ["writer (自规划循环)"]
-        direction TB
-        W_PLAN[create_plan] --> W_EXEC[执行工具]
-        W_EXEC --> W_UPDATE[update_plan_progress]
-        W_UPDATE -->|未完成| W_EXEC
-        W_UPDATE -->|全部完成| W_COMPLETE[attempt_completion]
-    end
-    
-    subgraph researcher ["researcher (自规划循环)"]
-        direction TB
-        R_PLAN[create_plan] --> R_EXEC[执行工具]
-        R_EXEC --> R_UPDATE[update_plan_progress]
-        R_UPDATE -->|未完成| R_EXEC
-        R_UPDATE -->|全部完成| R_COMPLETE[attempt_completion]
-    end
-    
-    subgraph organizer ["organizer (自规划循环)"]
-        direction TB
-        O_PLAN[create_plan] --> O_EXEC[执行工具]
-        O_EXEC --> O_UPDATE[update_plan_progress]
-        O_UPDATE -->|未完成| O_EXEC
-        O_UPDATE -->|全部完成| O_COMPLETE[attempt_completion]
-    end
-    
-    EDITOR --> E_PLAN
-    WRITER --> W_PLAN
-    RESEARCHER --> R_PLAN
-    ORGANIZER --> O_PLAN
-    
-    E_COMPLETE --> REPORT
-    W_COMPLETE --> REPORT
-    R_COMPLETE --> REPORT
-    O_COMPLETE --> REPORT
-    
-    REPORT --> END_((__end__))
-```
-
-核心机制：
-- **自规划**：Agent 接收任务后首先调用 `create_plan` 分解为 1-5 个步骤
-- **自执行**：循环调用工具执行每个步骤
-- **自监督**：`attempt_completion` 会检查计划完成度，未完成时拒绝结束并要求继续
-
-Agent 工具集（18 个）：
-
-| 类别 | 工具 |
-| :--- | :--- |
-| 计划 | `update_plan` |
-| 读取 | `read_note`, `read_outline`, `read_section` |
-| 写入 | `edit_note`, `create_note` |
-| 搜索 | `list_notes`, `search_notes`, `grep_search`, `semantic_search`, `fast_search` |
-| 组织 | `move_note`, `delete_note` |
-| 数据库 | `query_database`, `add_database_row` |
-| 其他 | `get_backlinks`, `ask_user`, `attempt_completion` |
-
-### B 站视频笔记
-
-边看视频边做笔记，通过弹幕同步实现精确时间戳记录。
-
-- **内嵌播放**：在应用内直接播放 B 站视频，支持登录和发弹幕
-- **弹幕同步**：发送带前缀的弹幕（如 `#笔记内容`），一键同步为带时间戳的笔记
-- **时间跳转**：点击笔记时间戳，视频自动跳转到对应位置（无需刷新）
-- **自动保存**：笔记自动保存为 Markdown 文件，下次打开同一视频自动加载
-
-### PDF 智能阅读器
-
-为学术工作流优化的 PDF 阅读和标注系统。
-
-- **交互式元素识别**：自动识别文本、图片、表格等元素，支持悬浮高亮和点击选中
-- **PDF 批注系统**：选中文本添加高亮/下划线，支持 5 种颜色和笔记
-- **批注笔记同步**：批注自动保存为 Markdown 文件，与 PDF 同目录
-- **双向跳转**：点击笔记中的链接跳转到 PDF 对应位置，Ctrl+Click 分栏打开
-- **缩略图与目录**：侧边栏显示页面缩略图和文档大纲，快速跳转
-- **全文搜索**：支持在 PDF 中搜索关键词，实时高亮匹配结果
-- **与 AI 对话**：将选中的 PDF 内容发送给 AI，进行摘要、翻译或解释
-
-### 主题系统
-
-- **15 套官方主题**：默认/海洋/森林/薰衣草/玫瑰/落日/薄荷/靛青/拿铁/极光/极简等
-- **明暗双模式**：每套主题都有明亮和暗黑两种模式（共 30 种外观）
-- **Markdown 颜色**：主题影响标题/链接/代码块/引用等 17 种元素
-- **设置面板**：左下角齿轮图标，统一管理主题、AI、RAG 等设置
-
-### 多模型生态
-
-支持接入主流 LLM Provider，自由切换模型：
-
-Anthropic · OpenAI · Gemini · DeepSeek · Moonshot · Groq · OpenRouter · Ollama (Local)
-
----
-
-## 技术架构
-
-本项目采用 Rust + React 的前后端分离架构，通过 Tauri v2 进行原生能力桥接。
-
-```mermaid
-graph TD
-    subgraph Frontend["Frontend (React 18 + TS)"]
-        UI[Components & UI]
-        Editor[CodeMirror Editor]
-        Agent[AI Agent System]
-        Store[Zustand Store]
-    end
-
-    subgraph Backend["Backend (Rust + Tauri v2)"]
-        Tauri[Tauri Commands]
-        FS[File System Ops]
-        Vector[SQLite Vector DB]
-        LLM[LLM Client]
-    end
-
-    UI --> Store
-    Editor --> Store
-    Agent --> LLM
-    Agent --> Tauri
-    Tauri --> FS
-    Tauri --> Vector
-```
-
-### 技术栈
-
-- **Core**: Tauri v2
-- **UI**: React 18, Tailwind CSS, Radix UI
-- **Editor**: CodeMirror 6
-- **State**: Zustand
-- **Database**: SQLite (Vector Extension)
-- **Lang**: TypeScript, Rust
+### 更多功能
+- B 站视频笔记（弹幕同步时间戳）
+- 语音输入（实时转文字）
+- 数据库视图（表格/看板）
+- WebDAV 同步
+- 闪卡复习
+- 15 套主题
 
 ---
 
 ## 快速开始
 
-### 环境准备
+1. 下载并安装应用
+2. 首次启动时选择一个文件夹作为笔记库
+3. 点击左下角设置，配置 AI 模型的 API Key
+4. 开始使用
 
-- Node.js 18.0+
-- Rust 1.70+
-- npm 或 pnpm
+---
 
-### 安装步骤
+## 从源码构建
 
-1. 克隆仓库
+需要 Node.js 18+ 和 Rust 1.70+
 
 ```bash
 git clone https://github.com/blueberrycongee/Lumina-Note.git
 cd Lumina-Note
-```
-
-2. 安装依赖
-
-```bash
 npm install
-```
-
-3. 开发模式运行
-
-```bash
 npm run tauri dev
 ```
 
-4. 构建生产包
-
-```bash
-npm run tauri build
-```
-
-### PDF 元素识别功能（可选）
-
-如果需要使用 PDF 智能识别功能（交互式元素选择），需要启动后端解析服务：
-
-1. 安装 Python 依赖（首次使用）
-
-```bash
-cd scripts
-pip install flask flask-cors pymupdf
-```
-
-2. 启动 PDF 解析服务
-
-```bash
-python simple_pdf_server.py
-```
-
-服务将在 `http://localhost:8080` 启动。
-
-3. 在应用中使用
-   - 打开任意 PDF 文件
-   - 点击右上角"交互模式"按钮（闪电图标）
-   - 鼠标悬浮在文本/图片上即可看到高亮
-   - 点击元素选中，Ctrl+点击多选
-   - 右侧元素面板可复制引用或与 AI 对话
-
-进阶选项：如需更精确的版面分析（表格、公式识别），可使用 PP-Structure：
-
-```bash
-cd scripts
-pip install -r requirements-pp-structure.txt
-python pp_structure_server.py
-```
-
-详见 [docs/PP_STRUCTURE_SETUP.md](docs/PP_STRUCTURE_SETUP.md)
-
 ---
 
-## 使用指南
+## 技术栈
 
-### 首次使用
-
-1. **选择工作区（Vault）**：
-   - 首次启动时选择一个文件夹作为笔记库
-   - 建议选择专门的笔记文件夹，不要选择过大的目录（如整个 Documents）
-   - 文件夹内文件过多会导致索引速度变慢，影响 AI 语义搜索性能
-   - 推荐：新建一个专用文件夹，如 `MyNotes` 或 `Vault`
-
-2. **界面布局**：
-   - 左侧边栏：文件树、搜索、速记按钮
-   - 中央区域：编辑器/PDF 阅读器/知识图谱
-   - 右侧边栏：AI 对话、大纲、反向链接、标签
-   - 左下角：设置按钮（齿轮图标）
-
-### 基础编辑
-
-1. **新建笔记**：点击侧边栏 `+` 按钮或使用 `Ctrl+N`
-2. **编辑模式切换**（点击右上角按钮）：
-   - 源码模式：显示原始 Markdown 语法
-   - 实时预览：边写边看渲染效果（推荐日常使用）
-   - 阅读模式：纯阅读视图，无编辑干扰
-3. **双向链接**：输入 `[[` 触发笔记链接，自动补全已有笔记
-4. **标签**：使用 `#标签名` 为笔记添加标签
-
-### 每日速记
-
-- 点击侧边栏的日历图标按钮
-- 笔记自动命名为 `速记_2025-12-02_06-00.md`（含时间戳）
-- 适合快速捕捉灵感、会议记录、临时笔记
-- 创建后自动打开编辑
-
-### 语音笔记
-
-- 点击侧边栏的麦克风图标按钮
-- 语音实时转换为文字，流式显示在编辑器中
-- 静音 3 秒后自动停止录音
-- 录音时按钮显示动态波纹效果
-- 基于浏览器 Web Speech API，无需额外安装
-
-### 知识图谱
-
-1. **打开图谱**：点击侧边栏的网络图标或使用命令面板
-2. **节点交互**：
-   - 单击节点：跳转到对应笔记
-   - 拖拽节点：调整节点位置
-   - 右键节点：打开孤立视图（只显示该节点及其关联）
-   - 滚轮缩放：放大/缩小图谱
-3. **图谱特性**：
-   - 文件夹显示为带刺圆球样式
-   - 按文件夹自动着色，子文件继承颜色
-   - `[[WikiLinks]]` 自动解析为节点间连线
-   - 物理引擎模拟，节点自然聚集
-
-### 主题设置
-
-1. 打开设置：点击左下角齿轮图标
-2. 切换主题：在设置面板中选择主题
-3. 15 套官方主题：默认、海洋、森林、薰衣草、玫瑰、落日、薄荷、靛青、拿铁、极光、极简等
-4. 明暗模式：每套主题都有明亮和暗黑两种模式
-5. 一键切换：点击标题栏的太阳/月亮图标快速切换明暗
-
-### 使用 AI 助手
-
-1. **配置 API Key**：
-   - 点击左下角设置图标 → AI 设置
-   - 选择模型提供商，填入你的 API Key
-   - 点击保存
-
-2. **使用入口（3 个）——都支持 Chat / Agent 模式**：
-   - **右侧 AI 面板**：在右侧栏切换到 AI Tab，可在当前笔记上下文中聊天或使用 Agent
-   - **悬浮球**：在设置中开启「悬浮球模式」，屏幕上会出现一个可拖拽的 AI 按钮，随时呼出 Chat / Agent 对话
-   - **主视图 AI 模式（左侧 Ribbon 按钮）**：在左侧功能栏点击 AI 图标，可以在主编辑区域打开一个全屏 AI 视图，适合长对话或复杂 Agent 任务
-
-3. **RAG 语义搜索**：
-   - 在设置中开启 RAG 索引
-   - AI 可以基于你的整个笔记库进行语义检索回答问题
-   - 首次索引可能较慢，建议笔记库不要过大
-
-### PDF 批注
-
-1. 打开 PDF：从文件树点击 PDF 文件
-2. 添加批注：选中文本 → 弹出工具栏 → 选择高亮颜色或添加笔记
-3. 批注文件：自动保存为 `文件名.annotations.md`
-4. 跳转：
-   - 普通点击 `[跳转]` 链接：在主视图打开 PDF
-   - Ctrl+Click：分栏打开 PDF 并跳转到对应位置
-
-### 分栏编辑
-
-1. 开启分栏：点击工具栏的分栏按钮
-2. 切换活动面板：点击左/右面板，高亮边框表示当前活动
-3. 打开文件到活动面板：从侧边栏点击文件，会在活动面板中打开
-4. 调整大小：拖拽中间分隔条
-
-### B 站视频笔记
-
-1. 打开视频：粘贴 B 站视频链接到笔记中，点击播放按钮
-2. 记录笔记：发送带 `#` 前缀的弹幕，自动同步为带时间戳的笔记
-3. 时间跳转：点击笔记中的时间戳，视频自动跳转
-
-### 数据库（Dataview 风格）
-
-1. 创建数据库：新建 `.db.json` 文件定义列结构
-2. 添加数据：在笔记 YAML frontmatter 中添加 `db: 数据库ID`
-3. 视图：支持表格视图和看板视图
-4. 编辑：直接在表格/看板中编辑，自动同步回笔记文件
-
----
-
-## Roadmap
-
-### 已完成
-
-- [x] 多 LLM Provider 接入支持（8 个提供商）
-- [x] 具备工具调用能力的 AI Agent 系统（4 模式 + 14 工具）
-- [x] 本地向量数据库与语义检索（支持 Reranker）
-- [x] AI 悬浮球与流式响应交互
-- [x] B 站视频笔记（内嵌 WebView + 弹幕同步）
-- [x] 语音转文字（流式显示 + 自动停止 + 录音动画）
-- [x] 15 套官方主题 + Markdown 颜色自定义
-- [x] 中央弹窗式设置面板
-- [x] PDF 智能阅读器（元素识别 + 交互选择 + AI 对话）
-- [x] PDF 批注：高亮/下划线/笔记，Markdown 存储，双向跳转
-- [x] 分栏编辑：可调整大小的分栏，活动面板追踪
-- [x] 数据库：Dataview 风格 YAML 驱动，表格/看板视图
-- [x] 图片粘贴：截图直接粘贴到编辑器，自动保存到笔记库
-- [x] 拖拽双链：从文件树拖拽文件到编辑器，自动插入 `[[WikiLink]]`
-- [x] WebDAV 同步：支持坚果云等 WebDAV 服务，双向同步笔记库
-- [x] 闪卡系统：从笔记生成闪卡，支持间隔重复复习（基础/填空/选择题）
-- [x] 多语言支持：中文/English/繁體中文/日本語 四语言国际化
-- [x] 动态路由：意图识别 + 多模型路由，智能分配任务
-- [x] 反向链接面板：显示哪些笔记引用了当前笔记，点击跳转
-- [x] 标签聚合：标签列表 + 计数 + 展开查看关联笔记
-- [x] 导出 PDF：笔记一键导出为 PDF 文件
-
-### 进行中
-
-- [ ] PDF Rust 移植：将 Python 解析服务移植到 Rust（消除外部依赖）
-- [ ] 日历视图：数据库日历视图
-
-### 计划中
-
-- [ ] 模板系统：新建笔记时选择预设模板
-- [ ] 导出 HTML/Word：更多导出格式
-- [ ] 插件系统：插件 API 设计
-- [ ] Git 同步：Git 版本控制集成
-- [ ] 移动端：iOS / Android 适配
-
----
-
-## 项目结构
-
-```
-lumina-note/
-├── src/
-│   ├── agent/           # AI Agent 核心逻辑 (Core, Tools, Prompts)
-│   ├── components/      # React UI 组件
-│   │   ├── layout/      # 组件布局
-│   │   ├── chat/        # 聊天组件
-│   │   ├── ai/          # AI 组件
-│   │   ├── search/      # 搜索组件
-│   │   ├── toolbar/     # 工具栏组件
-│   │   └── effects/     # 效果组件
-│   ├── editor/          # CodeMirror 编辑器配置与扩展
-│   ├── services/        # LLM 客户端与 RAG 服务层
-│   ├── hooks/           # 自定义 React Hooks
-│   └── stores/          # Zustand 状态管理
-├── src-tauri/
-│   └── src/
-│       ├── commands/    # 暴露给前端的 Rust 命令
-│       ├── fs/          # 文件系统操作封装
-│       └── vector_db/   # SQLite 向量存储逻辑
-├── scripts/             # Python 后端服务
-└── package.json
-```
+- **框架**: Tauri v2 (Rust + WebView)
+- **前端**: React 18, TypeScript, Tailwind CSS
+- **编辑器**: CodeMirror 6
+- **状态管理**: Zustand
+- **向量数据库**: SQLite
 
 ---
 
@@ -490,4 +121,10 @@ lumina-note/
 
 ## 许可证
 
-本项目基于 [Apache License 2.0](LICENSE) 开源。
+[Apache License 2.0](LICENSE)
+
+---
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=blueberrycongee/Lumina-Note&type=Date)](https://star-history.com/#blueberrycongee/Lumina-Note&Date)

@@ -23,7 +23,7 @@ pub fn get_all_tool_definitions() -> Vec<Value> {
         add_database_row_definition(),
         get_backlinks_definition(),
         ask_user_definition(),
-        attempt_completion_definition(),
+        // attempt_completion 已移除 - 任务完成由"无工具调用"判断
     ]
 }
 
@@ -40,7 +40,7 @@ pub fn get_tools_for_agent(agent: &str) -> Vec<Value> {
             list_notes_definition(),
             search_notes_definition(),
             ask_user_definition(),
-            attempt_completion_definition(),
+            // attempt_completion 已移除
         ],
         "researcher" => vec![
             update_plan_definition(),
@@ -54,7 +54,7 @@ pub fn get_tools_for_agent(agent: &str) -> Vec<Value> {
             semantic_search_definition(),
             get_backlinks_definition(),
             ask_user_definition(),
-            attempt_completion_definition(),
+            // attempt_completion 已移除
         ],
         "writer" => vec![
             update_plan_definition(),
@@ -63,7 +63,7 @@ pub fn get_tools_for_agent(agent: &str) -> Vec<Value> {
             edit_note_definition(),
             list_notes_definition(),
             ask_user_definition(),
-            attempt_completion_definition(),
+            // attempt_completion 已移除
         ],
         "organizer" => vec![
             update_plan_definition(),
@@ -75,7 +75,7 @@ pub fn get_tools_for_agent(agent: &str) -> Vec<Value> {
             query_database_definition(),
             add_database_row_definition(),
             ask_user_definition(),
-            attempt_completion_definition(),
+            // attempt_completion 已移除
         ],
         _ => get_all_tool_definitions(),
     }
@@ -322,25 +322,8 @@ fn ask_user_definition() -> Value {
     })
 }
 
-fn attempt_completion_definition() -> Value {
-    json!({
-        "type": "function",
-        "function": {
-            "name": "attempt_completion",
-            "description": "任务完成时调用，向用户报告结果。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "result": {
-                        "type": "string",
-                        "description": "任务完成的结果描述"
-                    }
-                },
-                "required": ["result"]
-            }
-        }
-    })
-}
+// attempt_completion_definition 已移除
+// 任务完成由 LLM 停止调用工具来判断，而非显式调用 attempt_completion
 
 fn grep_search_definition() -> Value {
     json!({

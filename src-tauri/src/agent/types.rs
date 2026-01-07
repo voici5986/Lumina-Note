@@ -281,6 +281,24 @@ pub enum AgentEvent {
     Complete { result: String },
     /// 错误
     Error { message: String },
+    /// 等待工具审批
+    WaitingApproval { 
+        tool: ToolCall,
+        request_id: String,
+    },
+    /// LLM 请求开始（用于超时检测）
+    LlmRequestStart {
+        request_id: String,
+        timestamp: u64,
+    },
+    /// LLM 请求结束
+    LlmRequestEnd {
+        request_id: String,
+    },
+    /// 心跳（用于连接状态监控）
+    Heartbeat {
+        timestamp: u64,
+    },
 }
 
 /// 任务上下文（从前端传入）
