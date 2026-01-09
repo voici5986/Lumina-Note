@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { getCurrentTranslations } from "./useLocaleStore";
+import { getTranslations, detectSystemLocale, type Translations } from "@/i18n";
 
 export interface SlashCommand {
     id: string;
@@ -17,10 +17,8 @@ interface CommandState {
     unregisterCommand: (key: string) => void; // Keep for backward compatibility if needed, or remove
 }
 
-// 根据当前语言获取默认命令
-export const getDefaultCommands = (): SlashCommand[] => {
-    const t = getCurrentTranslations();
-
+// 根据翻译对象获取默认命令（避免循环依赖）
+export const getDefaultCommandsFromTranslations = (t: Translations): SlashCommand[] => {
     return [
         {
             id: "default-explain",
@@ -43,10 +41,32 @@ export const getDefaultCommands = (): SlashCommand[] => {
     ];
 };
 
+// 兼容旧 API：延迟获取翻译
+export const getDefaultCommands = (): SlashCommand[] => {
+    // 延迟导入避免循环依赖
+    const { useLocaleStore } = require("./useLocaleStore");
+    const t = useLocaleStore.getState().t;
+    return getDefaultCommandsFromTranslations(t);
+};
+
+// 获取初始语言的翻译（不依赖 useLocaleStore）
+function getInitialTranslations(): Translations {
+    try {
+        const saved = localStorage.getItem('lumina-locale');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed.state?.locale) {
+                return getTranslations(parsed.state.locale);
+            }
+        }
+    } catch {}
+    return getTranslations(detectSystemLocale());
+}
+
 export const useCommandStore = create<CommandState>()(
     persist(
         (set) => ({
-            commands: getDefaultCommands(),
+            commands: getDefaultCommandsFromTranslations(getInitialTranslations()),
             registerCommand: (cmd) =>
                 set((state) => ({
                     commands: [
@@ -72,6 +92,23 @@ export const useCommandStore = create<CommandState>()(
         {
             name: "lumina-commands",
             version: 1,
+            merge: (persistedState, currentState) => {
+                const persisted = persistedState as Partial<CommandState> | undefined;
+                if (!persisted?.commands) {
+                    return currentState;
+                }
+                // 合并：保留持久化的自定义命令，更新默认命令的翻译
+                const defaultCommands = getDefaultCommandsFromTranslations(getInitialTranslations());
+                const defaultIds = new Set(defaultCommands.map(c => c.id));
+                
+                // 保留用户自定义命令（非默认命令）
+                const customCommands = persisted.commands.filter(c => !defaultIds.has(c.id));
+                
+                return {
+                    ...currentState,
+                    commands: [...defaultCommands, ...customCommands],
+                };
+            },
         }
     )
 );
