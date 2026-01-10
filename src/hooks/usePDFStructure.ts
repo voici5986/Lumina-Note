@@ -13,7 +13,11 @@ export function usePDFStructure() {
   const [parseBackend, setParseBackend] = useState<ParseBackend>('none');
 
   // 解析 PDF 结构
-  const parseStructure = useCallback(async (pdfPath: string, backend: ParseBackend = 'none') => {
+  const parseStructure = useCallback(async (
+    pdfPath: string,
+    backend: ParseBackend = 'none',
+    modifiedTime?: number
+  ) => {
     setParseStatus('parsing');
     setParseError(null);
     setParseBackend(backend);
@@ -43,6 +47,7 @@ export function usePDFStructure() {
             },
           },
           useCache: true,
+          modifiedTime,
         });
       }
 

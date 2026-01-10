@@ -5,6 +5,8 @@
 
 import type { ParseRequest, ParseResponse, CacheEntry } from "./types";
 import type { PDFStructure, ParseBackend } from "@/types/pdf";
+import { isTauri } from "@tauri-apps/api/core";
+import { stat } from "@tauri-apps/plugin-fs";
 
 // 缓存管理
 class ParseCache {
@@ -50,6 +52,37 @@ class ParseCache {
 }
 
 const parseCache = new ParseCache();
+
+async function resolveModifiedTime(request: ParseRequest): Promise<number> {
+  if (typeof request.modifiedTime === 'number') {
+    return request.modifiedTime;
+  }
+
+  if (!isTauri()) {
+    return Date.now();
+  }
+
+  try {
+    const info = await stat(request.pdfPath);
+    const mtime = info.mtime;
+    if (mtime instanceof Date) {
+      return mtime.getTime();
+    }
+    if (typeof mtime === 'number') {
+      return mtime;
+    }
+    if (typeof mtime === 'string') {
+      const parsed = new Date(mtime).getTime();
+      if (!Number.isNaN(parsed)) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to read PDF modified time:', err);
+  }
+
+  return Date.now();
+}
 
 /**
  * 使用 PP-Structure 解析 PDF
@@ -102,13 +135,13 @@ async function parseDeepSeekOcr(_pdfPath: string, _config: ParseRequest['config'
  */
 export async function parsePDF(request: ParseRequest): Promise<ParseResponse> {
   const startTime = Date.now();
+  const shouldUseCache = request.useCache !== false;
+  const cacheModifiedTime = shouldUseCache ? await resolveModifiedTime(request) : null;
 
   try {
     // 检查缓存
-    if (request.useCache !== false) {
-      // TODO: 获取文件修改时间
-      const modifiedTime = Date.now(); // 临时使用当前时间
-      const cached = parseCache.get(request.pdfPath, modifiedTime);
+    if (shouldUseCache && cacheModifiedTime !== null) {
+      const cached = parseCache.get(request.pdfPath, cacheModifiedTime);
       if (cached) {
         return {
           success: true,
@@ -139,9 +172,8 @@ export async function parsePDF(request: ParseRequest): Promise<ParseResponse> {
     }
 
     // 缓存结果
-    if (request.useCache !== false && structure.pages.length > 0) {
-      const modifiedTime = Date.now();
-      parseCache.set(request.pdfPath, modifiedTime, structure, request.config.backend);
+    if (shouldUseCache && cacheModifiedTime !== null && structure.pages.length > 0) {
+      parseCache.set(request.pdfPath, cacheModifiedTime, structure, request.config.backend);
     }
 
     return {

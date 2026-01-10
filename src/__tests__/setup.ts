@@ -46,6 +46,7 @@ vi.mock('@tauri-apps/api/core', () => ({
     console.log(`[Mock invoke] 未处理的命令: ${cmd}`, args);
     return Promise.resolve(null);
   }),
+  isTauri: vi.fn(() => false),
 }));
 
 vi.mock('@tauri-apps/api/event', () => ({
@@ -61,6 +62,7 @@ vi.mock('@tauri-apps/plugin-fs', () => ({
   readDir: vi.fn(),
   remove: vi.fn(),
   rename: vi.fn(),
+  stat: vi.fn(),
 }));
 
 vi.mock('@tauri-apps/plugin-dialog', () => ({

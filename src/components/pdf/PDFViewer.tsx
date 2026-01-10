@@ -13,7 +13,7 @@ import { useUIStore } from "@/stores/useUIStore";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, ListTree, Loader2, FileText } from 'lucide-react';
 import { useLocaleStore } from '@/stores/useLocaleStore';
-import { readFile } from "@tauri-apps/plugin-fs";
+import { readFile, stat } from "@tauri-apps/plugin-fs";
 
 interface PDFViewerProps {
   filePath: string;
@@ -63,7 +63,24 @@ export function PDFViewer({ filePath, className }: PDFViewerProps) {
           
           // 自动解析 PDF 结构
           // 'none': 模拟数据, 'pp-structure': PP-Structure 服务
-          parseStructure(filePath, 'pp-structure');
+          let modifiedTime: number | undefined;
+          try {
+            const info = await stat(filePath);
+            if (info.mtime instanceof Date) {
+              modifiedTime = info.mtime.getTime();
+            } else if (typeof info.mtime === 'number') {
+              modifiedTime = info.mtime;
+            } else if (typeof info.mtime === 'string') {
+              const parsed = new Date(info.mtime).getTime();
+              if (!Number.isNaN(parsed)) {
+                modifiedTime = parsed;
+              }
+            }
+          } catch (err) {
+            console.warn('Failed to read PDF modified time:', err);
+          }
+
+          parseStructure(filePath, 'pp-structure', modifiedTime);
         }
       } catch (err) {
         console.error("Failed to read PDF file:", err);
