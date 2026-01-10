@@ -7,8 +7,10 @@ import React, { useState, useRef, useEffect, useCallback, forwardRef, useImperat
 import { useFileStore } from "@/stores/useFileStore";
 import { useAIStore } from "@/stores/useAIStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
-import { Send, FileText, Folder, X, Loader2, Paperclip, Quote, Image as ImageIcon, AlertCircle } from "lucide-react";
+import { Send, FileText, Folder, X, Loader2, Paperclip, Quote, Image as ImageIcon, AlertCircle, Terminal, Plus, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCommandStore, SlashCommand } from "@/stores/useCommandStore";
+import { CommandManagerModal } from "./CommandManagerModal";
 
 // 引用的文件
 export interface ReferencedFile {
@@ -43,6 +45,7 @@ interface ChatInputProps {
   rows?: number;
   hideSendButton?: boolean;
   supportsVision?: boolean; // 当前模型是否支持图片
+  enableSlashCommands?: boolean; // 是否启用斜杠命令
 }
 
 export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
@@ -57,6 +60,7 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
   rows = 2,
   hideSendButton = false,
   supportsVision = true,
+  enableSlashCommands = true,
 }, ref) => {
   const { t } = useLocaleStore();
   const { fileTree } = useFileStore();
@@ -69,9 +73,19 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
   const [showFilePicker, setShowFilePicker] = useState(false);
   const [filePickerQuery, setFilePickerQuery] = useState("");
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
-  
+
+  // Slash Command 状态
+  const { commands, registerCommand, updateCommand } = useCommandStore();
+  const [showCommand, setShowCommand] = useState(false);
+  const [commandQuery, setCommandQuery] = useState("");
+  const [commandIndex, setCommandIndex] = useState(0);
+  const [activeCommand, setActiveCommand] = useState<SlashCommand | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCommand, setEditingCommand] = useState<SlashCommand | null>(null);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mentionRef = useRef<HTMLDivElement>(null);
+  const commandRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -85,28 +99,28 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
       });
       textareaRef.current?.focus();
     };
-    
+
     // 直接拖拽到输入框区域
     const handleLuminaDrop = (e: Event) => {
       const { filePath, fileName, x, y } = (e as CustomEvent).detail;
       if (!filePath || !fileName) return;
-      
+
       const container = containerRef.current;
       if (!container) return;
-      
+
       const rect = container.getBoundingClientRect();
       if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return;
-      
+
       addFileRef(filePath, fileName);
     };
-    
+
     // 从父容器（RightPanel/AIFloatingPanel）转发的拖拽事件
     const handlePanelFileDrop = (e: Event) => {
       const { filePath, fileName } = (e as CustomEvent).detail;
       if (!filePath || !fileName) return;
       addFileRef(filePath, fileName);
     };
-    
+
     window.addEventListener('lumina-drop', handleLuminaDrop);
     window.addEventListener('chat-input-file-drop', handlePanelFileDrop);
     return () => {
@@ -144,14 +158,14 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
       const dataUrl = e.target?.result as string;
       const base64 = dataUrl.split(',')[1];
       const mediaType = file.type as AttachedImage['mediaType'];
-      
+
       const newImage: AttachedImage = {
         id: `img_${Date.now()}_${Math.random().toString(36).slice(2)}`,
         data: base64,
         mediaType,
         preview: dataUrl,
       };
-      
+
       setAttachedImages(prev => [...prev, newImage]);
     };
     reader.readAsDataURL(file);
@@ -217,6 +231,13 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
       .slice(0, 10);
   }, [allFiles, mentionQuery]);
 
+  // 过滤匹配的命令
+  const filteredCommands = React.useMemo(() => {
+    if (!commandQuery) return commands;
+    const query = commandQuery.toLowerCase();
+    return commands.filter(c => c.key.toLowerCase().includes(query));
+  }, [commands, commandQuery]);
+
   // 处理输入变化
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
@@ -231,9 +252,24 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
       setShowMention(true);
       setMentionQuery(atMatch[1]);
       setMentionIndex(0);
+      setShowCommand(false);
     } else {
       setShowMention(false);
       setMentionQuery("");
+    }
+
+    // 检测 / 符号 (仅在行首或空格后)
+    if (enableSlashCommands) {
+      const slashMatch = textBeforeCursor.match(/(?:^|\s)\/([^\s/]*)$/);
+      if (slashMatch) {
+        setShowCommand(true);
+        setCommandQuery(slashMatch[1]);
+        setCommandIndex(0);
+        setShowMention(false);
+      } else {
+        setShowCommand(false);
+        setCommandQuery("");
+      }
     }
   };
 
@@ -252,6 +288,21 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
       } else if (e.key === "Escape") {
         setShowMention(false);
       }
+    } else if (showCommand) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setCommandIndex(i => Math.min(i + 1, filteredCommands.length - 1));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setCommandIndex(i => Math.max(i - 1, 0));
+      } else if (e.key === "Enter" || e.key === "Tab") {
+        if (filteredCommands.length > 0) {
+          e.preventDefault();
+          selectCommand(filteredCommands[commandIndex]);
+        }
+      } else if (e.key === "Escape") {
+        setShowCommand(false);
+      }
     } else if (e.key === "Enter" && !e.shiftKey && !isStreaming && !isLoading) {
       e.preventDefault();
       handleSend();
@@ -265,14 +316,14 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
     const cursorPos = textareaRef.current.selectionStart;
     const textBeforeCursor = value.slice(0, cursorPos);
     const textAfterCursor = value.slice(cursorPos);
-    
+
     // 找到 @ 符号位置
     const atMatch = textBeforeCursor.match(/@([^\s@]*)$/);
     if (!atMatch) return;
 
     const atPos = cursorPos - atMatch[0].length;
     const newValue = value.slice(0, atPos) + textAfterCursor;
-    
+
     onChange(newValue);
     setShowMention(false);
     setMentionQuery("");
@@ -286,6 +337,46 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
     setTimeout(() => textareaRef.current?.focus(), 0);
   };
 
+  // 选择命令
+  const selectCommand = (cmd: SlashCommand) => {
+    if (!textareaRef.current) return;
+
+    const cursorPos = textareaRef.current.selectionStart;
+    const textBeforeCursor = value.slice(0, cursorPos);
+    const textAfterCursor = value.slice(cursorPos);
+
+    // 找到 / 符号位置
+    const slashMatch = textBeforeCursor.match(/(?:^|\s)\/([^\s/]*)$/);
+    if (!slashMatch) return;
+
+    const slashPos = cursorPos - slashMatch[0].length + (slashMatch[0].startsWith(' ') ? 1 : 0);
+    // 移除命令文本，不插入 prompt，而是设置 activeCommand
+    const newValue = value.slice(0, slashPos) + textAfterCursor;
+
+    onChange(newValue);
+    setShowCommand(false);
+    setCommandQuery("");
+    setActiveCommand(cmd);
+
+    // 聚焦回输入框
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        // 光标位置调整到删除命令后的位置
+        textareaRef.current.setSelectionRange(slashPos, slashPos);
+      }
+    }, 0);
+  };
+
+  // 处理命令保存
+  const handleSaveCommand = (cmd: Omit<SlashCommand, "id">) => {
+    if (editingCommand) {
+      updateCommand(editingCommand.id, cmd);
+    } else {
+      registerCommand(cmd);
+    }
+  };
+
   // 移除引用的文件
   const removeReference = (path: string) => {
     setReferencedFiles(files => files.filter(f => f.path !== path));
@@ -293,24 +384,31 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
 
   // 发送消息
   const handleSend = useCallback(() => {
-    if (!value.trim() && referencedFiles.length === 0 && textSelections.length === 0 && attachedImages.length === 0) return;
+    if (!value.trim() && referencedFiles.length === 0 && textSelections.length === 0 && attachedImages.length === 0 && !activeCommand) return;
     if (isLoading || isStreaming) return;
-    
+
     // 构建带引用的消息
     let messageToSend = value.trim();
+
+    // 注入 Slash Command 提示词
+    if (activeCommand) {
+      messageToSend = `${activeCommand.prompt}\n${messageToSend}`;
+    }
+
     if (textSelections.length > 0) {
-      const quotedTexts = textSelections.map(sel => 
+      const quotedTexts = textSelections.map(sel =>
         `> ${t.ai.quoteFrom} ${sel.source}:\n> ${sel.text.split('\n').join('\n> ')}`
       ).join('\n\n');
       messageToSend = quotedTexts + (messageToSend ? `\n\n${messageToSend}` : '');
     }
-    
+
     onSend(messageToSend, referencedFiles, attachedImages.length > 0 ? attachedImages : undefined);
     onChange("");
     setReferencedFiles([]);
     setAttachedImages([]);
+    setActiveCommand(null);
     clearTextSelections();
-  }, [value, referencedFiles, textSelections, attachedImages, isLoading, isStreaming, onSend, onChange, clearTextSelections]);
+  }, [value, referencedFiles, textSelections, attachedImages, isLoading, isStreaming, onSend, onChange, clearTextSelections, activeCommand]);
 
   // 暴露方法给父组件
   useImperativeHandle(ref, () => ({
@@ -324,6 +422,9 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
     const handleClickOutside = (e: MouseEvent) => {
       if (mentionRef.current && !mentionRef.current.contains(e.target as Node)) {
         setShowMention(false);
+      }
+      if (commandRef.current && !commandRef.current.contains(e.target as Node)) {
+        setShowCommand(false);
       }
       // 关闭文件选择器（检查是否点击在选择器外部）
       const target = e.target as HTMLElement;
@@ -341,8 +442,23 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
       className={cn("relative", className)}
     >
       {/* 已引用的文件、文本片段和图片标签 */}
-      {(referencedFiles.length > 0 || textSelections.length > 0 || attachedImages.length > 0) && (
+      {(referencedFiles.length > 0 || textSelections.length > 0 || attachedImages.length > 0 || activeCommand) && (
         <div className="flex flex-wrap gap-1 mb-2">
+          {/* Active Command Tag */}
+          {activeCommand && (
+            <div className="flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded-md text-xs border border-primary/20">
+              <Terminal size={12} />
+              <span className="font-medium">/{activeCommand.key}</span>
+              <span className="text-muted-foreground ml-1 hidden sm:inline">{activeCommand.description}</span>
+              <button
+                onClick={() => setActiveCommand(null)}
+                className="hover:bg-primary/20 rounded p-0.5 ml-1"
+                aria-label="Remove command"
+              >
+                <X size={10} />
+              </button>
+            </div>
+          )}
           {/* 文件引用 */}
           {referencedFiles.map(file => (
             <div
@@ -411,7 +527,7 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
           rows={rows}
           className="flex-1 resize-none bg-transparent outline-none text-sm"
         />
-        
+
         {/* 附加图片按钮 */}
         <input
           ref={imageInputRef}
@@ -451,7 +567,7 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
           >
             <Paperclip size={16} />
           </button>
-          
+
           {/* 文件选择下拉菜单 */}
           {showFilePicker && (
             <div className="absolute bottom-full right-0 mb-1 w-72 bg-background border border-border rounded-lg shadow-lg z-50">
@@ -552,6 +668,80 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
           )}
         </div>
       )}
+
+      {/* / 命令下拉菜单 */}
+      {showCommand && (
+        <div
+          ref={commandRef}
+          className="absolute bottom-full left-0 mb-1 w-64 bg-background border border-border rounded-lg shadow-lg z-50 flex flex-col overflow-hidden"
+        >
+          <div className="px-3 py-2 text-xs text-muted-foreground font-medium bg-muted/30 border-b border-border">
+            {t.ai.slashCommands.shortcuts}
+          </div>
+
+          <div className="max-h-52 overflow-y-auto">
+            {filteredCommands.length === 0 ? (
+              <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                {t.ai.slashCommands.noCommandsFound}
+              </div>
+            ) : (
+              filteredCommands.map((cmd, index) => (
+                <div
+                  key={cmd.id}
+                  className={cn(
+                    "group flex items-center justify-between hover:bg-accent transition-colors pr-2",
+                    index === commandIndex && "bg-accent"
+                  )}
+                >
+                  <button
+                    onClick={() => selectCommand(cmd)}
+                    className="flex-1 px-3 py-2 text-sm text-left flex flex-col gap-0.5"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-foreground">/{cmd.key}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {cmd.description}
+                    </div>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingCommand(cmd);
+                      setIsModalOpen(true);
+                      setShowCommand(false);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-1.5 text-muted-foreground hover:text-foreground hover:bg-background rounded-md transition-all"
+                    title="编辑"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          <button
+            onClick={() => {
+              setEditingCommand(null);
+              setIsModalOpen(true);
+              setShowCommand(false);
+            }}
+            className="w-full text-left px-3 py-2.5 text-sm hover:bg-accent border-t border-border flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Plus size={14} />
+            {t.ai.slashCommands.createShortcut}
+          </button>
+        </div>
+      )}
+
+      {/* 命令管理弹窗 */}
+      <CommandManagerModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleSaveCommand}
+        initialData={editingCommand}
+      />
 
     </div>
   );

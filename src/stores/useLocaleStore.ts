@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Locale, getTranslations, detectSystemLocale, Translations } from '@/i18n';
+import { useCommandStore, getDefaultCommandsFromTranslations, type SlashCommand } from './useCommandStore';
 
 interface LocaleState {
   locale: Locale;
@@ -45,10 +46,30 @@ export const useLocaleStore = create<LocaleState>()(
       locale: initialLocale,
       t: getTranslations(initialLocale),
       setLocale: (locale: Locale) => {
+        const newTranslations = getTranslations(locale);
         set({
           locale,
-          t: getTranslations(locale),
+          t: newTranslations,
         });
+
+        // 语言切换时更新命令的翻译
+        const commandStore = useCommandStore.getState();
+        const defaultCommands: SlashCommand[] = getDefaultCommandsFromTranslations(newTranslations);
+        // 只更新默认命令的翻译，保留用户自定义命令
+        const updatedCommands = commandStore.commands.map(cmd => {
+          const defaultCmd = defaultCommands.find((dc: SlashCommand) => dc.id === cmd.id);
+          if (defaultCmd) {
+            return { ...cmd, description: defaultCmd.description, prompt: defaultCmd.prompt };
+          }
+          return cmd;
+        });
+        // 确保所有默认命令都存在
+        defaultCommands.forEach((defaultCmd: SlashCommand) => {
+          if (!updatedCommands.find(cmd => cmd.id === defaultCmd.id)) {
+            updatedCommands.push(defaultCmd);
+          }
+        });
+        useCommandStore.setState({ commands: updatedCommands });
       },
     }),
     {
