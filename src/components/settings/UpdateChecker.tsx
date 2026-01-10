@@ -4,6 +4,14 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { Loader2, RefreshCw, Download, RotateCcw, CheckCircle2, AlertCircle } from "lucide-react";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 
+type DownloadEvent = {
+    event: string;
+    data?: {
+        contentLength?: number;
+        chunkLength?: number;
+    };
+};
+
 export function UpdateChecker() {
     const { t } = useLocaleStore();
     const [checking, setChecking] = useState(false);
@@ -49,7 +57,7 @@ export function UpdateChecker() {
             contentLengthRef.current = 0;
             downloadedRef.current = 0;
 
-            await update.downloadAndInstall((event) => {
+            await update.downloadAndInstall((event: DownloadEvent) => {
                 switch (event.event) {
                     case 'Started':
                         const len = (event.data as any).contentLength;
