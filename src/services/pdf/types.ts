@@ -32,6 +32,7 @@ export interface ParseRequest {
   pdfPath: string;
   config: ParseConfig;
   useCache?: boolean;
+  modifiedTime?: number;
 }
 
 // 解析响应
