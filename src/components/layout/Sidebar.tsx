@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useFileStore } from "@/stores/useFileStore";
 import { useRAGStore } from "@/stores/useRAGStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
@@ -33,6 +33,7 @@ import { useVoiceNote } from "@/hooks/useVoiceNote";
 import { useUIStore } from "@/stores/useUIStore";
 import { useSplitStore } from "@/stores/useSplitStore";
 import { useFavoriteStore } from "@/stores/useFavoriteStore";
+import { useShallow } from "zustand/react/shallow";
 
 interface ContextMenuState {
   x: number;
@@ -55,20 +56,28 @@ export function Sidebar() {
   const { setRightPanelTab, splitView } = useUIStore();
   const { activePane, openSecondaryFile, openSecondaryPdf } = useSplitStore();
   const {
-    favoriteEntries,
+    favorites,
+    manualOrder,
     favoriteSortMode,
     setFavoriteSortMode,
     moveFavorite,
     toggleFavorite,
     isFavorite,
-  } = useFavoriteStore((state) => ({
-    favoriteEntries: state.getFavorites(state.defaultSortMode),
+    getFavorites,
+  } = useFavoriteStore(useShallow((state) => ({
+    favorites: state.favorites,
+    manualOrder: state.manualOrder,
     favoriteSortMode: state.defaultSortMode,
     setFavoriteSortMode: state.setDefaultSortMode,
     moveFavorite: state.moveFavorite,
     toggleFavorite: state.toggleFavorite,
     isFavorite: state.isFavorite,
-  }));
+    getFavorites: state.getFavorites,
+  })));
+  const favoriteEntries = useMemo(
+    () => getFavorites(favoriteSortMode),
+    [getFavorites, favoriteSortMode, favorites, manualOrder]
+  );
   const { 
     isRecording, 
     status: voiceStatus, 
