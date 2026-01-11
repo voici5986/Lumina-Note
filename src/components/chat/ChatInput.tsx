@@ -282,7 +282,7 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         setMentionIndex(i => (i - 1 + filteredFiles.length) % filteredFiles.length);
-      } else if (e.key === "Enter" && filteredFiles.length > 0) {
+      } else if ((e.key === "Enter" || e.key === "Tab") && filteredFiles.length > 0) {
         e.preventDefault();
         selectMention(filteredFiles[mentionIndex]);
       } else if (e.key === "Escape") {
