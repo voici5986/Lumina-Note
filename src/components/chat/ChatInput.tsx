@@ -7,7 +7,7 @@ import React, { useState, useRef, useEffect, useCallback, forwardRef, useImperat
 import { useFileStore } from "@/stores/useFileStore";
 import { useAIStore } from "@/stores/useAIStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
-import { Send, FileText, Folder, X, Loader2, Paperclip, Quote, Image as ImageIcon, AlertCircle, Terminal, Plus, Pencil } from "lucide-react";
+import { Send, FileText, Folder, X, Loader2, Paperclip, Quote, Image as ImageIcon, AlertCircle, Terminal, Plus, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCommandStore, SlashCommand } from "@/stores/useCommandStore";
 import { CommandManagerModal } from "./CommandManagerModal";
@@ -75,7 +75,7 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
 
   // Slash Command 状态
-  const { commands, registerCommand, updateCommand } = useCommandStore();
+  const { commands, registerCommand, updateCommand, deleteCommand } = useCommandStore();
   const [showCommand, setShowCommand] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
   const [commandIndex, setCommandIndex] = useState(0);
@@ -278,10 +278,14 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
     if (showMention) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setMentionIndex(i => (i + 1) % filteredFiles.length);
+        if (filteredFiles.length > 0) {
+          setMentionIndex(i => (i + 1) % filteredFiles.length);
+        }
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        setMentionIndex(i => (i - 1 + filteredFiles.length) % filteredFiles.length);
+        if (filteredFiles.length > 0) {
+          setMentionIndex(i => (i - 1 + filteredFiles.length) % filteredFiles.length);
+        }
       } else if ((e.key === "Enter" || e.key === "Tab") && filteredFiles.length > 0) {
         e.preventDefault();
         selectMention(filteredFiles[mentionIndex]);
@@ -291,10 +295,14 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
     } else if (showCommand) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setCommandIndex(i => (i + 1) % filteredCommands.length);
+        if (filteredCommands.length > 0) {
+          setCommandIndex(i => (i + 1) % filteredCommands.length);
+        }
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        setCommandIndex(i => (i - 1 + filteredCommands.length) % filteredCommands.length);
+        if (filteredCommands.length > 0) {
+          setCommandIndex(i => (i - 1 + filteredCommands.length) % filteredCommands.length);
+        }
       } else if (e.key === "Enter" || e.key === "Tab") {
         if (filteredCommands.length > 0) {
           e.preventDefault();
@@ -720,18 +728,32 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
                       {cmd.description}
                     </div>
                   </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingCommand(cmd);
-                      setIsModalOpen(true);
-                      setShowCommand(false);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 text-muted-foreground hover:text-foreground hover:bg-background rounded-md transition-all"
-                    title="编辑"
-                  >
-                    <Pencil size={12} />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingCommand(cmd);
+                        setIsModalOpen(true);
+                        setShowCommand(false);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1.5 text-muted-foreground hover:text-foreground hover:bg-background rounded-md transition-all"
+                      title="编辑"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm("确定要删除这个命令吗？")) {
+                          deleteCommand(cmd.id);
+                        }
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1.5 text-muted-foreground hover:text-red-500 hover:bg-background rounded-md transition-all"
+                      title="删除"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
                 </div>
               ))
             )}
