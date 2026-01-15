@@ -42,3 +42,8 @@ coverage/
 # AI assistants
 .claude/
 .kiro/
+
+# Local Codex/skills scratch
+.tmp_codex_ext/
+skills/
+tmp.txt

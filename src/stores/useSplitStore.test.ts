@@ -214,6 +214,23 @@ describe('useSplitStore', () => {
       expect(useSplitStore.getState().secondaryIsDirty).toBe(false);
     });
 
+    it('should skip reload when dirty and skipIfDirty is set', async () => {
+      vi.mocked(readFile).mockResolvedValue('Reloaded content');
+
+      useSplitStore.setState({
+        secondaryFile: '/path/to/file.md',
+        secondaryContent: 'Dirty content',
+        secondaryIsDirty: true,
+      });
+
+      const store = useSplitStore.getState();
+      await store.reloadSecondaryIfOpen('/path/to/file.md', { skipIfDirty: true });
+
+      expect(readFile).not.toHaveBeenCalled();
+      expect(useSplitStore.getState().secondaryContent).toBe('Dirty content');
+      expect(useSplitStore.getState().secondaryIsDirty).toBe(true);
+    });
+
     it('should not reload if different file', async () => {
       useSplitStore.setState({
         secondaryFile: '/path/to/other.md',

@@ -23,6 +23,15 @@ pub enum AppError {
 
     #[error("WebDAV error: {0}")]
     WebDAV(String),
+
+    #[error("Network error: {0}")]
+    Network(String),
+}
+
+impl From<reqwest::Error> for AppError {
+    fn from(value: reqwest::Error) -> Self {
+        AppError::Network(value.to_string())
+    }
 }
 
 impl Serialize for AppError {

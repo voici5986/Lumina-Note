@@ -15,6 +15,7 @@ import { join } from "@/lib/path";
 import {
   ArrowUp,
   Bot,
+  Code2,
   FileText,
   Sparkles,
   X,
@@ -42,6 +43,7 @@ import type { ReferencedFile } from "@/hooks/useChatSend";
 import { AISettingsModal } from "../ai/AISettingsModal";
 import type { MessageContent, TextContent } from "@/services/llm";
 import { DeepResearchCard } from "../deep-research";
+import { CodexPanel } from "@/components/codex/CodexPanel";
 import { 
   useDeepResearchStore, 
   setupDeepResearchListener,
@@ -110,6 +112,7 @@ function SuggestionCard({
 export function MainAIChatShell() {
   const { t } = useLocaleStore();
   const { chatMode, setChatMode } = useUIStore();
+  const isCodexMode = chatMode === "codex";
   const [input, setInput] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -120,6 +123,12 @@ export function MainAIChatShell() {
   const [enableWebSearch, setEnableWebSearch] = useState(false); // 网络搜索开关
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (isCodexMode && showHistory) {
+      setShowHistory(false);
+    }
+  }, [isCodexMode, showHistory]);
 
   // 随机选择一个 emoji（组件挂载时确定）
   const [welcomeEmoji] = useState(() =>
@@ -306,21 +315,26 @@ export function MainAIChatShell() {
 
   // 判断是否有对话历史（用于控制动画状态）
   // Chat 模式下，流式进行中也算已开始（确保流式消息能正确显示）
-  const hasStarted = chatMode === "research"
-    ? _researchSession !== null
-    : chatMode === "agent"
-      ? agentMessages.length > 0
-      : chatMessages.length > 0 || chatStreaming;
+  const hasStarted = isCodexMode
+    ? true
+    : chatMode === "research"
+      ? _researchSession !== null
+      : chatMode === "agent"
+        ? agentMessages.length > 0
+        : chatMessages.length > 0 || chatStreaming;
 
   // 获取当前消息列表
-  const messages = chatMode === "agent" ? agentMessages : chatMessages;
+  const messages =
+    chatMode === "agent" ? agentMessages : chatMode === "chat" ? chatMessages : [];
 
   // 判断是否正在加载
   const isLoading = chatMode === "research"
     ? isResearchRunning
     : chatMode === "agent"
       ? agentStatus === "running"
-      : chatLoading || chatStreaming;
+      : chatMode === "chat"
+        ? chatLoading || chatStreaming
+        : false;
 
   // 自动滚动到底部
   useEffect(() => {
@@ -329,7 +343,7 @@ export function MainAIChatShell() {
 
   // 首次加载检查（仅 Chat 模式需要）
   useEffect(() => {
-    if (chatMode !== "agent") {
+    if (chatMode === "chat") {
       checkChatFirstLoad();
     }
   }, [chatMode, checkChatFirstLoad]);
@@ -406,6 +420,9 @@ export function MainAIChatShell() {
   // 发送消息
   const handleSend = useCallback(async () => {
     console.log("[handleSend] Called, chatMode:", chatMode, "input:", input, "isLoading:", isLoading);
+    if (chatMode === "codex") {
+      return;
+    }
     if ((!input.trim() && referencedFiles.length === 0) || isLoading) {
       console.log("[handleSend] Blocked: input empty or loading");
       return;
@@ -492,7 +509,7 @@ export function MainAIChatShell() {
       abortResearch();
     } else if (chatMode === "agent") {
       agentAbort();
-    } else {
+    } else if (chatMode === "chat") {
       stopStreaming();
     }
   }, [chatMode, agentAbort, stopStreaming, abortResearch]);
@@ -552,6 +569,9 @@ export function MainAIChatShell() {
 
   // 新建对话
   const handleNewChat = () => {
+    if (chatMode === "codex") {
+      return;
+    }
     if (chatMode === "research") {
       // Research 模式: 重置当前研究会话，准备新研究
       resetResearch();
@@ -576,35 +596,102 @@ export function MainAIChatShell() {
     return date.toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
   };
 
+  const renderModeToggle = (className?: string) => (
+    <div className={`flex items-center bg-muted rounded-lg p-0.5 ${className ?? ""}`}>
+      <button
+        onClick={() => setChatMode("chat")}
+        title={t.ai.chatModeHint}
+        className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${chatMode === "chat"
+            ? "bg-background text-foreground shadow-sm"
+            : "text-muted-foreground hover:text-foreground"
+          }`}
+      >
+        <span className="flex items-center gap-1">
+          <Sparkles size={12} />
+          Chat
+        </span>
+      </button>
+      <button
+        onClick={() => setChatMode("agent")}
+        title={t.ai.agentModeHint}
+        className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${chatMode === "agent"
+            ? "bg-background text-foreground shadow-sm"
+            : "text-muted-foreground hover:text-foreground"
+          }`}
+      >
+        <span className="flex items-center gap-1">
+          <Bot size={12} />
+          Agent
+        </span>
+      </button>
+      <button
+        onClick={() => setChatMode("research")}
+        title="Deep Research - 深度研究笔记库"
+        className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${chatMode === "research"
+            ? "bg-background text-foreground shadow-sm"
+            : "text-muted-foreground hover:text-foreground"
+          }`}
+      >
+        <span className="flex items-center gap-1">
+          <Microscope size={12} />
+          Research
+        </span>
+      </button>
+      <button
+        onClick={() => setChatMode("codex")}
+        title="Codex"
+        className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${chatMode === "codex"
+            ? "bg-background text-foreground shadow-sm"
+            : "text-muted-foreground hover:text-foreground"
+          }`}
+      >
+        <span className="flex items-center gap-1">
+          <Code2 size={12} />
+          Codex
+        </span>
+      </button>
+    </div>
+  );
+
   return (
     <div ref={chatContainerRef} className="h-full bg-background text-foreground flex flex-col overflow-hidden relative">
       {/* 顶部工具栏 */}
-      <div className="h-10 flex items-center justify-between px-4 border-b border-border shrink-0">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowHistory(!showHistory)}
-            className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded-md transition-colors ${showHistory
-                ? "bg-muted text-foreground"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              }`}
-          >
-            <History size={14} />
-            <span>{t.ai.historyChats}</span>
-          </button>
-          <span className="ml-3 text-[11px] text-muted-foreground select-none">
-            {t.ai.sessionTokens}: {chatMode === "agent" ? rustTotalTokens : chatTotalTokens}
-          </span>
+      {isCodexMode ? (
+        <div className="h-10 flex items-center justify-between px-4 border-b border-border shrink-0">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Code2 size={14} />
+            <span>Codex</span>
+          </div>
+          {renderModeToggle()}
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleNewChat}
-            className="flex items-center gap-1.5 px-2 py-1 text-xs rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <Plus size={14} />
-            <span>{t.ai.newChat}</span>
-          </button>
+      ) : (
+        <div className="h-10 flex items-center justify-between px-4 border-b border-border shrink-0">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded-md transition-colors ${showHistory
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+            >
+              <History size={14} />
+              <span>{t.ai.historyChats}</span>
+            </button>
+            <span className="ml-3 text-[11px] text-muted-foreground select-none">
+              {t.ai.sessionTokens}: {chatMode === "agent" ? rustTotalTokens : chatTotalTokens}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleNewChat}
+              className="flex items-center gap-1.5 px-2 py-1 text-xs rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <Plus size={14} />
+              <span>{t.ai.newChat}</span>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex-1 relative overflow-hidden">
         {/* 历史对话侧边栏 - 覆盖式，不影响内容居中 */}
@@ -706,8 +793,16 @@ export function MainAIChatShell() {
         </AnimatePresence>
 
         {/* 主要内容区域 - 始终居中 */}
-        <main className={`h-full w-full flex flex-col transition-all duration-700 ease-out overflow-hidden ${hasStarted ? "" : "justify-center items-center"
+        <main className={`h-full w-full flex flex-col transition-all duration-700 ease-out overflow-hidden min-h-0 min-w-0 ${hasStarted ? "" : "justify-center items-center"
           }`}>
+          {isCodexMode ? (
+            <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+              <div className="flex-1 flex overflow-hidden min-h-0">
+                <CodexPanel visible={isCodexMode} workspacePath={vaultPath} renderMode="iframe" />
+              </div>
+            </div>
+          ) : (
+            <>
 
           {/* 欢迎语与头像 - 仅在未开始时显示 */}
           <AnimatePresence>
@@ -867,6 +962,7 @@ export function MainAIChatShell() {
           )}
 
           {/* 输入框容器 */}
+          {!isCodexMode && (
           <div className={`w-full shrink-0 ${hasStarted ? "pb-4" : ""}`}>
             <motion.div
               layout
@@ -974,48 +1070,8 @@ export function MainAIChatShell() {
                       )}
                     </div>
 
-                    {/* Chat/Agent/Research 切换滑块 */}
-                    <div className="flex items-center bg-muted rounded-lg p-0.5">
-                      <button
-                        onClick={() => setChatMode("chat")}
-                        title={t.ai.chatModeHint}
-                        className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${chatMode === "chat"
-                            ? "bg-background text-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground"
-                          }`}
-                      >
-                        <span className="flex items-center gap-1">
-                          <Sparkles size={12} />
-                          Chat
-                        </span>
-                      </button>
-                      <button
-                        onClick={() => setChatMode("agent")}
-                        title={t.ai.agentModeHint}
-                        className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${chatMode === "agent"
-                            ? "bg-background text-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground"
-                          }`}
-                      >
-                        <span className="flex items-center gap-1">
-                          <Bot size={12} />
-                          Agent
-                        </span>
-                      </button>
-                      <button
-                        onClick={() => setChatMode("research")}
-                        title="Deep Research - 深度研究笔记库"
-                        className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${chatMode === "research"
-                            ? "bg-background text-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground"
-                          }`}
-                      >
-                        <span className="flex items-center gap-1">
-                          <Microscope size={12} />
-                          Research
-                        </span>
-                      </button>
-                    </div>
+                    {/* Chat/Agent/Research/Codex 切换滑块 */}
+                    {renderModeToggle()}
 
                     {/* 网络搜索按钮（独立于模式切换） */}
                     <button
@@ -1132,8 +1188,10 @@ export function MainAIChatShell() {
               </motion.div>
             </motion.div>
           </div>
+          )}
 
           {/* 建议卡片区域 - 仅在未开始时显示 */}
+          {!isCodexMode && (
           <AnimatePresence>
             {!hasStarted && (
               <motion.div
@@ -1159,6 +1217,9 @@ export function MainAIChatShell() {
               </motion.div>
             )}
           </AnimatePresence>
+          )}
+            </>
+          )}
         </main>
 
         {/* 调试按钮（开发模式） */}

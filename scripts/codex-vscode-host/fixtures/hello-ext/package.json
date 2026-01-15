@@ -1,0 +1,6 @@
+{
+  "name": "hello-ext",
+  "version": "0.0.0",
+  "main": "./extension.js"
+}
+

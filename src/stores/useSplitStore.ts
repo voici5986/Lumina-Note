@@ -33,7 +33,7 @@ interface SplitState {
   saveSecondary: () => Promise<void>;
   closeSecondary: () => void;
   swapPanels: () => void;
-  reloadSecondaryIfOpen: (path: string) => Promise<void>;
+  reloadSecondaryIfOpen: (path: string, options?: { skipIfDirty?: boolean }) => Promise<void>;
 }
 
 export const useSplitStore = create<SplitState>((set, get) => ({
@@ -119,9 +119,10 @@ export const useSplitStore = create<SplitState>((set, get) => ({
   },
   
   // Reload secondary file if it's currently open (for external updates)
-  reloadSecondaryIfOpen: async (path: string) => {
-    const { secondaryFile } = get();
+  reloadSecondaryIfOpen: async (path: string, options?: { skipIfDirty?: boolean }) => {
+    const { secondaryFile, secondaryIsDirty } = get();
     if (secondaryFile !== path) return;
+    if (options?.skipIfDirty && secondaryIsDirty) return;
     
     try {
       const content = await readFile(path);

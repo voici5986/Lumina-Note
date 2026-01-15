@@ -132,7 +132,7 @@ interface FileState {
   canGoForward: () => boolean;
 
   // File sync actions
-  reloadFileIfOpen: (path: string) => Promise<void>;
+  reloadFileIfOpen: (path: string, options?: { skipIfDirty?: boolean }) => Promise<void>;
 
   // Move file/folder actions
   moveFileToFolder: (sourcePath: string, targetFolder: string) => Promise<void>;
@@ -1513,7 +1513,7 @@ export const useFileStore = create<FileState>()(
       },
 
       // Reload file if it's currently open (for external updates like database edits)
-      reloadFileIfOpen: async (path: string) => {
+      reloadFileIfOpen: async (path: string, options?: { skipIfDirty?: boolean }) => {
         const { tabs, activeTabIndex, currentFile } = get();
 
         // 查找该文件是否在标签页中打开
@@ -1521,7 +1521,14 @@ export const useFileStore = create<FileState>()(
         if (tabIndex === -1) return;
 
         try {
+          const skipIfDirty = options?.skipIfDirty ?? false;
+          const targetTab = tabs[tabIndex];
+          if (skipIfDirty && targetTab?.isDirty) {
+            return;
+          }
+
           const newContent = await readFile(path);
+
           const updatedTabs = tabs.map((tab, i) =>
             i === tabIndex ? { ...tab, content: newContent, isDirty: false } : tab
           );

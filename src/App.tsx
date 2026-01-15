@@ -31,6 +31,7 @@ import { VoiceInputBall } from "@/components/ai/VoiceInputBall";
 import { enableDebugLogger } from "@/lib/debugLogger";
 import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
 import { AgentEvalPanel } from "@/tests/agent-eval/AgentEvalPanel";
+import { CodexVscodeHostPanel } from "@/components/debug/CodexVscodeHostPanel";
 
 // 启用调试日志收集（开发模式下）
 if (import.meta.env.DEV) {
@@ -138,6 +139,7 @@ function App() {
   const [isLoadingVault, setIsLoadingVault] = useState(false);
   const [createDbOpen, setCreateDbOpen] = useState(false);
   const [evalPanelOpen, setEvalPanelOpen] = useState(false);
+  const [codexPanelOpen, setCodexPanelOpen] = useState(false);
 
   // 首次启动时默认打开 AI Chat
   useEffect(() => {
@@ -165,6 +167,9 @@ function App() {
       try {
         const { listen } = await import("@tauri-apps/api/event");
         const { startFileWatcher } = await import("@/lib/tauri");
+        const { handleFsChangeEvent } = await import("@/lib/fsChange");
+        const { reloadFileIfOpen } = useFileStore.getState();
+        const { reloadSecondaryIfOpen } = (await import("@/stores/useSplitStore")).useSplitStore.getState();
 
         // 启动后端文件监听
         await startFileWatcher(vaultPath);
@@ -180,6 +185,10 @@ function App() {
           if (debounceTimer) clearTimeout(debounceTimer);
           debounceTimer = setTimeout(() => {
             refreshFileTree();
+            handleFsChangeEvent(event.payload, (path) => {
+              reloadFileIfOpen(path, { skipIfDirty: true });
+              reloadSecondaryIfOpen(path, { skipIfDirty: true });
+            });
           }, 500);
         });
       } catch (error) {
@@ -408,10 +417,24 @@ function App() {
         return;
       }
 
+      // Ctrl+Shift+C: Codex VS Code extension host (Dev only)
+      if (import.meta.env.DEV && isCtrl && e.shiftKey && e.key === "C") {
+        e.preventDefault();
+        setCodexPanelOpen(true);
+        return;
+      }
+
       // Esc: Close eval panel
       if (e.key === "Escape" && evalPanelOpen) {
         e.preventDefault();
         setEvalPanelOpen(false);
+        return;
+      }
+
+      // Esc: Close codex panel
+      if (e.key === "Escape" && codexPanelOpen) {
+        e.preventDefault();
+        setCodexPanelOpen(false);
         return;
       }
     };
@@ -420,7 +443,7 @@ function App() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [save, vaultPath, createNewFile, evalPanelOpen]);
+  }, [save, vaultPath, createNewFile, evalPanelOpen, codexPanelOpen]);
 
   // Open folder dialog
   const handleOpenVault = useCallback(async () => {
@@ -706,6 +729,21 @@ function App() {
             </button>
           </div>
           <AgentEvalPanel />
+        </div>
+      )}
+
+      {/* Codex VS Code extension host panel (Dev only) */}
+      {import.meta.env.DEV && codexPanelOpen && (
+        <div className="fixed inset-0 z-[100] bg-background">
+          <div className="hidden">
+            <button
+              onClick={() => setCodexPanelOpen(false)}
+              className="px-4 py-2 bg-muted rounded hover:bg-muted/80"
+            >
+              âœ?å…³é—­ (Esc)
+            </button>
+          </div>
+          <CodexVscodeHostPanel onClose={() => setCodexPanelOpen(false)} />
         </div>
       )}
     </div>

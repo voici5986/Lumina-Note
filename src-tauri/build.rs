@@ -2,6 +2,14 @@ use std::fs;
 use std::path::Path;
 
 fn main() {
+    // tauri-build >=2.5 expects `DEP_TAURI_DEV` to be set via a dependency build script.
+    // In some environments (e.g. running `cargo test` directly), it may be missing.
+    // Fall back to Cargo's `PROFILE` so builds don't panic during the build script.
+    if std::env::var_os("DEP_TAURI_DEV").is_none() {
+        let is_dev = std::env::var("PROFILE").map(|p| p == "debug").unwrap_or(true);
+        std::env::set_var("DEP_TAURI_DEV", if is_dev { "true" } else { "false" });
+    }
+
     // Create a minimal valid ICO file if it doesn't exist
     let icons_dir = Path::new("icons");
     let icon_path = icons_dir.join("icon.ico");

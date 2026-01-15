@@ -4,6 +4,29 @@
 import { vi } from 'vitest';
 import '@testing-library/jest-dom';
 
+function ensureResizableBufferSupport() {
+  const define = (ctor: typeof ArrayBuffer | typeof SharedArrayBuffer | undefined) => {
+    if (!ctor?.prototype) return;
+    if (!Object.getOwnPropertyDescriptor(ctor.prototype, "resizable")) {
+      Object.defineProperty(ctor.prototype, "resizable", { get: () => false });
+    }
+    if (!Object.getOwnPropertyDescriptor(ctor.prototype, "maxByteLength")) {
+      Object.defineProperty(ctor.prototype, "maxByteLength", {
+        get() {
+          return this.byteLength;
+        },
+      });
+    }
+  };
+
+  define(ArrayBuffer);
+  if (typeof SharedArrayBuffer !== "undefined") {
+    define(SharedArrayBuffer);
+  }
+}
+
+ensureResizableBufferSupport();
+
 // Mock Tauri API - 智能 Mock，根据命令名返回模拟数据
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn((cmd: string, args?: unknown) => {
@@ -79,17 +102,19 @@ global.ResizeObserver = vi.fn().mockImplementation(() => ({
   disconnect: vi.fn(),
 }));
 
-// Mock window.matchMedia
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: vi.fn().mockImplementation(query => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })),
-});
+// Mock window.matchMedia (jsdom only)
+if (typeof window !== "undefined") {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: vi.fn().mockImplementation((query) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+}

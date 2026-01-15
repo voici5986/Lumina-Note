@@ -7,6 +7,10 @@ body.resizing * {
   transition: none !important;
 }
 
+body.resizing iframe[data-codex-iframe="true"] {
+  pointer-events: none;
+}
+
 /* 实时预览中透明文字的选中高亮 */
 .live-preview ::selection {
   background-color: hsl(var(--primary) / 0.3);

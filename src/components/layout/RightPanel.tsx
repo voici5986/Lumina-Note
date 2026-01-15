@@ -21,6 +21,7 @@ import {
   ArrowUpRight,
   ChevronRight,
   Bot,
+  Code2,
   Search,
   Lightbulb,
 } from "lucide-react";
@@ -28,6 +29,7 @@ import { AgentPanel } from "../chat/AgentPanel";
 import { ConversationList } from "../chat/ConversationList";
 import { ChatPanel } from "../chat/ChatPanel";
 import { useConversationManager } from "@/hooks/useConversationManager";
+import { CodexPanel } from "@/components/codex/CodexPanel";
 
 // Heading item in outline
 interface HeadingItem {
@@ -343,7 +345,7 @@ export function RightPanel() {
     setFloatingBallPosition,
     setFloatingBallDragging,
   } = useUIStore();
-  const { tabs, activeTabIndex } = useFileStore();
+  const { tabs, activeTabIndex, vaultPath } = useFileStore();
   const { 
     config,
     setConfig,
@@ -513,7 +515,13 @@ export function RightPanel() {
             } ${isDraggingAI ? "cursor-grabbing" : "cursor-grab"}`}
             title={t.ai.chat}
           >
-            {chatMode === "agent" ? <Bot size={12} /> : <BrainCircuit size={12} />}
+            {chatMode === "agent" ? (
+              <Bot size={12} />
+            ) : chatMode === "codex" ? (
+              <Code2 size={12} />
+            ) : (
+              <BrainCircuit size={12} />
+            )}
             <span className="hidden sm:inline">AI</span>
           </button>
         )}
@@ -559,7 +567,7 @@ export function RightPanel() {
       {rightPanelTab === "chat" && aiPanelMode === "docked" && !isMainAIActive && (
         <div className="flex-1 flex overflow-hidden">
           {/* 可折叠的对话列表侧栏 */}
-          <ConversationList />
+          {chatMode !== "codex" && <ConversationList />}
           
           {/* 右侧主内容区 */}
           <div className="flex-1 flex flex-col overflow-hidden">
@@ -592,31 +600,47 @@ export function RightPanel() {
                   <BrainCircuit size={12} />
                   {t.ai.conversation}
                 </button>
+                <button
+                  onClick={() => setChatMode("codex")}
+                  className={`px-2 py-1 text-xs rounded transition-colors flex items-center gap-1 ${
+                    chatMode === "codex"
+                      ? "bg-background text-primary shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  title="Codex"
+                >
+                  <Code2 size={12} />
+                  Codex
+                </button>
               </div>
-              <span className="text-xs text-muted-foreground">
-                {config.apiKey ? "✓" : t.settingsModal.notConfigured}
-              </span>
+              {chatMode !== "codex" && (
+                <span className="text-xs text-muted-foreground">
+                  {config.apiKey ? "Configured" : t.settingsModal.notConfigured}
+                </span>
+              )}
             </div>
-            <div className="flex gap-1">
-              <button
-                onClick={deleteCurrentSession}
-                className="p-1 text-muted-foreground hover:text-foreground transition-colors"
-                title={t.conversationList.deleteConversation}
-              >
-                <Trash2 size={14} />
-              </button>
-              <button
-                onClick={() => setShowSettings(!showSettings)}
-                className="p-1 text-muted-foreground hover:text-foreground transition-colors"
-                title={t.common.settings}
-              >
-                <Settings size={14} />
-              </button>
-            </div>
+            {chatMode !== "codex" && (
+              <div className="flex gap-1">
+                <button
+                  onClick={deleteCurrentSession}
+                  className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                  title={t.conversationList.deleteConversation}
+                >
+                  <Trash2 size={14} />
+                </button>
+                <button
+                  onClick={() => setShowSettings(!showSettings)}
+                  className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                  title={t.common.settings}
+                >
+                  <Settings size={14} />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Settings Panel - 全屏模式 */}
-          {showSettings ? (
+          {showSettings && chatMode !== "codex" ? (
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* 返回按钮 */}
               <div className="flex items-center justify-between mb-2">
@@ -1019,6 +1043,8 @@ export function RightPanel() {
                 )}
               </div>
             </div>
+          ) : chatMode === "codex" ? (
+            <CodexPanel visible={chatMode === "codex"} workspacePath={vaultPath} />
           ) : (
             <>
           {/* Agent Mode */}

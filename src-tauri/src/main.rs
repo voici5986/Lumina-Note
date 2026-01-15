@@ -14,6 +14,8 @@ mod webdav;
 mod langgraph;
 mod agent;
 mod mcp;
+mod codex_vscode_host;
+mod codex_extension;
 
 use tauri::Manager;
 
@@ -135,10 +137,23 @@ fn main() {
             mcp::mcp_reload,
             mcp::mcp_test_tool,
             mcp::mcp_shutdown,
+            // VS Code extension host (Codex POC)
+            codex_vscode_host::codex_vscode_host_start,
+            codex_vscode_host::codex_vscode_host_stop,
+            codex_vscode_host::codex_webview_exists,
+            codex_vscode_host::create_codex_webview,
+            codex_vscode_host::update_codex_webview_bounds,
+            codex_vscode_host::set_codex_webview_visible,
+            codex_vscode_host::navigate_codex_webview,
+            codex_vscode_host::close_codex_webview,
+            // Codex extension management (Marketplace install)
+            codex_extension::codex_extension_get_status,
+            codex_extension::codex_extension_install_latest,
         ])
         .manage(webdav::commands::WebDAVState::new())
         .manage(agent::AgentState::new())
         .manage(agent::DeepResearchStateManager::new())
+        .manage(codex_vscode_host::CodexVscodeHostState::default())
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
             
