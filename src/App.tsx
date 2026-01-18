@@ -32,6 +32,7 @@ import { enableDebugLogger } from "@/lib/debugLogger";
 import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
 import { AgentEvalPanel } from "@/tests/agent-eval/AgentEvalPanel";
 import { CodexVscodeHostPanel } from "@/components/debug/CodexVscodeHostPanel";
+import type { FsChangePayload } from "@/lib/fsChange";
 
 // 启用调试日志收集（开发模式下）
 if (import.meta.env.DEV) {
@@ -176,7 +177,7 @@ function App() {
         console.log("[FileWatcher] Started watching:", vaultPath);
 
         // 监听文件变化事件（带防抖）
-        unlisten = await listen("fs:change", (event) => {
+        unlisten = await listen<FsChangePayload | null>("fs:change", (event) => {
           if (import.meta.env.DEV) {
             console.log("[FileWatcher] File changed:", event.payload);
           }

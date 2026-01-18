@@ -29,6 +29,7 @@ describe("handleFsChangeEvent", () => {
   it("does not call onReloadPath for invalid payloads", () => {
     const onReloadPath = vi.fn();
     handleFsChangeEvent(null, onReloadPath);
+    handleFsChangeEvent(undefined, onReloadPath);
     handleFsChangeEvent({ type: "Modified" }, onReloadPath);
     handleFsChangeEvent({ type: "Renamed", old_path: "/tmp/old.md" }, onReloadPath);
     handleFsChangeEvent({ type: "Unknown", path: "/tmp/d.md" }, onReloadPath);
