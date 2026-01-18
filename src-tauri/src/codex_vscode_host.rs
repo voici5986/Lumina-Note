@@ -1,5 +1,6 @@
 use crate::error::AppError;
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
 use tauri::{
@@ -101,6 +102,72 @@ fn host_script_path(app: &AppHandle) -> Result<std::path::PathBuf, AppError> {
     Ok(script_path)
 }
 
+#[cfg(windows)]
+fn node_binary_name() -> &'static str {
+    "node.exe"
+}
+
+#[cfg(not(windows))]
+fn node_binary_name() -> &'static str {
+    "node"
+}
+
+fn candidate_node_paths(resource_dir: Option<&Path>, app_data_dir: Option<&Path>) -> Vec<PathBuf> {
+    let binary = node_binary_name();
+    let mut candidates = Vec::new();
+
+    if let Some(resource_dir) = resource_dir {
+        candidates.push(resource_dir.join(binary));
+        candidates.push(resource_dir.join("node").join(binary));
+        candidates.push(resource_dir.join("node").join("bin").join(binary));
+    }
+
+    if let Some(app_data_dir) = app_data_dir {
+        candidates.push(
+            app_data_dir
+                .join("codex")
+                .join("node")
+                .join(binary),
+        );
+    }
+
+    candidates
+}
+
+fn resolve_node_path(app: &AppHandle) -> Option<PathBuf> {
+    if let Ok(env_path) = std::env::var("LUMINA_NODE_PATH") {
+        let candidate = PathBuf::from(env_path);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+
+    let resource_dir = app.path().resource_dir().ok();
+    let app_data_dir = app.path().app_data_dir().ok();
+    for candidate in candidate_node_paths(resource_dir.as_deref(), app_data_dir.as_deref()) {
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+
+    None
+}
+
+fn apply_no_window_flag(cmd: &mut Command) -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt as _;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        true
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = cmd;
+        false
+    }
+}
+
 async fn drain_lines(mut reader: tokio::io::Lines<BufReader<tokio::process::ChildStdout>>) {
     while let Ok(Some(_)) = reader.next_line().await {}
 }
@@ -127,7 +194,11 @@ pub async fn codex_vscode_host_start(
 
     let script_path = host_script_path(&app)?;
 
-    let mut cmd = Command::new("node");
+    let mut cmd = match resolve_node_path(&app) {
+        Some(path) => Command::new(path),
+        None => Command::new("node"),
+    };
+    apply_no_window_flag(&mut cmd);
     cmd.arg(script_path)
         .arg("--extensionPath")
         .arg(extension_path)
@@ -144,7 +215,15 @@ pub async fn codex_vscode_host_start(
         }
     }
 
-    let mut child = cmd.spawn()?;
+    let mut child = cmd.spawn().map_err(|err| {
+        if err.kind() == std::io::ErrorKind::NotFound {
+            AppError::InvalidPath(
+                "Node runtime not found. Bundle node with the app or set LUMINA_NODE_PATH.".into(),
+            )
+        } else {
+            AppError::Io(err)
+        }
+    })?;
 
     let stdout = child
         .stdout
@@ -186,6 +265,40 @@ pub async fn codex_vscode_host_start(
     inner.child = Some(child);
 
     Ok(CodexVscodeHostInfo { origin, port })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn candidate_node_paths_include_expected_locations() {
+        let resource_dir = Path::new("resource-root");
+        let app_data_dir = Path::new("app-data");
+        let binary = node_binary_name();
+        let candidates = candidate_node_paths(Some(resource_dir), Some(app_data_dir));
+
+        assert!(candidates.contains(&resource_dir.join(binary)));
+        assert!(candidates.contains(&resource_dir.join("node").join(binary)));
+        assert!(candidates.contains(&resource_dir.join("node").join("bin").join(binary)));
+        assert!(
+            candidates.contains(&app_data_dir.join("codex").join("node").join(binary))
+        );
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn apply_no_window_flag_sets_flag_on_windows() {
+        let mut cmd = Command::new("node");
+        assert!(apply_no_window_flag(&mut cmd));
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn apply_no_window_flag_is_noop_on_non_windows() {
+        let mut cmd = Command::new("node");
+        assert!(!apply_no_window_flag(&mut cmd));
+    }
 }
 
 #[tauri::command]

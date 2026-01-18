@@ -149,6 +149,7 @@ fn main() {
             // Codex extension management (Marketplace install)
             codex_extension::codex_extension_get_status,
             codex_extension::codex_extension_install_latest,
+            codex_extension::codex_extension_install_vsix,
         ])
         .manage(webdav::commands::WebDAVState::new())
         .manage(agent::AgentState::new())

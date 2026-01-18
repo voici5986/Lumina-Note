@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -16,6 +16,13 @@ pub struct CodexExtensionStatus {
 
 #[derive(Debug, Serialize)]
 struct CurrentVersionFile {
+    version: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ExtensionManifest {
+    name: String,
+    publisher: String,
     version: String,
 }
 
@@ -41,6 +48,24 @@ fn version_dir(base: &Path, version: &str) -> PathBuf {
 
 fn extension_path_for_version(base: &Path, version: &str) -> PathBuf {
     version_dir(base, version).join("extension")
+}
+
+fn extension_manifest_path(base: &Path) -> PathBuf {
+    base.join("extension").join("package.json")
+}
+
+fn parse_extension_manifest(contents: &str) -> Result<ExtensionManifest, AppError> {
+    serde_json::from_str(contents)
+        .map_err(|e| AppError::InvalidPath(format!("Invalid extension manifest: {}", e)))
+}
+
+fn validate_openai_chatgpt_manifest(manifest: &ExtensionManifest) -> Result<(), AppError> {
+    if manifest.publisher != "openai" || manifest.name != "chatgpt" {
+        return Err(AppError::InvalidPath(
+            "VSIX is not openai.chatgpt".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn read_current_version(base: &Path) -> Option<String> {
@@ -231,6 +256,17 @@ pub async fn codex_extension_install_latest(app: AppHandle) -> Result<CodexExten
         .await
         .map_err(|e| AppError::InvalidPath(format!("VSIX extract task failed: {}", e)))??;
 
+    let manifest_path = extension_manifest_path(&out_dir);
+    let manifest_contents = tokio::fs::read_to_string(&manifest_path).await?;
+    let manifest = parse_extension_manifest(&manifest_contents)?;
+    validate_openai_chatgpt_manifest(&manifest)?;
+    if manifest.version != version {
+        return Err(AppError::InvalidPath(format!(
+            "VSIX version mismatch: expected {}, got {}",
+            version, manifest.version
+        )));
+    }
+
     write_current_version(&base, &version)?;
 
     Ok(CodexExtensionStatus {
@@ -239,4 +275,83 @@ pub async fn codex_extension_install_latest(app: AppHandle) -> Result<CodexExten
         extension_path: Some(extension_path_for_version(&base, &version).to_string_lossy().to_string()),
         latest_version: Some(version),
     })
+}
+
+#[tauri::command]
+pub async fn codex_extension_install_vsix(
+    app: AppHandle,
+    vsix_path: String,
+) -> Result<CodexExtensionStatus, AppError> {
+    let base = codex_openai_chatgpt_dir(&app)?;
+    let vsix_path = PathBuf::from(vsix_path);
+    if !vsix_path.is_file() {
+        return Err(AppError::FileNotFound(format!(
+            "VSIX not found: {}",
+            vsix_path.display()
+        )));
+    }
+
+    let tmp_root = base.join("tmp");
+    tokio::fs::create_dir_all(&tmp_root).await?;
+    let tmp_dir = tmp_root.join(format!("import-{}", uuid::Uuid::new_v4()));
+    tokio::fs::create_dir_all(&tmp_dir).await?;
+
+    let vsix_path_cloned = vsix_path.clone();
+    let tmp_dir_cloned = tmp_dir.clone();
+    let extract = tokio::task::spawn_blocking(move || extract_vsix(&vsix_path_cloned, &tmp_dir_cloned))
+        .await
+        .map_err(|e| AppError::InvalidPath(format!("VSIX extract task failed: {}", e)))?;
+    if let Err(err) = extract {
+        let _ = tokio::fs::remove_dir_all(&tmp_dir).await;
+        return Err(err);
+    }
+
+    let manifest_path = extension_manifest_path(&tmp_dir);
+    let manifest_contents = tokio::fs::read_to_string(&manifest_path).await?;
+    let manifest = parse_extension_manifest(&manifest_contents)?;
+    validate_openai_chatgpt_manifest(&manifest)?;
+
+    let version = manifest.version.clone();
+    let out_dir = version_dir(&base, &version);
+    if out_dir.exists() {
+        tokio::fs::remove_dir_all(&out_dir).await?;
+    }
+    tokio::fs::create_dir_all(base.join("versions")).await?;
+    if let Err(err) = tokio::fs::rename(&tmp_dir, &out_dir).await {
+        let _ = tokio::fs::remove_dir_all(&tmp_dir).await;
+        return Err(AppError::Io(err));
+    }
+
+    write_current_version(&base, &version)?;
+
+    Ok(CodexExtensionStatus {
+        installed: true,
+        version: Some(version.clone()),
+        extension_path: Some(extension_path_for_version(&base, &version).to_string_lossy().to_string()),
+        latest_version: Some(version),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_and_validate_manifest_accepts_openai_chatgpt() {
+        let manifest = parse_extension_manifest(
+            r#"{"name":"chatgpt","publisher":"openai","version":"0.5.60"}"#,
+        )
+        .expect("manifest parse");
+        validate_openai_chatgpt_manifest(&manifest).expect("manifest validate");
+    }
+
+    #[test]
+    fn validate_manifest_rejects_other_extensions() {
+        let manifest = parse_extension_manifest(
+            r#"{"name":"not-chatgpt","publisher":"acme","version":"1.0.0"}"#,
+        )
+        .expect("manifest parse");
+        let err = validate_openai_chatgpt_manifest(&manifest).unwrap_err();
+        assert!(err.to_string().contains("openai.chatgpt"));
+    }
 }
