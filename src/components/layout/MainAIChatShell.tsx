@@ -43,7 +43,7 @@ import type { ReferencedFile } from "@/hooks/useChatSend";
 import { AISettingsModal } from "../ai/AISettingsModal";
 import type { MessageContent, TextContent } from "@/services/llm";
 import { DeepResearchCard } from "../deep-research";
-import { CodexPanel } from "@/components/codex/CodexPanel";
+import { CodexPanelSlot } from "@/components/codex/CodexPanelSlot";
 import { 
   useDeepResearchStore, 
   setupDeepResearchListener,
@@ -798,7 +798,7 @@ export function MainAIChatShell() {
           {isCodexMode ? (
             <div className="flex-1 flex flex-col overflow-hidden min-h-0">
               <div className="flex-1 flex overflow-hidden min-h-0">
-                <CodexPanel visible={isCodexMode} workspacePath={vaultPath} renderMode="iframe" />
+                <CodexPanelSlot slot="main" renderMode="iframe" className="flex-1 h-full w-full" />
               </div>
             </div>
           ) : (

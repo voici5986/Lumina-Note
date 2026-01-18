@@ -29,7 +29,7 @@ import { AgentPanel } from "../chat/AgentPanel";
 import { ConversationList } from "../chat/ConversationList";
 import { ChatPanel } from "../chat/ChatPanel";
 import { useConversationManager } from "@/hooks/useConversationManager";
-import { CodexPanel } from "@/components/codex/CodexPanel";
+import { CodexPanelSlot } from "@/components/codex/CodexPanelSlot";
 
 // Heading item in outline
 interface HeadingItem {
@@ -345,7 +345,7 @@ export function RightPanel() {
     setFloatingBallPosition,
     setFloatingBallDragging,
   } = useUIStore();
-  const { tabs, activeTabIndex, vaultPath } = useFileStore();
+  const { tabs, activeTabIndex } = useFileStore();
   const { 
     config,
     setConfig,
@@ -1044,7 +1044,7 @@ export function RightPanel() {
               </div>
             </div>
           ) : chatMode === "codex" ? (
-            <CodexPanel visible={chatMode === "codex"} workspacePath={vaultPath} />
+            <CodexPanelSlot slot="side" renderMode="native" className="flex-1 h-full w-full" />
           ) : (
             <>
           {/* Agent Mode */}

@@ -32,6 +32,7 @@ import { enableDebugLogger } from "@/lib/debugLogger";
 import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
 import { AgentEvalPanel } from "@/tests/agent-eval/AgentEvalPanel";
 import { CodexVscodeHostPanel } from "@/components/debug/CodexVscodeHostPanel";
+import { CodexPanelHost } from "@/components/codex/CodexPanelHost";
 import type { FsChangePayload } from "@/lib/fsChange";
 
 // 启用调试日志收集（开发模式下）
@@ -691,6 +692,8 @@ function App() {
           <RightPanel />
         </div>
       </div>
+
+      <CodexPanelHost />
 
       {/* Command Palette */}
       <CommandPalette

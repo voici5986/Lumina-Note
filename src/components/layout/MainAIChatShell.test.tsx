@@ -1,35 +1,31 @@
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render } from "@testing-library/react";
+import { beforeEach, describe, expect, it } from "vitest";
 import { MainAIChatShell } from "./MainAIChatShell";
 import { useUIStore } from "@/stores/useUIStore";
 import { useFileStore } from "@/stores/useFileStore";
-
-vi.mock("@/components/codex/CodexPanel", () => ({
-  CodexPanel: ({ visible }: { visible: boolean }) => (
-    <div data-testid="codex-panel" data-visible={visible ? "true" : "false"} />
-  ),
-}));
+import { useCodexPanelDockStore } from "@/stores/useCodexPanelDock";
 
 describe("MainAIChatShell", () => {
   beforeEach(() => {
     useUIStore.setState({ chatMode: "chat" });
     useFileStore.setState({ vaultPath: "/tmp" });
+    useCodexPanelDockStore.setState({ targets: {} });
   });
 
-  it("renders CodexPanel and hides chat input when in codex mode", () => {
+  it("renders Codex slot and hides chat input when in codex mode", () => {
     useUIStore.setState({ chatMode: "codex" });
 
-    const { queryByRole } = render(<MainAIChatShell />);
+    const { container, queryByRole } = render(<MainAIChatShell />);
 
-    expect(screen.getByTestId("codex-panel")).toBeInTheDocument();
+    expect(container.querySelector('[data-codex-slot="main"]')).toBeTruthy();
     expect(queryByRole("textbox")).toBeNull();
   });
 
-  it("does not render CodexPanel in chat mode", () => {
+  it("does not render Codex slot in chat mode", () => {
     useUIStore.setState({ chatMode: "chat" });
 
-    render(<MainAIChatShell />);
+    const { container } = render(<MainAIChatShell />);
 
-    expect(screen.queryByTestId("codex-panel")).toBeNull();
+    expect(container.querySelector('[data-codex-slot="main"]')).toBeNull();
   });
 });
