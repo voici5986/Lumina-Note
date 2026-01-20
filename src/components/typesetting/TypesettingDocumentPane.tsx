@@ -15,7 +15,10 @@ import {
 } from "@/lib/tauri";
 import { decodeBase64ToBytes } from "@/typesetting/base64";
 import { docxBlocksToHtml, docxHtmlToBlocks } from "@/typesetting/docxHtml";
-import { docxBlocksToPlainText } from "@/typesetting/docxText";
+import {
+  docxBlocksToLineHeightPx,
+  docxBlocksToPlainText,
+} from "@/typesetting/docxText";
 import { docOpFromBeforeInput } from "@/typesetting/docOps";
 
 type TypesettingDocumentPaneProps = {
@@ -110,6 +113,11 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
     setLayoutError(null);
 
     const text = docxBlocksToPlainText(doc.blocks);
+    const lineHeightPx = docxBlocksToLineHeightPx(
+      doc.blocks,
+      DEFAULT_LINE_HEIGHT_PX,
+      DEFAULT_DPI,
+    );
     const runId = ++layoutRunRef.current;
     const handler = setTimeout(async () => {
       const fontPath = await getTypesettingFixtureFontPath();
@@ -125,7 +133,7 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
           text,
           fontPath,
           maxWidth,
-          lineHeight: DEFAULT_LINE_HEIGHT_PX,
+          lineHeight: lineHeightPx,
         });
         if (layoutRunRef.current !== runId) return;
         updateLayoutSummary(path, `Layout: ${layoutData.lines.length} lines`);

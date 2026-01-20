@@ -426,3 +426,8 @@ pm run test:run -- src/typesetting/pdfMetrics.test.ts src/typesetting/pixelDiff.
   - Key decisions: Capture w:jc + w:spacing + w:ind into paragraphStyle; convert twips to pt; auto lineRule stores multiples (line/240) while exact/atLeast uses pt (line/20); hanging indents become negative first-line indent.
   - Files changed: src/typesetting/docxImport.ts; src/typesetting/docxImport.test.ts
   - Blockers/next steps: Wire paragraphStyle into layout engine inputs (font/size/line height/indent/spacing/alignment) in preview/pagination; pm command missing so tests ran via npm; cargo tests ok with warnings.
+- 2026-01-20
+  - Task completed: M19 -> Map docx styles -> layout engine inputs (line-height mapping in preview layout)
+  - Key decisions: Derive a single preview line height from the first paragraph/list/table style; auto lineHeight uses the default as a multiplier; exact/atLeast rules convert pt -> px at 96dpi with atLeast clamping.
+  - Files changed: src/typesetting/docxText.ts; src/typesetting/docxText.test.ts; src/components/typesetting/TypesettingDocumentPane.tsx
+  - Blockers/next steps: `pm` is unavailable; tests ran via `npm run test:run -- src/typesetting/docxText.test.ts`. Next: map alignment/indent/spacing into layout inputs.
