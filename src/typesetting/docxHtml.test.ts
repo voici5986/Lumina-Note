@@ -120,17 +120,24 @@ describe("docxHtmlToBlocks", () => {
     ]);
   });
 
-  it("parses image-only paragraphs into image blocks", () => {
+  it("parses image-only paragraphs into image blocks with extents", () => {
     const root = document.createElement("div");
-    root.innerHTML = `<p><img data-embed-id="rId3" src="data:image/png;base64,abc" /></p>`;
+    root.innerHTML = `<p><img data-embed-id="rId3" data-width-emu="914400" data-height-emu="457200" src="data:image/png;base64,abc" /></p>`;
 
     const blocks = docxHtmlToBlocks(root);
-    expect(blocks).toEqual([{ type: "image", embedId: "rId3" }]);
+    expect(blocks).toEqual([
+      {
+        type: "image",
+        embedId: "rId3",
+        widthEmu: 914400,
+        heightEmu: 457200,
+      },
+    ]);
   });
 
   it("renders image blocks with resolver data and preserves embed id", () => {
     const html = docxBlocksToHtml(
-      [{ type: "image", embedId: "rId5" }],
+      [{ type: "image", embedId: "rId5", widthEmu: 914400, heightEmu: 457200 }],
       {
         imageResolver: (embedId) =>
           embedId === "rId5"
@@ -140,6 +147,9 @@ describe("docxHtmlToBlocks", () => {
     );
 
     expect(html).toContain("data-embed-id=\"rId5\"");
+    expect(html).toContain("data-width-emu=\"914400\"");
+    expect(html).toContain("data-height-emu=\"457200\"");
+    expect(html).toContain("width:96px");
     expect(html).toContain("src=\"data:image/png;base64,abc\"");
     expect(html).toContain("alt=\"Logo\"");
   });

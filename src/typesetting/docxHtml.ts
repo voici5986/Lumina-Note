@@ -45,7 +45,9 @@ export function docxHtmlToBlocks(root: HTMLElement): DocxBlock[] {
     if (tag === "img") {
       const embedId = element.getAttribute("data-embed-id");
       if (embedId) {
-        blocks.push({ type: "image", embedId });
+        const widthEmu = parseDataNumber(element, "data-width-emu");
+        const heightEmu = parseDataNumber(element, "data-height-emu");
+        blocks.push({ type: "image", embedId, widthEmu, heightEmu });
       }
       continue;
     }
@@ -143,7 +145,9 @@ function imageToHtml(
   }
   const src = escapeHtml(resolved.src);
   const alt = escapeHtml(resolved.alt ?? "");
-  return `<p><img data-embed-id="${escapeHtml(block.embedId)}" src="${src}" alt="${alt}" style="max-width:100%;height:auto;" /></p>`;
+  const size = imageSizeAttributes(block);
+  const style = `${size.style ?? ""}max-width:100%;height:auto;`;
+  return `<p><img data-embed-id="${escapeHtml(block.embedId)}"${size.attributes} src="${src}" alt="${alt}" style="${style}" /></p>`;
 }
 
 function runsToHtml(runs: DocxRun[]): string {
@@ -243,7 +247,14 @@ function extractImageBlock(element: HTMLElement): DocxBlock | null {
   }
   const embedId = img.getAttribute("data-embed-id");
   if (!embedId) return null;
-  return { type: "image", embedId };
+  const widthEmu = parseDataNumber(img, "data-width-emu");
+  const heightEmu = parseDataNumber(img, "data-height-emu");
+  return {
+    type: "image",
+    embedId,
+    widthEmu,
+    heightEmu,
+  };
 }
 
 function applyInlineStyle(element: HTMLElement, style: DocxRunStyle) {
@@ -315,4 +326,42 @@ function escapeHtml(value: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+const EMU_PER_INCH = 914400;
+const DEFAULT_DPI = 96;
+
+function imageSizeAttributes(
+  block: Extract<DocxBlock, { type: "image" }>,
+): { attributes: string; style?: string } {
+  const widthEmu = block.widthEmu;
+  const heightEmu = block.heightEmu;
+  if (!Number.isFinite(widthEmu) || !Number.isFinite(heightEmu)) {
+    return { attributes: "" };
+  }
+
+  const widthPx = emuToPx(widthEmu, DEFAULT_DPI);
+  const heightPx = emuToPx(heightEmu, DEFAULT_DPI);
+  if (widthPx <= 0 || heightPx <= 0) {
+    return { attributes: "" };
+  }
+
+  return {
+    attributes: ` data-width-emu="${Math.round(widthEmu)}" data-height-emu="${Math.round(heightEmu)}"`,
+    style: `width:${widthPx}px;`,
+  };
+}
+
+function emuToPx(emu: number, dpi: number): number {
+  if (!Number.isFinite(emu) || emu <= 0) return 0;
+  const px = (emu / EMU_PER_INCH) * dpi;
+  return Math.max(1, Math.round(px));
+}
+
+function parseDataNumber(element: Element, attribute: string): number | undefined {
+  const raw = element.getAttribute(attribute);
+  if (!raw) return undefined;
+  const value = Number.parseInt(raw, 10);
+  if (!Number.isFinite(value) || value <= 0) return undefined;
+  return value;
 }

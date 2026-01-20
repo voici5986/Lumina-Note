@@ -323,15 +323,19 @@ describe("parseDocxDocumentXml", () => {
     }
   });
 
-  it("parses image-only paragraphs into image blocks", () => {
+  it("parses image-only paragraphs into image blocks with extents", () => {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
       <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
         xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
-        xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+        xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
         <w:body>
           <w:p>
             <w:r>
               <w:drawing>
+                <wp:inline>
+                  <wp:extent cx="914400" cy="457200" />
+                </wp:inline>
                 <a:blip r:embed="rId5" />
               </w:drawing>
             </w:r>
@@ -345,6 +349,8 @@ describe("parseDocxDocumentXml", () => {
     expect(image.type).toBe("image");
     if (image.type === "image") {
       expect(image.embedId).toBe("rId5");
+      expect(image.widthEmu).toBe(914400);
+      expect(image.heightEmu).toBe(457200);
     }
   });
 

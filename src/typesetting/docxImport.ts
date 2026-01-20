@@ -64,6 +64,8 @@ export type DocxImageBlock = {
   type: "image";
   embedId: string;
   description?: string;
+  widthEmu?: number;
+  heightEmu?: number;
 };
 
 export type DocxBlock =
@@ -419,6 +421,7 @@ function extractParagraphImages(paragraph: Element): DocxImageBlock[] {
   ];
 
   for (const drawing of drawings) {
+    const extent = parseDrawingExtent(drawing);
     const blips = [
       ...Array.from(drawing.getElementsByTagName("a:blip")),
       ...Array.from(drawing.getElementsByTagName("blip")),
@@ -426,12 +429,44 @@ function extractParagraphImages(paragraph: Element): DocxImageBlock[] {
     for (const blip of blips) {
       const embed = blip.getAttribute("r:embed") ?? blip.getAttribute("embed");
       if (embed) {
-        images.push({ type: "image", embedId: embed });
+        images.push({
+          type: "image",
+          embedId: embed,
+          widthEmu: extent?.widthEmu,
+          heightEmu: extent?.heightEmu,
+        });
       }
     }
   }
 
   return images;
+}
+
+function parseDrawingExtent(drawing: Element): { widthEmu: number; heightEmu: number } | null {
+  const extent =
+    drawing.getElementsByTagName("wp:extent")[0] ??
+    drawing.getElementsByTagName("extent")[0] ??
+    drawing.getElementsByTagName("a:ext")[0];
+  if (!extent) {
+    return null;
+  }
+
+  const widthEmu = parseExtentValue(extent.getAttribute("cx"));
+  const heightEmu = parseExtentValue(extent.getAttribute("cy"));
+  if (widthEmu === null || heightEmu === null) {
+    return null;
+  }
+
+  return { widthEmu, heightEmu };
+}
+
+function parseExtentValue(raw: string | null): number | null {
+  if (!raw) return null;
+  const value = Number.parseInt(raw, 10);
+  if (!Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  return value;
 }
 
 function parseTable(table: Element): DocxTableBlock {

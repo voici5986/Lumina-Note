@@ -465,3 +465,8 @@ pm run test:run -- src/components/typesetting/TypesettingDocumentPane.test.tsx\)
   - Key decisions: Added a baseline folder README to document expected Word PDF filenames and metadata reference.
   - Files changed: tests/typesetting/word-baselines/README.md; docs/TYPESETTING_ENGINE_PROGRESS.md
   - Blockers/next steps: Export Word PDFs into tests/typesetting/word-baselines; record capture metadata in docs/WORD_BASELINE_CAPTURE.md. Tests not run (docs-only).
+- 2026-01-20
+  - Task completed: M19 -> Capture docx image extents for preview sizing (partial toward engine image rendering)
+  - Key decisions: Parse wp:extent cx/cy in EMU for image blocks; emit data-width-emu/data-height-emu plus width style for HTML rendering; preserve extents on HTML round-trip.
+  - Files changed: src/typesetting/docxImport.ts; src/typesetting/docxImport.test.ts; src/typesetting/docxHtml.ts; src/typesetting/docxHtml.test.ts
+  - Blockers/next steps: WSL unavailable; ran targeted tests locally via `npm run test:run -- src/typesetting/docxImport.test.ts src/typesetting/docxHtml.test.ts`. Next: render images/tables/headers/footers via the engine pipeline (beyond HTML) and iterate diffs.
