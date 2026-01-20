@@ -91,9 +91,6 @@ const scaleBoxPx = (
   height: scalePx(box.height, zoom),
 });
 
-const hasTableBlocks = (blocks: DocxBlock[]): boolean =>
-  blocks.some((block) => block.type === "table");
-
 const defaultLineHeightForFont = (fontSizePx: number) =>
   Math.max(1, Math.round(fontSizePx * 1.2));
 
@@ -309,10 +306,8 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
     );
     const headerText = docxBlocksToPlainText(doc.headerBlocks);
     const footerText = docxBlocksToPlainText(doc.footerBlocks);
-    const headerUsesEngine = headerText.trim().length > 0
-      && !hasTableBlocks(doc.headerBlocks);
-    const footerUsesEngine = footerText.trim().length > 0
-      && !hasTableBlocks(doc.footerBlocks);
+    const headerUsesEngine = headerText.trim().length > 0;
+    const footerUsesEngine = footerText.trim().length > 0;
 
     if (!headerUsesEngine) {
       setHeaderLayout(null);
@@ -489,7 +484,6 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
 
   const bodyUsesEngine = !!doc
     && !isEditing
-    && !hasTableBlocks(doc.blocks)
     && (bodyLines.length > 0 || bodyImages.length > 0);
 
   const headerUsesEngine = headerLines.length > 0 || headerImages.length > 0;

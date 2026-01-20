@@ -8,7 +8,7 @@ import {
 } from "@/stores/useTypesettingDocStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { DocxBlock } from "@/typesetting/docxImport";
-import { DOCX_IMAGE_PLACEHOLDER } from "@/typesetting/docxText";
+import { DOCX_IMAGE_PLACEHOLDER, docxBlocksToPlainText } from "@/typesetting/docxText";
 
 const createDeferred = <T,>() => {
   let resolve!: (value: T) => void;
@@ -463,6 +463,76 @@ describe("TypesettingDocumentPane", () => {
     const image = screen.getByTestId("typesetting-body-image");
     expect(image).toHaveAttribute("data-embed-id", "rId1");
     expect(image.getAttribute("src")).toContain("data:image/png;base64,");
+
+    layoutSpy.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it("renders engine body text for table blocks when not editing", async () => {
+    vi.useFakeTimers();
+
+    const path = "C:/vault/report.docx";
+    const tableBlock: DocxBlock = {
+      type: "table",
+      rows: [
+        {
+          cells: [
+            {
+              blocks: [
+                { type: "paragraph", runs: [{ text: "Cell A" }] } as DocxBlock,
+              ],
+            },
+            {
+              blocks: [
+                { type: "paragraph", runs: [{ text: "Cell B" }] } as DocxBlock,
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    useTypesettingDocStore.setState({
+      docs: {
+        [path]: buildDoc(path, { blocks: [tableBlock] }),
+      },
+    });
+
+    const text = docxBlocksToPlainText([tableBlock]);
+    const textBytes = new TextEncoder().encode(text).length;
+
+    const layoutSpy = vi
+      .spyOn(tauri, "getTypesettingLayoutText")
+      .mockResolvedValue({
+        lines: [
+          {
+            start: 0,
+            end: text.length,
+            width: 200,
+            x_offset: 0,
+            y_offset: 0,
+            start_byte: 0,
+            end_byte: textBytes,
+          },
+        ],
+      });
+
+    render(<TypesettingDocumentPane path={path} />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(350);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const engineBody = screen.getByTestId("typesetting-body-engine");
+    expect(engineBody).toBeInTheDocument();
+    expect(engineBody).toHaveTextContent("Cell A");
+    expect(engineBody).toHaveTextContent("Cell B");
 
     layoutSpy.mockRestore();
     vi.useRealTimers();
