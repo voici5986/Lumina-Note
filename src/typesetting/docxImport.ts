@@ -75,12 +75,20 @@ export type DocxBlock =
   | DocxTableBlock
   | DocxImageBlock;
 
-export function parseDocxDocumentXml(xml: string): DocxBlock[] {
-  return parseDocxXmlWithContainer(xml, ["w:body", "body"]);
+export type DocxStyleMap = import("./docxStyles").DocxStyleMap;
+
+export function parseDocxDocumentXml(
+  xml: string,
+  styles?: DocxStyleMap,
+): DocxBlock[] {
+  return parseDocxXmlWithContainer(xml, ["w:body", "body"], styles);
 }
 
-export function parseDocxHeaderFooterXml(xml: string): DocxBlock[] {
-  return parseDocxXmlWithContainer(xml, ["w:hdr", "hdr", "w:ftr", "ftr"]);
+export function parseDocxHeaderFooterXml(
+  xml: string,
+  styles?: DocxStyleMap,
+): DocxBlock[] {
+  return parseDocxXmlWithContainer(xml, ["w:hdr", "hdr", "w:ftr", "ftr"], styles);
 }
 
 type ParagraphContent = {
@@ -94,6 +102,7 @@ type ParagraphContent = {
 function parseDocxXmlWithContainer(
   xml: string,
   containerTags: string[],
+  styles?: DocxStyleMap,
 ): DocxBlock[] {
   if (!xml.trim()) {
     return [];
@@ -118,10 +127,10 @@ function parseDocxXmlWithContainer(
     return [];
   }
 
-  return parseBodyBlocks(fallback);
+  return parseBodyBlocks(fallback, styles);
 }
 
-function parseBodyBlocks(container: Element): DocxBlock[] {
+function parseBodyBlocks(container: Element, styles?: DocxStyleMap): DocxBlock[] {
   const blocks: DocxBlock[] = [];
   let currentList: { key: string; block: DocxListBlock } | null = null;
 
@@ -140,7 +149,7 @@ function parseBodyBlocks(container: Element): DocxBlock[] {
     const element = node as Element;
     switch (element.tagName) {
       case "w:p": {
-        const content = parseParagraphContent(element, { includeList: true });
+        const content = parseParagraphContent(element, { includeList: true }, styles);
         if (content.listKey) {
           if (!currentList || currentList.key !== content.listKey) {
             flushList();
@@ -164,7 +173,7 @@ function parseBodyBlocks(container: Element): DocxBlock[] {
       }
       case "w:tbl": {
         flushList();
-        blocks.push(parseTable(element));
+        blocks.push(parseTable(element, styles));
         break;
       }
       default:
@@ -212,12 +221,13 @@ function paragraphContentToBlocks(content: ParagraphContent): DocxBlock[] {
 function parseParagraphContent(
   paragraph: Element,
   options: { includeList: boolean },
+  styles?: DocxStyleMap,
 ): ParagraphContent {
-  const runs = parseRuns(paragraph);
+  const { paragraphStyle, runDefaults } = resolveParagraphStyles(paragraph, styles);
+  const runs = parseRuns(paragraph, runDefaults, styles);
   const headingLevel = parseHeadingLevel(paragraph);
   const listKey = options.includeList ? parseListKey(paragraph) : undefined;
   const images = extractParagraphImages(paragraph);
-  const paragraphStyle = parseParagraphStyle(paragraph);
   return { runs, headingLevel, listKey, images, paragraphStyle };
 }
 
@@ -270,7 +280,11 @@ function parseListKey(paragraph: Element): string | undefined {
   return `${numId}:${level}`;
 }
 
-function parseRuns(paragraph: Element): DocxRun[] {
+function parseRuns(
+  paragraph: Element,
+  defaults: DocxRunStyle | undefined,
+  styles?: DocxStyleMap,
+): DocxRun[] {
   const runs = Array.from(paragraph.getElementsByTagName("w:r"));
   const result: DocxRun[] = [];
 
@@ -280,9 +294,12 @@ function parseRuns(paragraph: Element): DocxRun[] {
       continue;
     }
 
-    const style = parseRunStyle(run);
-    if (style) {
-      result.push({ text, style });
+    const directStyle = parseRunStyle(run);
+    const styleId = parseRunStyleId(run);
+    const styleFromMap = styleId ? resolveCharacterStyle(styleId, styles) : undefined;
+    const merged = mergeRunStyles(defaults, styleFromMap, directStyle);
+    if (merged) {
+      result.push({ text, style: merged });
     } else {
       result.push({ text });
     }
@@ -368,6 +385,30 @@ function parseParagraphStyle(paragraph: Element): DocxParagraphStyle | undefined
   }
 
   return Object.keys(style).length > 0 ? style : undefined;
+}
+
+function parseParagraphStyleId(paragraph: Element): string | undefined {
+  const pPr =
+    paragraph.getElementsByTagName("w:pPr")[0] ??
+    paragraph.getElementsByTagName("pPr")[0];
+  if (!pPr) return undefined;
+  const pStyle =
+    pPr.getElementsByTagName("w:pStyle")[0] ??
+    pPr.getElementsByTagName("pStyle")[0];
+  if (!pStyle) return undefined;
+  return pStyle.getAttribute("w:val") ?? pStyle.getAttribute("val") ?? undefined;
+}
+
+function parseRunStyleId(run: Element): string | undefined {
+  const rPr =
+    run.getElementsByTagName("w:rPr")[0] ??
+    run.getElementsByTagName("rPr")[0];
+  if (!rPr) return undefined;
+  const rStyle =
+    rPr.getElementsByTagName("w:rStyle")[0] ??
+    rPr.getElementsByTagName("rStyle")[0];
+  if (!rStyle) return undefined;
+  return rStyle.getAttribute("w:val") ?? rStyle.getAttribute("val") ?? undefined;
 }
 
 function parseAlignment(value?: string | null): DocxParagraphStyle["alignment"] {
@@ -469,13 +510,13 @@ function parseExtentValue(raw: string | null): number | null {
   return value;
 }
 
-function parseTable(table: Element): DocxTableBlock {
+function parseTable(table: Element, styles?: DocxStyleMap): DocxTableBlock {
   const rows = Array.from(table.getElementsByTagName("w:tr")).map((row) => {
     const cells = Array.from(row.getElementsByTagName("w:tc")).map((cell) => {
       const paragraphs = Array.from(cell.getElementsByTagName("w:p"));
       const blocks: DocxBlock[] = [];
       for (const paragraph of paragraphs) {
-        const content = parseParagraphContent(paragraph, { includeList: false });
+        const content = parseParagraphContent(paragraph, { includeList: false }, styles);
         blocks.push(...paragraphContentToBlocks(content));
       }
       return { blocks };
@@ -575,4 +616,109 @@ function parseRunStyle(run: Element): DocxRunStyle | undefined {
   }
 
   return Object.keys(style).length > 0 ? style : undefined;
+}
+
+function resolveParagraphStyles(
+  paragraph: Element,
+  styles?: DocxStyleMap,
+): { paragraphStyle?: DocxParagraphStyle; runDefaults?: DocxRunStyle } {
+  if (!styles) {
+    return {
+      paragraphStyle: parseParagraphStyle(paragraph),
+      runDefaults: undefined,
+    };
+  }
+
+  const styleId = parseParagraphStyleId(paragraph);
+  const baseParagraph = styles.defaults.paragraph;
+  const baseRun = styles.defaults.run;
+  const fromStyles = styleId ? resolveParagraphStyle(styleId, styles) : undefined;
+  const directParagraph = parseParagraphStyle(paragraph);
+
+  return {
+    paragraphStyle: mergeParagraphStyles(baseParagraph, fromStyles?.paragraph, directParagraph),
+    runDefaults: mergeRunStyles(baseRun, fromStyles?.run),
+  };
+}
+
+function resolveParagraphStyle(
+  styleId: string,
+  styles: DocxStyleMap,
+): { paragraph?: DocxParagraphStyle; run?: DocxRunStyle } | undefined {
+  const visited = new Set<string>();
+  let currentId: string | undefined = styleId;
+  let paragraph: DocxParagraphStyle | undefined;
+  let run: DocxRunStyle | undefined;
+
+  while (currentId && !visited.has(currentId)) {
+    visited.add(currentId);
+    const style = styles.paragraph[currentId];
+    if (!style) {
+      break;
+    }
+    paragraph = mergeParagraphStyles(style.paragraph, paragraph);
+    run = mergeRunStyles(style.run, run);
+    currentId = style.basedOn;
+  }
+
+  if (!paragraph && !run) {
+    return undefined;
+  }
+  return { paragraph, run };
+}
+
+function resolveCharacterStyle(
+  styleId: string,
+  styles?: DocxStyleMap,
+): DocxRunStyle | undefined {
+  if (!styles) return undefined;
+  const visited = new Set<string>();
+  let currentId: string | undefined = styleId;
+  let run: DocxRunStyle | undefined;
+
+  while (currentId && !visited.has(currentId)) {
+    visited.add(currentId);
+    const style = styles.character[currentId];
+    if (!style) {
+      break;
+    }
+    run = mergeRunStyles(style.run, run);
+    currentId = style.basedOn;
+  }
+
+  return run;
+}
+
+function mergeParagraphStyles(
+  ...styles: Array<DocxParagraphStyle | undefined>
+): DocxParagraphStyle | undefined {
+  const merged: DocxParagraphStyle = {};
+  for (const style of styles) {
+    if (!style) continue;
+    if (style.alignment !== undefined) merged.alignment = style.alignment;
+    if (style.lineHeight !== undefined) merged.lineHeight = style.lineHeight;
+    if (style.lineHeightRule !== undefined) merged.lineHeightRule = style.lineHeightRule;
+    if (style.spacingBeforePt !== undefined) merged.spacingBeforePt = style.spacingBeforePt;
+    if (style.spacingAfterPt !== undefined) merged.spacingAfterPt = style.spacingAfterPt;
+    if (style.indentFirstLinePt !== undefined) merged.indentFirstLinePt = style.indentFirstLinePt;
+    if (style.indentLeftPt !== undefined) merged.indentLeftPt = style.indentLeftPt;
+    if (style.indentRightPt !== undefined) merged.indentRightPt = style.indentRightPt;
+  }
+  return Object.keys(merged).length > 0 ? merged : undefined;
+}
+
+function mergeRunStyles(
+  ...styles: Array<DocxRunStyle | undefined>
+): DocxRunStyle | undefined {
+  const merged: DocxRunStyle = {};
+  for (const style of styles) {
+    if (!style) continue;
+    if (style.font !== undefined) merged.font = style.font;
+    if (style.sizePt !== undefined) merged.sizePt = style.sizePt;
+    if (style.bold !== undefined) merged.bold = style.bold;
+    if (style.italic !== undefined) merged.italic = style.italic;
+    if (style.underline !== undefined) merged.underline = style.underline;
+    if (style.strikethrough !== undefined) merged.strikethrough = style.strikethrough;
+  }
+  return Object.keys(merged).length > 0 ? merged : undefined;
 }

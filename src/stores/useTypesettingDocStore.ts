@@ -5,6 +5,7 @@ import {
   parseDocxHeaderFooterXml,
   DocxBlock,
 } from "@/typesetting/docxImport";
+import { parseDocxStylesXml } from "@/typesetting/docxStyles";
 import {
   buildDocxDocumentXml,
   buildDocxHeaderXml,
@@ -43,6 +44,7 @@ export type TypesettingLayoutCache = {
 type TypesettingDocState = {
   docs: Record<string, TypesettingDoc>;
   openDoc: (path: string) => Promise<void>;
+  openDocFromBytes: (path: string, bytes: Uint8Array) => Promise<void>;
   updateDocBlocks: (path: string, blocks: DocxBlock[]) => void;
   updateStyleRefs: (path: string, refs: TypesettingStyleRefs) => void;
   updateLayoutSummary: (path: string, summary: string) => void;
@@ -82,35 +84,53 @@ const buildDocxBytes = (doc: TypesettingDoc): Uint8Array => {
   });
 };
 
+const parseDocxBytes = (path: string, bytes: Uint8Array): TypesettingDoc => {
+  const pkg = parseDocxPackage(bytes);
+  const styleMap = parseDocxStylesXml(pkg.stylesXml);
+
+  const blocks = parseDocxDocumentXml(pkg.documentXml, styleMap);
+  const headerBlocks = pkg.headers.length > 0
+    ? parseDocxHeaderFooterXml(pkg.headers[0], styleMap)
+    : [];
+  const footerBlocks = pkg.footers.length > 0
+    ? parseDocxHeaderFooterXml(pkg.footers[0], styleMap)
+    : [];
+
+  return {
+    path,
+    blocks: blocks.length > 0 ? blocks : emptyDoc(path).blocks,
+    headerBlocks,
+    footerBlocks,
+    relationships: pkg.relationships,
+    media: pkg.media,
+    isDirty: false,
+    styleRefs: {},
+  };
+};
+
 export const useTypesettingDocStore = create<TypesettingDocState>((set, get) => ({
   docs: {},
 
   openDoc: async (path: string) => {
     const base64 = await readBinaryFileBase64(path);
     const bytes = decodeBase64ToBytes(base64);
-    const pkg = parseDocxPackage(bytes);
-
-    const blocks = parseDocxDocumentXml(pkg.documentXml);
-    const headerBlocks = pkg.headers.length > 0
-      ? parseDocxHeaderFooterXml(pkg.headers[0])
-      : [];
-    const footerBlocks = pkg.footers.length > 0
-      ? parseDocxHeaderFooterXml(pkg.footers[0])
-      : [];
+    const doc = parseDocxBytes(path, bytes);
 
     set((state) => ({
       docs: {
         ...state.docs,
-        [path]: {
-          path,
-          blocks: blocks.length > 0 ? blocks : emptyDoc(path).blocks,
-          headerBlocks,
-          footerBlocks,
-          relationships: pkg.relationships,
-          media: pkg.media,
-          isDirty: false,
-          styleRefs: {},
-        },
+        [path]: doc,
+      },
+    }));
+  },
+
+  openDocFromBytes: async (path: string, bytes: Uint8Array) => {
+    const doc = parseDocxBytes(path, bytes);
+
+    set((state) => ({
+      docs: {
+        ...state.docs,
+        [path]: doc,
       },
     }));
   },

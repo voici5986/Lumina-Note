@@ -4,8 +4,11 @@ import { diffPdfMetrics, PdfMetrics } from "../src/typesetting/pdfMetrics";
 
 async function loadPdfMetrics(path: string): Promise<PdfMetrics> {
   const data = await readFile(path);
+  const bytes = data instanceof Uint8Array
+    ? Uint8Array.from(data)
+    : new Uint8Array(data);
   const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const pdf = await getDocument({ data, disableWorker: true }).promise;
+  const pdf = await getDocument({ data: bytes, disableWorker: true }).promise;
   const pages = [];
 
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {

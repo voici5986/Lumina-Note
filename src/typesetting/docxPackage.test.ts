@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { strToU8, unzipSync, zipSync } from "fflate";
 import { buildDocxPackage, parseDocxPackage } from "./docxPackage";
@@ -20,8 +21,19 @@ const FOOTER_XML = `<?xml version="1.0" encoding="UTF-8"?>
 </w:ftr>`;
 
 describe("docxPackage", () => {
-  const hasEntry = (entries: Record<string, Uint8Array>, name: string) =>
-    Object.keys(entries).some((key) => key.replace(/^[\\/]+/, "") === name);
+  const normalizeKey = (value: string) =>
+    value
+      .replace(/\\/g, "/")
+      .replace(/^\.\//, "")
+      .replace(/^[\\/]+/, "")
+      .replace(/\0/g, "")
+      .trim()
+      .toLowerCase();
+
+  const hasEntry = (entries: Record<string, Uint8Array>, name: string) => {
+    const target = normalizeKey(name);
+    return Object.keys(entries).some((key) => normalizeKey(key) === target);
+  };
 
   it("parses a minimal docx package", () => {
     const zipBytes = zipSync({

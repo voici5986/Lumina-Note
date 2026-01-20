@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect } from "vitest";
 import { parseDocxDocumentXml, parseDocxHeaderFooterXml } from "./docxImport";
+import { parseDocxStylesXml } from "./docxStyles";
 
 describe("parseDocxDocumentXml", () => {
   it("parses headings, paragraphs, and run font styles", () => {
@@ -65,6 +66,63 @@ describe("parseDocxDocumentXml", () => {
         },
       ]);
     }
+  });
+
+  it("applies paragraph and run styles from styles.xml", () => {
+    const stylesXml = `<?xml version="1.0" encoding="UTF-8"?>
+      <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:docDefaults>
+          <w:rPrDefault>
+            <w:rPr>
+              <w:rFonts w:ascii="Times New Roman" />
+              <w:sz w:val="24" />
+            </w:rPr>
+          </w:rPrDefault>
+          <w:pPrDefault>
+            <w:pPr>
+              <w:jc w:val="left" />
+            </w:pPr>
+          </w:pPrDefault>
+        </w:docDefaults>
+        <w:style w:type="paragraph" w:styleId="Normal">
+          <w:rPr>
+            <w:sz w:val="24" />
+          </w:rPr>
+        </w:style>
+        <w:style w:type="paragraph" w:styleId="Heading1">
+          <w:basedOn w:val="Normal" />
+          <w:pPr>
+            <w:jc w:val="center" />
+          </w:pPr>
+          <w:rPr>
+            <w:sz w:val="36" />
+          </w:rPr>
+        </w:style>
+      </w:styles>`;
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:body>
+          <w:p>
+            <w:pPr>
+              <w:pStyle w:val="Heading1" />
+            </w:pPr>
+            <w:r>
+              <w:t>Styled Title</w:t>
+            </w:r>
+          </w:p>
+        </w:body>
+      </w:document>`;
+
+    const styles = parseDocxStylesXml(stylesXml);
+    const blocks = parseDocxDocumentXml(xml, styles);
+    expect(blocks).toHaveLength(1);
+    const heading = blocks[0];
+    expect(heading.type).toBe("heading");
+    if (heading.type !== "heading") return;
+    expect(heading.paragraphStyle?.alignment).toBe("center");
+    expect(heading.runs[0].style?.sizePt).toBe(18);
+    expect(heading.runs[0].style?.font).toBe("Times New Roman");
   });
 
   it("handles tabs, line breaks, and missing style values", () => {

@@ -1,10 +1,14 @@
+// @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { JSDOM } from "jsdom";
 import { writeBinaryFile } from "@/lib/tauri";
 import {
   useTypesettingDocStore,
   TypesettingDoc,
 } from "@/stores/useTypesettingDocStore";
 import { DocxBlock } from "@/typesetting/docxImport";
+import { buildDocxPackage } from "@/typesetting/docxPackage";
+import { buildDocxDocumentXml } from "@/typesetting/docxExport";
 import type { DocOp } from "@/typesetting/docOps";
 
 vi.mock("@/lib/tauri", () => ({
@@ -26,6 +30,10 @@ const buildDoc = (path: string, overrides: Partial<TypesettingDoc> = {}): Typese
 
 describe("useTypesettingDocStore", () => {
   beforeEach(() => {
+    if (!globalThis.DOMParser) {
+      const dom = new JSDOM();
+      globalThis.DOMParser = dom.window.DOMParser;
+    }
     useTypesettingDocStore.setState({ docs: {} });
   });
 
@@ -111,6 +119,20 @@ describe("useTypesettingDocStore", () => {
 
     const doc = useTypesettingDocStore.getState().docs[path];
     expect(doc?.lastOp).toEqual(op);
+    expect(doc?.isDirty).toBe(false);
+  });
+
+  it("loads a document from raw docx bytes", async () => {
+    const path = "C:/vault/imported.docx";
+    const blocks = [{ type: "paragraph", runs: [{ text: "Hello" }] } as DocxBlock];
+    const documentXml = buildDocxDocumentXml(blocks);
+    const bytes = buildDocxPackage({ documentXml });
+
+    await useTypesettingDocStore.getState().openDocFromBytes(path, bytes);
+
+    const doc = useTypesettingDocStore.getState().docs[path];
+    expect(doc).toBeTruthy();
+    expect(doc?.blocks[0]).toEqual(blocks[0]);
     expect(doc?.isDirty).toBe(false);
   });
 });

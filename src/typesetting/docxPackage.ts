@@ -2,6 +2,7 @@ import { strToU8, unzipSync, zipSync } from "fflate";
 
 export type DocxPackage = {
   documentXml: string;
+  stylesXml?: string;
   headers: string[];
   footers: string[];
   relationships: Record<string, string>;
@@ -10,6 +11,7 @@ export type DocxPackage = {
 
 type DocxPackageInput = {
   documentXml: string;
+  stylesXml?: string;
   headers?: string[];
   footers?: string[];
   relationships?: Record<string, string>;
@@ -41,6 +43,7 @@ export function parseDocxPackage(bytes: Uint8Array): DocxPackage {
     throw new Error("docx package missing word/document.xml");
   }
 
+  const stylesXml = decodeEntry(entries["word/styles.xml"]) ?? undefined;
   const headers = collectXmlEntries(entries, "word/header");
   const footers = collectXmlEntries(entries, "word/footer");
   const relationships = parseRelationships(entries["word/_rels/document.xml.rels"]);
@@ -48,6 +51,7 @@ export function parseDocxPackage(bytes: Uint8Array): DocxPackage {
 
   return {
     documentXml,
+    stylesXml,
     headers,
     footers,
     relationships,
@@ -72,6 +76,10 @@ export function buildDocxPackage(input: DocxPackageInput): Uint8Array {
     "word/_rels/document.xml.rels": strToU8(docRels),
   };
 
+  if (input.stylesXml) {
+    entries["word/styles.xml"] = strToU8(input.stylesXml);
+  }
+
   headers.forEach((xml, index) => {
     entries[`word/header${index + 1}.xml`] = strToU8(xml);
   });
@@ -93,11 +101,27 @@ function decodeEntry(entry?: Uint8Array): string | null {
   return new TextDecoder("utf-8").decode(entry);
 }
 
+function normalizeEntryKey(key: string): string {
+  return key
+    .replace(/\\/g, "/")
+    .replace(/^\.\//, "")
+    .replace(/^[\\/]+/, "")
+    .replace(/\0/g, "")
+    .trim();
+}
+
 function normalizeEntries(entries: Record<string, Uint8Array>): Record<string, Uint8Array> {
   const normalized: Record<string, Uint8Array> = {};
   for (const [key, value] of Object.entries(entries)) {
-    const cleanKey = key.replace(/^[\\/]+/, "");
+    const cleanKey = normalizeEntryKey(key);
+    if (!cleanKey) {
+      continue;
+    }
     normalized[cleanKey] = value;
+    const lowerKey = cleanKey.toLowerCase();
+    if (!normalized[lowerKey]) {
+      normalized[lowerKey] = value;
+    }
   }
   return normalized;
 }

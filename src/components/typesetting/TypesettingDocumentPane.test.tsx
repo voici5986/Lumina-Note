@@ -404,47 +404,25 @@ describe("TypesettingDocumentPane", () => {
       },
     });
 
-    const encoder = new TextEncoder();
-    const beforeBytes = encoder.encode("Intro").length;
-    const placeholderBytes = encoder.encode(DOCX_IMAGE_PLACEHOLDER).length;
-    const afterBytes = encoder.encode("Outro").length;
-    const line2Start = beforeBytes + 1;
-    const line2End = line2Start + placeholderBytes;
-    const line3Start = line2End + 1;
-    const line3End = line3Start + afterBytes;
-
     const layoutSpy = vi
       .spyOn(tauri, "getTypesettingLayoutText")
-      .mockResolvedValue({
-        lines: [
-          {
-            start: 0,
-            end: 5,
-            width: 200,
-            x_offset: 0,
-            y_offset: 0,
-            start_byte: 0,
-            end_byte: beforeBytes,
-          },
-          {
-            start: 6,
-            end: 7,
-            width: 120,
-            x_offset: 0,
-            y_offset: 20,
-            start_byte: line2Start,
-            end_byte: line2End,
-          },
-          {
-            start: 8,
-            end: 13,
-            width: 200,
-            x_offset: 0,
-            y_offset: 40,
-            start_byte: line3Start,
-            end_byte: line3End,
-          },
-        ],
+      .mockImplementation(async ({ text }) => {
+        const bytes = new TextEncoder().encode(text).length;
+        return {
+          lines: text.length > 0
+            ? [
+                {
+                  start: 0,
+                  end: text.length,
+                  width: 200,
+                  x_offset: 0,
+                  y_offset: 0,
+                  start_byte: 0,
+                  end_byte: bytes,
+                },
+              ]
+            : [],
+        };
       });
 
     render(<TypesettingDocumentPane path={path} />);

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
-import { writeFile } from "@tauri-apps/plugin-fs";
+import { exists, writeFile } from "@tauri-apps/plugin-fs";
 import { join, tempDir } from "@tauri-apps/api/path";
 import { open as openExternal } from "@tauri-apps/plugin-shell";
 import { useTypesettingDocStore } from "@/stores/useTypesettingDocStore";
@@ -23,13 +23,16 @@ import {
   docxBlocksToPlainText,
   DOCX_IMAGE_PLACEHOLDER,
 } from "@/typesetting/docxText";
+import { getDefaultPreviewPageMm } from "@/typesetting/previewDefaults";
 import { docOpFromBeforeInput } from "@/typesetting/docOps";
 import { sliceUtf8 } from "@/typesetting/utf8";
 import type { TypesettingDoc } from "@/stores/useTypesettingDocStore";
-import type { DocxBlock, DocxImageBlock } from "@/typesetting/docxImport";
+import type { DocxBlock, DocxImageBlock, DocxListBlock, DocxParagraphStyle, DocxRun, DocxTableBlock } from "@/typesetting/docxImport";
 
 type TypesettingDocumentPaneProps = {
   path: string;
+  onExportReady?: ((exporter: (() => Promise<Uint8Array>) | null) => void) | null;
+  autoOpen?: boolean;
 };
 
 const DEFAULT_DPI = 96;
@@ -39,6 +42,20 @@ const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2;
 const ZOOM_STEP = 0.1;
 const EMU_PER_INCH = 914400;
+const WINDOWS_FONT_DIR = "C:\\Windows\\Fonts";
+
+const FONT_FAMILY_FILES: Record<string, string[]> = {
+  "simsun": ["simsun.ttc"],
+  "宋体": ["simsun.ttc"],
+  "simhei": ["simhei.ttf"],
+  "黑体": ["simhei.ttf"],
+  "microsoft yahei": ["msyh.ttc", "msyh.ttf"],
+  "微软雅黑": ["msyh.ttc", "msyh.ttf"],
+  "times new roman": ["times.ttf", "timesbd.ttf"],
+  "arial": ["arial.ttf"],
+  "calibri": ["calibri.ttf"],
+  "cambria": ["cambria.ttc"],
+};
 
 type LayoutRender = {
   text: string;
@@ -52,6 +69,8 @@ type RenderedLine = {
   x: number;
   y: number;
   width: number;
+  fontSizePx?: number;
+  lineHeightPx?: number;
 };
 
 type RenderedImage = {
@@ -100,21 +119,25 @@ const stripImagePlaceholder = (value: string) =>
 const buildRenderedLines = (
   text: string,
   lines: TypesettingTextLine[],
+  lineStyles?: Array<{ fontSizePx: number; lineHeightPx: number }>,
 ): RenderedLine[] => {
   if (!text || lines.length === 0) return [];
   const rendered: RenderedLine[] = [];
-  for (const line of lines) {
+  for (const [index, line] of lines.entries()) {
     const raw = sliceUtf8(text, line.start_byte, line.end_byte);
     if (!raw) continue;
     const cleaned = stripImagePlaceholder(raw);
     if (!cleaned && raw.includes(DOCX_IMAGE_PLACEHOLDER)) {
       continue;
     }
+    const style = lineStyles?.[index];
     rendered.push({
       text: cleaned,
       x: line.x_offset,
       y: line.y_offset,
       width: line.width,
+      fontSizePx: style?.fontSizePx,
+      lineHeightPx: style?.lineHeightPx,
     });
   }
   return rendered;
@@ -207,6 +230,21 @@ const imageMimeType = (path: string): string | null => {
   }
 };
 
+const normalizeFontFamily = (value: string): string =>
+  value
+    .trim()
+    .replace(/^['"]|['"]$/g, "")
+    .toLowerCase();
+
+const fontCandidatesForFamily = (family: string): string[] => {
+  const normalized = normalizeFontFamily(family);
+  const direct = FONT_FAMILY_FILES[normalized];
+  if (direct) return direct;
+  const noSpaces = normalized.replace(/\s+/g, "");
+  const alias = FONT_FAMILY_FILES[noSpaces];
+  return alias ?? [];
+};
+
 const resolveDocxImage = (
   doc: TypesettingDoc,
   embedId: string,
@@ -227,7 +265,179 @@ const resolveDocxImage = (
   return { src: `data:${mime};base64,${base64}`, alt: embedId };
 };
 
-export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) {
+const getUtf8ByteLength = (value: string): number =>
+  new TextEncoder().encode(value).length;
+
+type ParagraphSegment = {
+  text: string;
+  options: ReturnType<typeof docxBlocksToLayoutTextOptions>;
+  lineHeightPx: number;
+  fontSizePx: number;
+  fontFamily?: string;
+};
+
+const joinRunsText = (runs: DocxRun[]) => runs.map((run) => run.text).join("");
+
+const firstRunFontFamilyFromRuns = (runs: DocxRun[]): string | undefined =>
+  runs.find((run) => run.style?.font)?.style?.font;
+
+const firstRunFontFamilyFromBlocks = (blocks: DocxBlock[]): string | undefined => {
+  for (const block of blocks) {
+    switch (block.type) {
+      case "paragraph":
+      case "heading": {
+        const font = firstRunFontFamilyFromRuns(block.runs);
+        if (font) return font;
+        break;
+      }
+      case "list": {
+        for (const item of block.items) {
+          const font = firstRunFontFamilyFromRuns(item.runs);
+          if (font) return font;
+        }
+        break;
+      }
+      case "table":
+        for (const row of block.rows) {
+          for (const cell of row.cells) {
+            const font = firstRunFontFamilyFromBlocks(cell.blocks);
+            if (font) return font;
+          }
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  return undefined;
+};
+
+const buildParagraphSegment = (
+  runs: DocxRun[],
+  paragraphStyle: DocxParagraphStyle | undefined,
+  defaultFontSizePx: number,
+  defaultLineHeightPx: number,
+  dpi: number,
+): ParagraphSegment => {
+  const block: DocxBlock = {
+    type: "paragraph",
+    runs,
+    paragraphStyle,
+  };
+  const text = joinRunsText(runs) || " ";
+  return {
+    text,
+    options: docxBlocksToLayoutTextOptions([block], dpi),
+    lineHeightPx: docxBlocksToLineHeightPx([block], defaultLineHeightPx, dpi),
+    fontSizePx: docxBlocksToFontSizePx([block], defaultFontSizePx, dpi),
+    fontFamily: firstRunFontFamilyFromRuns(runs),
+  };
+};
+
+const buildSegmentsFromList = (
+  block: DocxListBlock,
+  defaultFontSizePx: number,
+  defaultLineHeightPx: number,
+  dpi: number,
+): ParagraphSegment[] =>
+  block.items.map((item) =>
+    buildParagraphSegment(
+      item.runs,
+      item.paragraphStyle,
+      defaultFontSizePx,
+      defaultLineHeightPx,
+      dpi,
+    ),
+  );
+
+const buildSegmentsFromTable = (
+  block: DocxTableBlock,
+  defaultFontSizePx: number,
+  defaultLineHeightPx: number,
+  dpi: number,
+): ParagraphSegment[] => {
+  const styleBlock: DocxBlock = block;
+  const options = docxBlocksToLayoutTextOptions([styleBlock], dpi);
+  const lineHeightPx = docxBlocksToLineHeightPx(
+    [styleBlock],
+    defaultLineHeightPx,
+    dpi,
+  );
+  const fontSizePx = docxBlocksToFontSizePx([styleBlock], defaultFontSizePx, dpi);
+  const fontFamily = firstRunFontFamilyFromBlocks([block]);
+  return block.rows.map((row) => {
+    const rowText = row.cells
+      .map((cell) => docxBlocksToPlainText(cell.blocks).replace(/\n+/g, " ").trim())
+      .join("\t");
+    return {
+      text: rowText || " ",
+      options,
+      lineHeightPx,
+      fontSizePx,
+      fontFamily,
+    };
+  });
+};
+
+const buildSegmentsFromBlocks = (
+  blocks: DocxBlock[],
+  defaultFontSizePx: number,
+  defaultLineHeightPx: number,
+  dpi: number,
+): ParagraphSegment[] => {
+  const segments: ParagraphSegment[] = [];
+  for (const block of blocks) {
+    switch (block.type) {
+      case "paragraph":
+      case "heading":
+        segments.push(
+          buildParagraphSegment(
+            block.runs,
+            block.paragraphStyle,
+            defaultFontSizePx,
+            defaultLineHeightPx,
+            dpi,
+          ),
+        );
+        break;
+      case "list":
+        segments.push(
+          ...buildSegmentsFromList(
+            block,
+            defaultFontSizePx,
+            defaultLineHeightPx,
+            dpi,
+          ),
+        );
+        break;
+      case "table":
+        segments.push(
+          ...buildSegmentsFromTable(
+            block,
+            defaultFontSizePx,
+            defaultLineHeightPx,
+            dpi,
+          ),
+        );
+        break;
+      case "image": {
+        const size = imageBlockSizePx(block, defaultLineHeightPx);
+        segments.push({
+          text: DOCX_IMAGE_PLACEHOLDER,
+          options: { align: "left", firstLineIndentPx: 0, spaceBeforePx: 0, spaceAfterPx: 0 },
+          lineHeightPx: Math.max(defaultLineHeightPx, size.height),
+          fontSizePx: defaultFontSizePx,
+        });
+        break;
+      }
+      default:
+        break;
+    }
+  }
+  return segments;
+};
+
+export function TypesettingDocumentPane({ path, onExportReady, autoOpen = true }: TypesettingDocumentPaneProps) {
   const { save: saveActiveFile, markTypesettingTabDirty } = useFileStore();
   const {
     docs,
@@ -254,13 +464,31 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
   const [bodyLayout, setBodyLayout] = useState<LayoutRender | null>(null);
   const [headerLayout, setHeaderLayout] = useState<LayoutRender | null>(null);
   const [footerLayout, setFooterLayout] = useState<LayoutRender | null>(null);
+  const [bodyLineStyles, setBodyLineStyles] = useState<Array<{ fontSizePx: number; lineHeightPx: number }>>([]);
+  const [fallbackContentHeightPx, setFallbackContentHeightPx] = useState<number | null>(null);
+  const [pageMounted, setPageMounted] = useState(false);
   const editableRef = useRef<HTMLDivElement | null>(null);
+  const pageRef = useRef<HTMLDivElement | null>(null);
+  const fontPathCache = useRef(new Map<string, string>());
   const layoutRunRef = useRef(0);
+  const exportReady = Boolean(pageMm && pageMounted);
+
+  const handlePageRef = useCallback((node: HTMLDivElement | null) => {
+    pageRef.current = node;
+    setPageMounted(Boolean(node));
+  }, []);
 
   useEffect(() => {
+    if (!autoOpen) return;
     if (doc) return;
     openDoc(path).catch((err) => setError(String(err)));
-  }, [doc, openDoc, path]);
+  }, [autoOpen, doc, openDoc, path]);
+
+  useEffect(() => {
+    if (doc && error) {
+      setError(null);
+    }
+  }, [doc, error]);
 
   useEffect(() => {
     let active = true;
@@ -272,7 +500,8 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
       })
       .catch((err) => {
         if (active) {
-          setError(String(err));
+          console.warn("Typesetting preview fallback:", err);
+          setPageMm(getDefaultPreviewPageMm());
         }
       });
     return () => {
@@ -280,28 +509,46 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
     };
   }, []);
 
+  const resolveFontPath = async (
+    family: string | undefined,
+    fallbackPath: string,
+  ): Promise<string> => {
+    if (!family) return fallbackPath;
+    const normalized = normalizeFontFamily(family);
+    const cached = fontPathCache.current.get(normalized);
+    if (cached) {
+      return cached;
+    }
+    const candidates = fontCandidatesForFamily(family);
+    for (const fileName of candidates) {
+      const candidatePath = `${WINDOWS_FONT_DIR}\\${fileName}`;
+      try {
+        if (await exists(candidatePath)) {
+          fontPathCache.current.set(normalized, candidatePath);
+          return candidatePath;
+        }
+      } catch {
+        // Ignore permission errors and fall back to fixture font.
+      }
+    }
+    fontPathCache.current.set(normalized, fallbackPath);
+    return fallbackPath;
+  };
+
   useEffect(() => {
     if (!doc || !pageMm) {
       setBodyLayout(null);
       setHeaderLayout(null);
       setFooterLayout(null);
+      setBodyLineStyles([]);
       return;
     }
     setLayoutError(null);
 
-    const text = docxBlocksToPlainText(doc.blocks);
-    const lineHeightPx = docxBlocksToLineHeightPx(
-      doc.blocks,
-      DEFAULT_LINE_HEIGHT_PX,
-      DEFAULT_DPI,
-    );
-    const fontSizePx = docxBlocksToFontSizePx(
+    const segments = buildSegmentsFromBlocks(
       doc.blocks,
       DEFAULT_FONT_SIZE_PX,
-      DEFAULT_DPI,
-    );
-    const layoutOptions = docxBlocksToLayoutTextOptions(
-      doc.blocks,
+      DEFAULT_LINE_HEIGHT_PX,
       DEFAULT_DPI,
     );
     const headerText = docxBlocksToPlainText(doc.headerBlocks);
@@ -318,7 +565,18 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
 
     const runId = ++layoutRunRef.current;
     const handler = setTimeout(async () => {
-      const fontPath = await getTypesettingFixtureFontPath();
+      let fontPath: string | null = null;
+      try {
+        fontPath = await getTypesettingFixtureFontPath();
+      } catch (err) {
+        setLayoutError(String(err));
+        updateLayoutSummary(path, "Layout unavailable");
+        setBodyLayout(null);
+        setHeaderLayout(null);
+        setFooterLayout(null);
+        setBodyLineStyles([]);
+        return;
+      }
       if (layoutRunRef.current !== runId) return;
       if (!fontPath) {
         setLayoutError("missing fixture font");
@@ -326,13 +584,20 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
         setBodyLayout(null);
         setHeaderLayout(null);
         setFooterLayout(null);
+        setBodyLineStyles([]);
         return;
       }
       try {
+        const headerFontFamily = firstRunFontFamilyFromBlocks(doc.headerBlocks);
+        const footerFontFamily = firstRunFontFamilyFromBlocks(doc.footerBlocks);
+        const resolvedHeaderFontPath = await resolveFontPath(headerFontFamily, fontPath);
+        const resolvedFooterFontPath = await resolveFontPath(footerFontFamily, fontPath);
+
         const buildHeaderFooterLayout = async (
           blocks: DocxBlock[],
           content: string,
           maxWidthMm: number,
+          fontPathOverride: string,
         ): Promise<LayoutRender> => {
           const fontSize = docxBlocksToFontSizePx(
             blocks,
@@ -347,7 +612,7 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
           const options = docxBlocksToLayoutTextOptions(blocks, DEFAULT_DPI);
           const layout = await getTypesettingLayoutText({
             text: content,
-            fontPath,
+            fontPath: fontPathOverride,
             maxWidth: mmToPx(maxWidthMm),
             lineHeight,
             fontSize,
@@ -365,32 +630,67 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
         };
 
         const maxWidth = mmToPx(pageMm.body.width_mm);
-        const layoutData = await getTypesettingLayoutText({
-          text,
-          fontPath,
-          maxWidth,
-          lineHeight: lineHeightPx,
-          fontSize: fontSizePx,
-          align: layoutOptions.align,
-          firstLineIndent: layoutOptions.firstLineIndentPx,
-          spaceBefore: layoutOptions.spaceBeforePx,
-          spaceAfter: layoutOptions.spaceAfterPx,
-        });
+        const combinedLines: TypesettingTextLine[] = [];
+        const lineStyles: Array<{ fontSizePx: number; lineHeightPx: number }> = [];
+        const textParts: string[] = [];
+        let yOffset = 0;
+        let byteOffset = 0;
+
+        for (const segment of segments) {
+          const segmentFontPath = await resolveFontPath(segment.fontFamily, fontPath);
+          const layoutData = await getTypesettingLayoutText({
+            text: segment.text,
+            fontPath: segmentFontPath,
+            maxWidth,
+            lineHeight: segment.lineHeightPx,
+            fontSize: segment.fontSizePx,
+            align: segment.options.align,
+            firstLineIndent: segment.options.firstLineIndentPx,
+            spaceBefore: segment.options.spaceBeforePx,
+            spaceAfter: segment.options.spaceAfterPx,
+          });
+          if (layoutRunRef.current !== runId) return;
+
+          for (const line of layoutData.lines) {
+            combinedLines.push({
+              ...line,
+              y_offset: line.y_offset + yOffset,
+              start_byte: line.start_byte + byteOffset,
+              end_byte: line.end_byte + byteOffset,
+            });
+            lineStyles.push({
+              fontSizePx: segment.fontSizePx,
+              lineHeightPx: segment.lineHeightPx,
+            });
+          }
+
+          const paragraphHeight = layoutData.lines.length > 0
+            ? layoutData.lines[layoutData.lines.length - 1].y_offset
+              + segment.lineHeightPx
+              + segment.options.spaceAfterPx
+            : segment.options.spaceBeforePx
+              + segment.lineHeightPx
+              + segment.options.spaceAfterPx;
+          yOffset += paragraphHeight;
+
+          textParts.push(segment.text);
+          textParts.push("\n");
+          byteOffset += getUtf8ByteLength(segment.text) + getUtf8ByteLength("\n");
+        }
+
+        const text = textParts.join("");
+        const layoutData = { lines: combinedLines };
+        const defaultFontSize = segments[0]?.fontSizePx ?? DEFAULT_FONT_SIZE_PX;
+        const defaultLineHeight = segments[0]?.lineHeightPx ?? DEFAULT_LINE_HEIGHT_PX;
         if (layoutRunRef.current !== runId) return;
         setBodyLayout({
           text,
-          fontSizePx,
-          lineHeightPx,
+          fontSizePx: defaultFontSize,
+          lineHeightPx: defaultLineHeight,
           lines: layoutData.lines,
         });
-        const contentHeightPx = layoutData.lines.length > 0
-          ? Math.max(
-              0,
-              layoutData.lines[layoutData.lines.length - 1].y_offset
-                + lineHeightPx
-                + layoutOptions.spaceAfterPx,
-            )
-          : 0;
+        setBodyLineStyles(lineStyles);
+        const contentHeightPx = Math.max(0, yOffset);
         updateLayoutSummary(path, `Layout: ${layoutData.lines.length} lines`);
         updateLayoutCache(path, {
           lineCount: layoutData.lines.length,
@@ -403,18 +703,31 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
           content: string,
           widthMm: number,
           enabled: boolean,
+          fontPathOverride: string,
         ): Promise<LayoutRender | null> => {
           if (!enabled) return null;
           try {
-            return await buildHeaderFooterLayout(blocks, content, widthMm);
+            return await buildHeaderFooterLayout(blocks, content, widthMm, fontPathOverride);
           } catch {
             return null;
           }
         };
 
         const [nextHeaderLayout, nextFooterLayout] = await Promise.all([
-          safeLayout(doc.headerBlocks, headerText, pageMm.header.width_mm, headerUsesEngine),
-          safeLayout(doc.footerBlocks, footerText, pageMm.footer.width_mm, footerUsesEngine),
+          safeLayout(
+            doc.headerBlocks,
+            headerText,
+            pageMm.header.width_mm,
+            headerUsesEngine,
+            resolvedHeaderFontPath,
+          ),
+          safeLayout(
+            doc.footerBlocks,
+            footerText,
+            pageMm.footer.width_mm,
+            footerUsesEngine,
+            resolvedFooterFontPath,
+          ),
         ]);
         if (layoutRunRef.current !== runId) return;
         setHeaderLayout(nextHeaderLayout);
@@ -426,6 +739,7 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
         setBodyLayout(null);
         setHeaderLayout(null);
         setFooterLayout(null);
+        setBodyLineStyles([]);
       }
     }, 300);
 
@@ -464,13 +778,50 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
 
   const bodyLines = useMemo(() => {
     if (!bodyLayout) return [];
-    return buildRenderedLines(bodyLayout.text, bodyLayout.lines);
-  }, [bodyLayout]);
+    return buildRenderedLines(bodyLayout.text, bodyLayout.lines, bodyLineStyles);
+  }, [bodyLayout, bodyLineStyles]);
+
+  const bodyPageHeightPx = useMemo(() => {
+    if (!pageMm) return null;
+    return mmToPx(pageMm.body.height_mm);
+  }, [pageMm]);
+
+  const pagedBodyLines = useMemo(() => {
+    if (!bodyLayout || !bodyPageHeightPx) return bodyLines;
+    const pageStart = (currentPage - 1) * bodyPageHeightPx;
+    const pageEnd = pageStart + bodyPageHeightPx;
+    return bodyLines
+      .filter(
+        (line) => {
+          const lineHeight = line.lineHeightPx ?? bodyLayout.lineHeightPx;
+          return line.y + lineHeight > pageStart && line.y < pageEnd;
+        },
+      )
+      .map((line) => ({
+        ...line,
+        y: line.y - pageStart,
+      }));
+  }, [bodyLines, bodyLayout, bodyPageHeightPx, currentPage]);
 
   const bodyImages = useMemo(() => {
     if (!doc) return [];
     return buildRenderedImages(bodyLayout, doc.blocks, imageResolver);
   }, [bodyLayout, doc, imageResolver]);
+
+  const pagedBodyImages = useMemo(() => {
+    if (!bodyPageHeightPx) return bodyImages;
+    const pageStart = (currentPage - 1) * bodyPageHeightPx;
+    const pageEnd = pageStart + bodyPageHeightPx;
+    return bodyImages
+      .filter(
+        (image) =>
+          image.y + image.height > pageStart && image.y < pageEnd,
+      )
+      .map((image) => ({
+        ...image,
+        y: image.y - pageStart,
+      }));
+  }, [bodyImages, bodyPageHeightPx, currentPage]);
 
   const headerImages = useMemo(() => {
     if (!doc) return [];
@@ -490,8 +841,42 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
   const footerUsesEngine = footerLines.length > 0 || footerImages.length > 0;
 
   useEffect(() => {
+    if (bodyUsesEngine) return;
+    if (!editableRef.current || !bodyPageHeightPx) return;
+    editableRef.current.scrollTop = (currentPage - 1) * bodyPageHeightPx;
+  }, [bodyUsesEngine, bodyPageHeightPx, currentPage]);
+
+  const measureFallbackHeight = () => {
+    const el = editableRef.current;
+    if (!el) return;
+    const height = el.scrollHeight;
+    if (Number.isFinite(height) && height > 0) {
+      setFallbackContentHeightPx(height);
+    }
+  };
+
+  useEffect(() => {
     if (!editableRef.current || isEditing) return;
     editableRef.current.innerHTML = html;
+    requestAnimationFrame(() => measureFallbackHeight());
+  }, [html, isEditing]);
+
+  useEffect(() => {
+    const el = editableRef.current;
+    if (!el) return;
+    const measure = () => {
+      const height = el.scrollHeight;
+      if (Number.isFinite(height) && height > 0) {
+        setFallbackContentHeightPx(height);
+      }
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const observer = new ResizeObserver(() => measure());
+    observer.observe(el);
+    return () => observer.disconnect();
   }, [html, isEditing]);
 
   const pagePx = useMemo(() => {
@@ -517,8 +902,14 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
   const totalPages = useMemo(() => {
     if (!pageMm) return 1;
     const bodyHeightPx = Math.max(1, mmToPx(pageMm.body.height_mm));
+    if (!bodyUsesEngine) {
+      if (Number.isFinite(fallbackContentHeightPx) && fallbackContentHeightPx && fallbackContentHeightPx > 0) {
+        return Math.max(1, Math.ceil(fallbackContentHeightPx / bodyHeightPx));
+      }
+      return 1;
+    }
     const contentHeightPx = doc?.layoutCache?.contentHeightPx;
-    if (Number.isFinite(contentHeightPx) && contentHeightPx > 0) {
+    if (Number.isFinite(contentHeightPx) && contentHeightPx && contentHeightPx > 0) {
       return Math.max(1, Math.ceil(contentHeightPx / bodyHeightPx));
     }
     const lineCount = doc?.layoutCache?.lineCount ?? 0;
@@ -528,7 +919,13 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
     );
     const safeLineCount = Math.max(1, lineCount);
     return Math.max(1, Math.ceil(safeLineCount / linesPerPage));
-  }, [doc?.layoutCache?.contentHeightPx, doc?.layoutCache?.lineCount, pageMm]);
+  }, [
+    bodyUsesEngine,
+    doc?.layoutCache?.contentHeightPx,
+    doc?.layoutCache?.lineCount,
+    fallbackContentHeightPx,
+    pageMm,
+  ]);
 
   useEffect(() => {
     setCurrentPage((prev) => Math.min(Math.max(1, prev), totalPages));
@@ -539,6 +936,7 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
     const blocks = docxHtmlToBlocks(editableRef.current);
     updateDocBlocks(path, blocks);
     markTypesettingTabDirty(path, true);
+    measureFallbackHeight();
   };
 
   const startEditing = () => {
@@ -554,6 +952,94 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
     }
   };
 
+  const handleEditableScroll = () => {
+    if (bodyUsesEngine || !editableRef.current || !bodyPageHeightPx) return;
+    const top = editableRef.current.scrollTop;
+    const page = Math.max(1, Math.floor(top / bodyPageHeightPx) + 1);
+    setCurrentPage((prev) => (prev === page ? prev : page));
+    measureFallbackHeight();
+  };
+
+  const waitForNextPaint = () =>
+    new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+
+  const renderPagesToPdfBytes = useCallback(async (): Promise<Uint8Array | null> => {
+    if (!pageRef.current || !pageMm) return null;
+    if (isEditing) {
+      editableRef.current?.blur();
+      setIsEditing(false);
+      await waitForNextPaint();
+    }
+    const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+      import("html2canvas"),
+      import("jspdf"),
+    ]);
+    const pageWidthMm = pageMm.page.width_mm;
+    const pageHeightMm = pageMm.page.height_mm;
+    const orientation = pageWidthMm > pageHeightMm ? "landscape" : "portrait";
+    const pdf = new jsPDF({
+      orientation,
+      unit: "mm",
+      format: [pageWidthMm, pageHeightMm],
+      compress: true,
+    });
+    const originalPage = currentPage;
+    const originalScrollTop = editableRef.current?.scrollTop ?? 0;
+    const bodyHeightPx = bodyPageHeightPx ?? mmToPx(pageMm.body.height_mm);
+    for (let page = 1; page <= totalPages; page += 1) {
+      if (!pageRef.current) break;
+      if (page !== currentPage) {
+        setCurrentPage(page);
+        await waitForNextPaint();
+      }
+      if (!bodyUsesEngine && editableRef.current && bodyHeightPx > 0) {
+        editableRef.current.scrollTop = (page - 1) * bodyHeightPx;
+        await waitForNextPaint();
+      }
+      const canvas = await html2canvas(pageRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+      });
+      if (page > 1) {
+        pdf.addPage();
+      }
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      pdf.addImage(imgData, "JPEG", 0, 0, pageWidthMm, pageHeightMm);
+    }
+    if (!bodyUsesEngine && editableRef.current) {
+      editableRef.current.scrollTop = originalScrollTop;
+      await waitForNextPaint();
+    }
+    if (originalPage !== currentPage) {
+      setCurrentPage(originalPage);
+      await waitForNextPaint();
+    }
+    return new Uint8Array(pdf.output("arraybuffer"));
+  }, [bodyPageHeightPx, bodyUsesEngine, currentPage, isEditing, pageMm, totalPages]);
+
+  const getExportPdfBytes = useCallback(async (): Promise<Uint8Array> => {
+    const rendered = await renderPagesToPdfBytes();
+    if (rendered) return rendered;
+    const payload = await getTypesettingExportPdfBase64();
+    return decodeBase64ToBytes(payload);
+  }, [renderPagesToPdfBytes]);
+
+  useEffect(() => {
+    if (!onExportReady) return;
+    if (!exportReady) {
+      onExportReady(null);
+      return;
+    }
+    onExportReady(() => getExportPdfBytes);
+    return () => {
+      onExportReady(null);
+    };
+  }, [exportReady, getExportPdfBytes, onExportReady]);
+
   const handleExport = async () => {
     setExportError(null);
     setExporting(true);
@@ -563,8 +1049,7 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
         filters: [{ name: "PDF", extensions: ["pdf"] }],
       });
       if (!filePath) return;
-      const payload = await getTypesettingExportPdfBase64();
-      const bytes = decodeBase64ToBytes(payload);
+      const bytes = await getExportPdfBytes();
       await writeFile(filePath, bytes);
     } catch (err) {
       console.error("Typesetting PDF export failed:", err);
@@ -604,8 +1089,7 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
         tempRoot,
         `lumina-typesetting-print-${Date.now()}.pdf`,
       );
-      const payload = await getTypesettingExportPdfBase64();
-      const bytes = decodeBase64ToBytes(payload);
+      const bytes = await getExportPdfBytes();
       await writeFile(filePath, bytes);
       await openExternal(filePath);
     } catch (err) {
@@ -793,6 +1277,7 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
           </div>
         ) : (
           <div
+            ref={handlePageRef}
             className="relative rounded-lg border border-border bg-white shadow-sm"
             style={{ width: pagePx.page.width, height: pagePx.page.height }}
           >
@@ -815,7 +1300,7 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
                   data-testid="typesetting-body-engine"
                   onClick={startEditing}
                 >
-                  {bodyLines.map((line, index) => (
+                  {pagedBodyLines.map((line, index) => (
                     <div
                       key={`${index}-${line.x}-${line.y}`}
                       style={{
@@ -824,12 +1309,14 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
                         top: line.y,
                         width: line.width,
                         whiteSpace: "pre",
+                        fontSize: line.fontSizePx ?? bodyLayout.fontSizePx,
+                        lineHeight: `${line.lineHeightPx ?? bodyLayout.lineHeightPx}px`,
                       }}
                     >
                       {line.text}
                     </div>
                   ))}
-                  {bodyImages.map((image) => (
+                  {pagedBodyImages.map((image) => (
                     <img
                       key={`body-${image.embedId}-${image.x}-${image.y}`}
                       src={image.src}
@@ -854,6 +1341,7 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
                   suppressContentEditableWarning
                   onBeforeInput={handleBeforeInput}
                   onInput={handleInput}
+                  onScroll={handleEditableScroll}
                   onFocus={() => setIsEditing(true)}
                   onBlur={() => {
                     setIsEditing(false);

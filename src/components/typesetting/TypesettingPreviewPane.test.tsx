@@ -14,7 +14,7 @@ describe("TypesettingPreviewPane", () => {
     const page = await screen.findByTestId("typesetting-preview-page");
 
     expect(page).toHaveStyle({ width: "794px", height: "1123px" });
-    expect(invokeMock).toHaveBeenCalledWith("typesetting_preview_page_mm");
+    expect(invokeMock).toHaveBeenCalledWith("typesetting_preview_page_mm", undefined);
   });
 
   it("renders a layout summary when sample layout data is available", async () => {
@@ -79,7 +79,7 @@ describe("TypesettingPreviewPane", () => {
       expect(writeFileMock).toHaveBeenCalled();
     });
 
-    expect(invokeMock).toHaveBeenCalledWith("typesetting_export_pdf_base64");
+    expect(invokeMock).toHaveBeenCalledWith("typesetting_export_pdf_base64", undefined);
 
     const [path, data] = writeFileMock.mock.calls[0] ?? [];
     expect(path).toBe("C:\\temp\\typesetting-preview.pdf");

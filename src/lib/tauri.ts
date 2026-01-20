@@ -75,6 +75,14 @@ const invokeTypesetting = async <T>(
   command: string,
   args?: Record<string, unknown>,
 ): Promise<T> => {
+  if (typeof window !== "undefined") {
+    const tauriInvoke = (window as typeof window & {
+      __TAURI__?: { core?: { invoke?: (...args: unknown[]) => unknown } };
+    }).__TAURI__?.core?.invoke;
+    if (typeof tauriInvoke !== "function") {
+      throw new Error("Tauri invoke unavailable");
+    }
+  }
   try {
     return await invoke<T>(command, args);
   } catch (err) {

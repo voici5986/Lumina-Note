@@ -25,6 +25,7 @@ import { FlashcardView } from "@/components/flashcard";
 import { CardFlowView } from "@/components/cardflow/CardFlowView";
 import { TypesettingPreviewPane } from "@/components/typesetting/TypesettingPreviewPane";
 import { TypesettingDocumentPane } from "@/components/typesetting/TypesettingDocumentPane";
+import { TypesettingExportHarness } from "@/components/typesetting/TypesettingExportHarness";
 import { useAIStore } from "@/stores/useAIStore";
 import { saveFile } from "@/lib/tauri";
 import { TitleBar } from "@/components/layout/TitleBar";
@@ -41,6 +42,9 @@ import type { FsChangePayload } from "@/lib/fsChange";
 if (import.meta.env.DEV) {
   enableDebugLogger();
 }
+
+const IS_TYPESETTING_HARNESS =
+  new URLSearchParams(window.location.search).get("typesettingHarness") === "1";
 
 // Component that shows tabs + graph/editor content
 function EditorWithGraph() {
@@ -125,6 +129,9 @@ interface BrowserNewTabEventPayload {
 let browserNewTabListenerRegistered = false;
 
 function App() {
+  if (IS_TYPESETTING_HARNESS) {
+    return <TypesettingExportHarness />;
+  }
   const { vaultPath, setVaultPath, currentFile, save, createNewFile, tabs, activeTabIndex, fileTree, refreshFileTree, openAIMainTab } = useFileStore();
   const { pendingDiff } = useAIStore();
   const { buildIndex } = useNoteIndexStore();
