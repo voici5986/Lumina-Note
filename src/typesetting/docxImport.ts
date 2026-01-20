@@ -7,6 +7,17 @@ export type DocxRunStyle = {
   strikethrough?: boolean;
 };
 
+export type DocxParagraphStyle = {
+  alignment?: "left" | "right" | "center" | "justify";
+  lineHeight?: number;
+  lineHeightRule?: "auto" | "exact" | "atLeast";
+  spacingBeforePt?: number;
+  spacingAfterPt?: number;
+  indentFirstLinePt?: number;
+  indentLeftPt?: number;
+  indentRightPt?: number;
+};
+
 export type DocxRun = {
   text: string;
   style?: DocxRunStyle;
@@ -15,16 +26,19 @@ export type DocxRun = {
 export type DocxParagraphBlock = {
   type: "paragraph";
   runs: DocxRun[];
+  paragraphStyle?: DocxParagraphStyle;
 };
 
 export type DocxHeadingBlock = {
   type: "heading";
   level: number;
   runs: DocxRun[];
+  paragraphStyle?: DocxParagraphStyle;
 };
 
 export type DocxListItem = {
   runs: DocxRun[];
+  paragraphStyle?: DocxParagraphStyle;
 };
 
 export type DocxListBlock = {
@@ -72,6 +86,7 @@ type ParagraphContent = {
   headingLevel?: number;
   listKey?: string;
   images: DocxImageBlock[];
+  paragraphStyle?: DocxParagraphStyle;
 };
 
 function parseDocxXmlWithContainer(
@@ -132,7 +147,11 @@ function parseBodyBlocks(container: Element): DocxBlock[] {
               block: { type: "list", ordered: false, items: [] },
             };
           }
-          currentList.block.items.push({ runs: content.runs });
+          const listItem: DocxListItem = { runs: content.runs };
+          if (content.paragraphStyle) {
+            listItem.paragraphStyle = content.paragraphStyle;
+          }
+          currentList.block.items.push(listItem);
           break;
         }
 
@@ -160,13 +179,24 @@ function paragraphContentToBlocks(content: ParagraphContent): DocxBlock[] {
 
   if (content.runs.length > 0) {
     if (content.headingLevel !== undefined) {
-      blocks.push({
+      const heading: DocxHeadingBlock = {
         type: "heading",
         level: content.headingLevel,
         runs: content.runs,
-      });
+      };
+      if (content.paragraphStyle) {
+        heading.paragraphStyle = content.paragraphStyle;
+      }
+      blocks.push(heading);
     } else {
-      blocks.push({ type: "paragraph", runs: content.runs });
+      const paragraph: DocxParagraphBlock = {
+        type: "paragraph",
+        runs: content.runs,
+      };
+      if (content.paragraphStyle) {
+        paragraph.paragraphStyle = content.paragraphStyle;
+      }
+      blocks.push(paragraph);
     }
   }
 
@@ -185,7 +215,8 @@ function parseParagraphContent(
   const headingLevel = parseHeadingLevel(paragraph);
   const listKey = options.includeList ? parseListKey(paragraph) : undefined;
   const images = extractParagraphImages(paragraph);
-  return { runs, headingLevel, listKey, images };
+  const paragraphStyle = parseParagraphStyle(paragraph);
+  return { runs, headingLevel, listKey, images, paragraphStyle };
 }
 
 function parseHeadingLevel(paragraph: Element): number | undefined {
@@ -256,6 +287,128 @@ function parseRuns(paragraph: Element): DocxRun[] {
   }
 
   return result;
+}
+
+function parseParagraphStyle(paragraph: Element): DocxParagraphStyle | undefined {
+  const pPr =
+    paragraph.getElementsByTagName("w:pPr")[0] ??
+    paragraph.getElementsByTagName("pPr")[0];
+  if (!pPr) {
+    return undefined;
+  }
+
+  const style: DocxParagraphStyle = {};
+
+  const alignmentNode =
+    pPr.getElementsByTagName("w:jc")[0] ??
+    pPr.getElementsByTagName("jc")[0];
+  const rawAlign =
+    alignmentNode?.getAttribute("w:val") ??
+    alignmentNode?.getAttribute("val");
+  const alignment = parseAlignment(rawAlign);
+  if (alignment) {
+    style.alignment = alignment;
+  }
+
+  const spacingNode =
+    pPr.getElementsByTagName("w:spacing")[0] ??
+    pPr.getElementsByTagName("spacing")[0];
+  if (spacingNode) {
+    const before = parseTwipAttribute(spacingNode, "before");
+    if (before !== null) {
+      style.spacingBeforePt = before;
+    }
+
+    const after = parseTwipAttribute(spacingNode, "after");
+    if (after !== null) {
+      style.spacingAfterPt = after;
+    }
+
+    const lineRaw = spacingNode.getAttribute("w:line")
+      ?? spacingNode.getAttribute("line");
+    const line = lineRaw ? Number.parseFloat(lineRaw) : Number.NaN;
+    if (Number.isFinite(line)) {
+      const rawRule =
+        spacingNode.getAttribute("w:lineRule") ??
+        spacingNode.getAttribute("lineRule");
+      const lineRule = normalizeLineRule(rawRule);
+      if (lineRule === "auto") {
+        style.lineHeightRule = "auto";
+        style.lineHeight = line / 240;
+      } else if (lineRule === "exact" || lineRule === "atLeast") {
+        style.lineHeightRule = lineRule;
+        style.lineHeight = line / 20;
+      }
+    }
+  }
+
+  const indentNode =
+    pPr.getElementsByTagName("w:ind")[0] ??
+    pPr.getElementsByTagName("ind")[0];
+  if (indentNode) {
+    const firstLine = parseTwipAttribute(indentNode, "firstLine");
+    const hanging = parseTwipAttribute(indentNode, "hanging");
+    if (firstLine !== null) {
+      style.indentFirstLinePt = firstLine;
+    } else if (hanging !== null) {
+      style.indentFirstLinePt = -hanging;
+    }
+
+    const left = parseTwipAttribute(indentNode, "left");
+    if (left !== null) {
+      style.indentLeftPt = left;
+    }
+
+    const right = parseTwipAttribute(indentNode, "right");
+    if (right !== null) {
+      style.indentRightPt = right;
+    }
+  }
+
+  return Object.keys(style).length > 0 ? style : undefined;
+}
+
+function parseAlignment(value?: string | null): DocxParagraphStyle["alignment"] {
+  if (!value) return undefined;
+  const normalized = value.toLowerCase();
+  switch (normalized) {
+    case "left":
+    case "start":
+      return "left";
+    case "right":
+    case "end":
+      return "right";
+    case "center":
+      return "center";
+    case "both":
+    case "justify":
+    case "distribute":
+      return "justify";
+    default:
+      return undefined;
+  }
+}
+
+function normalizeLineRule(value?: string | null): DocxParagraphStyle["lineHeightRule"] {
+  if (!value) return "auto";
+  const normalized = value.toLowerCase();
+  if (normalized === "exact") {
+    return "exact";
+  }
+  if (normalized === "atleast" || normalized === "at-least" || normalized === "at least") {
+    return "atLeast";
+  }
+  return "auto";
+}
+
+function parseTwipAttribute(node: Element, name: string): number | null {
+  const raw =
+    node.getAttribute(`w:${name}`) ??
+    node.getAttribute(name);
+  if (!raw) return null;
+  const value = Number.parseFloat(raw);
+  if (!Number.isFinite(value)) return null;
+  return value / 20;
 }
 
 function extractParagraphImages(paragraph: Element): DocxImageBlock[] {

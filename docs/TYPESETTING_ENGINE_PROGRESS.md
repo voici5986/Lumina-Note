@@ -421,3 +421,8 @@ Plan: docs/TYPESETTING_ENGINE_PLAN.md
   - Files changed: src/typesetting/pdfMetrics.ts; src/typesetting/pdfMetrics.test.ts; src/typesetting/pixelDiff.ts; src/typesetting/pixelDiff.test.ts; docs/TYPESETTING_ENGINE_PLAN.md; docs/TYPESETTING_ENGINE_PROGRESS.md
   - Blockers/next steps: pm is not available on this machine, so tests ran via 
 pm run test:run -- src/typesetting/pdfMetrics.test.ts src/typesetting/pixelDiff.test.ts. WSL remains unavailable; next up is capturing Word PDF baselines for fixtures or mapping docx styles into layout inputs.
+- 2026-01-20
+  - Task completed: M19 -> Parse docx paragraph style inputs (alignment/spacing/indent/line height) for layout mapping [partial]
+  - Key decisions: Capture w:jc + w:spacing + w:ind into paragraphStyle; convert twips to pt; auto lineRule stores multiples (line/240) while exact/atLeast uses pt (line/20); hanging indents become negative first-line indent.
+  - Files changed: src/typesetting/docxImport.ts; src/typesetting/docxImport.test.ts
+  - Blockers/next steps: Wire paragraphStyle into layout engine inputs (font/size/line height/indent/spacing/alignment) in preview/pagination; pm command missing so tests ran via npm; cargo tests ok with warnings.

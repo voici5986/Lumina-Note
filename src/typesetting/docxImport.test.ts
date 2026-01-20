@@ -106,6 +106,66 @@ describe("parseDocxDocumentXml", () => {
     }
   });
 
+  it("parses paragraph styles for alignment, spacing, and indent", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:body>
+          <w:p>
+            <w:pPr>
+              <w:jc w:val="center" />
+              <w:spacing w:before="120" w:after="240" w:line="360" w:lineRule="auto" />
+              <w:ind w:firstLine="240" w:left="720" w:right="360" />
+            </w:pPr>
+            <w:r><w:t>Styled</w:t></w:r>
+          </w:p>
+        </w:body>
+      </w:document>`;
+
+    const blocks = parseDocxDocumentXml(xml);
+    expect(blocks).toHaveLength(1);
+    const paragraph = blocks[0];
+    expect(paragraph.type).toBe("paragraph");
+    if (paragraph.type === "paragraph") {
+      expect(paragraph.paragraphStyle).toEqual({
+        alignment: "center",
+        spacingBeforePt: 6,
+        spacingAfterPt: 12,
+        lineHeight: 1.5,
+        lineHeightRule: "auto",
+        indentFirstLinePt: 12,
+        indentLeftPt: 36,
+        indentRightPt: 18,
+      });
+    }
+  });
+
+  it("parses hanging indents as negative first-line indents", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:body>
+          <w:p>
+            <w:pPr>
+              <w:ind w:hanging="240" />
+              <w:spacing w:line="400" w:lineRule="exact" />
+            </w:pPr>
+            <w:r><w:t>Hanging</w:t></w:r>
+          </w:p>
+        </w:body>
+      </w:document>`;
+
+    const blocks = parseDocxDocumentXml(xml);
+    expect(blocks).toHaveLength(1);
+    const paragraph = blocks[0];
+    expect(paragraph.type).toBe("paragraph");
+    if (paragraph.type === "paragraph") {
+      expect(paragraph.paragraphStyle).toEqual({
+        lineHeight: 20,
+        lineHeightRule: "exact",
+        indentFirstLinePt: -12,
+      });
+    }
+  });
+
   it("parses strikethrough run styles", () => {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
       <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
