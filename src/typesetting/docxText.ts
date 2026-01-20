@@ -5,6 +5,13 @@ import type {
   DocxTableBlock,
 } from "./docxImport";
 
+export type DocxTextLayoutOptions = {
+  align: NonNullable<DocxParagraphStyle["alignment"]> | "left";
+  firstLineIndentPx: number;
+  spaceBeforePx: number;
+  spaceAfterPx: number;
+};
+
 export function docxBlocksToPlainText(blocks: DocxBlock[]): string {
   return blocks
     .map((block) => blockToText(block))
@@ -38,6 +45,40 @@ export function docxBlocksToLineHeightPx(
     default:
       return clampLineHeight(defaultLineHeightPx * lineHeight);
   }
+}
+
+export function docxBlocksToLayoutTextOptions(
+  blocks: DocxBlock[],
+  dpi = 96,
+): DocxTextLayoutOptions {
+  const defaults: DocxTextLayoutOptions = {
+    align: "left",
+    firstLineIndentPx: 0,
+    spaceBeforePx: 0,
+    spaceAfterPx: 0,
+  };
+  const style = findFirstParagraphStyle(blocks);
+  if (!style) {
+    return defaults;
+  }
+
+  const align = style.alignment ?? "left";
+  const leftIndent = finiteOrZero(style.indentLeftPt);
+  const firstLineIndent = finiteOrZero(style.indentFirstLinePt);
+  const firstLineIndentPx = roundPx(pointsToPx(leftIndent + firstLineIndent, dpi));
+  const spaceBeforePx = clampNonNegativePx(
+    pointsToPx(finiteOrZero(style.spacingBeforePt), dpi),
+  );
+  const spaceAfterPx = clampNonNegativePx(
+    pointsToPx(finiteOrZero(style.spacingAfterPt), dpi),
+  );
+
+  return {
+    align,
+    firstLineIndentPx,
+    spaceBeforePx,
+    spaceAfterPx,
+  };
 }
 
 function blockToText(block: DocxBlock): string | null {
@@ -113,6 +154,20 @@ function findFirstParagraphStyle(
 
 function pointsToPx(points: number, dpi: number): number {
   return (points * dpi) / 72;
+}
+
+function finiteOrZero(value?: number): number {
+  if (value === undefined) return 0;
+  return Number.isFinite(value) ? value : 0;
+}
+
+function roundPx(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round(value);
+}
+
+function clampNonNegativePx(value: number): number {
+  return Math.max(0, roundPx(value));
 }
 
 function clampLineHeight(value: number): number {

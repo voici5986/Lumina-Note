@@ -50,6 +50,15 @@ pub struct TypesettingTextLayout {
     pub lines: Vec<TypesettingTextLine>,
 }
 
+#[derive(serde::Deserialize, Clone, Copy, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum AlignInput {
+    Left,
+    Right,
+    Center,
+    Justify,
+}
+
 fn page_box_to_mm(box_mm: PageBox) -> PreviewBoxMm {
     PreviewBoxMm {
         x_mm: box_mm.x_mm,
@@ -70,6 +79,15 @@ fn default_typesetting_page_style() -> PageStyle {
         },
         header_height_mm: 12.0,
         footer_height_mm: 12.0,
+    }
+}
+
+fn align_input_to_paragraph(align: AlignInput) -> ParagraphAlign {
+    match align {
+        AlignInput::Left => ParagraphAlign::Left,
+        AlignInput::Right => ParagraphAlign::Right,
+        AlignInput::Center => ParagraphAlign::Center,
+        AlignInput::Justify => ParagraphAlign::Justify,
     }
 }
 
@@ -120,6 +138,10 @@ pub async fn typesetting_layout_text(
     font_path: String,
     max_width: i32,
     line_height: i32,
+    align: Option<AlignInput>,
+    first_line_indent: Option<i32>,
+    space_before: Option<i32>,
+    space_after: Option<i32>,
 ) -> Result<TypesettingTextLayout, AppError> {
     if max_width <= 0 {
         return Err(AppError::InvalidPath(
@@ -138,10 +160,10 @@ pub async fn typesetting_layout_text(
     let options = TextLayoutOptions {
         max_width,
         line_height,
-        align: ParagraphAlign::Left,
-        first_line_indent: 0,
-        space_before: 0,
-        space_after: 0,
+        align: align_input_to_paragraph(align.unwrap_or(AlignInput::Left)),
+        first_line_indent: first_line_indent.unwrap_or(0),
+        space_before: space_before.unwrap_or(0),
+        space_after: space_after.unwrap_or(0),
     };
     let lines =
         layout_text_paragraph(&font, &text, options).map_err(|err| {
@@ -1081,6 +1103,10 @@ mod tests {
             fixture_font_path(),
             1000,
             1200,
+            None,
+            None,
+            None,
+            None,
         )
         .await
         .expect("layout should succeed");
@@ -1095,6 +1121,10 @@ mod tests {
             fixture_font_path(),
             0,
             1200,
+            None,
+            None,
+            None,
+            None,
         )
         .await
         .expect_err("expected invalid max_width error");
@@ -1106,6 +1136,10 @@ mod tests {
             fixture_font_path(),
             1000,
             0,
+            None,
+            None,
+            None,
+            None,
         )
         .await
         .expect_err("expected invalid line_height error");
@@ -1120,6 +1154,10 @@ mod tests {
             fixture_font_path(),
             100_000,
             1200,
+            None,
+            None,
+            None,
+            None,
         )
         .await
         .expect("layout should succeed");
@@ -1127,5 +1165,25 @@ mod tests {
         assert_eq!(layout.lines.len(), 1);
         assert_eq!(layout.lines[0].start, 0);
         assert!(layout.lines[0].end > layout.lines[0].start);
+    }
+
+    #[tokio::test]
+    async fn typesetting_layout_text_applies_alignment_and_spacing_inputs() {
+        let layout = typesetting_layout_text(
+            "Hello world".to_string(),
+            fixture_font_path(),
+            1000,
+            1200,
+            Some(AlignInput::Right),
+            Some(10),
+            Some(12),
+            Some(6),
+        )
+        .await
+        .expect("layout should succeed");
+
+        assert!(!layout.lines.is_empty());
+        assert!(layout.lines[0].x_offset > 10);
+        assert_eq!(layout.lines[0].y_offset, 12);
     }
 }

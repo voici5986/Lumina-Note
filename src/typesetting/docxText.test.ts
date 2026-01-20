@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DocxBlock } from "./docxImport";
-import { docxBlocksToLineHeightPx } from "./docxText";
+import { docxBlocksToLayoutTextOptions, docxBlocksToLineHeightPx } from "./docxText";
 
 describe("docxBlocksToLineHeightPx", () => {
   it("returns the default when no paragraph style is present", () => {
@@ -62,5 +62,81 @@ describe("docxBlocksToLineHeightPx", () => {
     ];
 
     expect(docxBlocksToLineHeightPx(blocks, 20)).toBe(40);
+  });
+});
+
+describe("docxBlocksToLayoutTextOptions", () => {
+  it("defaults to left alignment with zero spacing and indent", () => {
+    const blocks: DocxBlock[] = [
+      { type: "paragraph", runs: [{ text: "Hello" }] },
+    ];
+
+    expect(docxBlocksToLayoutTextOptions(blocks)).toEqual({
+      align: "left",
+      firstLineIndentPx: 0,
+      spaceBeforePx: 0,
+      spaceAfterPx: 0,
+    });
+  });
+
+  it("maps alignment and spacing from paragraph style", () => {
+    const blocks: DocxBlock[] = [
+      {
+        type: "paragraph",
+        runs: [{ text: "Hello" }],
+        paragraphStyle: {
+          alignment: "center",
+          spacingBeforePt: 12,
+          spacingAfterPt: 6,
+        },
+      },
+    ];
+
+    expect(docxBlocksToLayoutTextOptions(blocks)).toEqual({
+      align: "center",
+      firstLineIndentPx: 0,
+      spaceBeforePx: 16,
+      spaceAfterPx: 8,
+    });
+  });
+
+  it("combines left and first-line indents (including hanging indents)", () => {
+    const blocks: DocxBlock[] = [
+      {
+        type: "paragraph",
+        runs: [{ text: "Hello" }],
+        paragraphStyle: {
+          indentLeftPt: 6,
+          indentFirstLinePt: -12,
+        },
+      },
+    ];
+
+    expect(docxBlocksToLayoutTextOptions(blocks)).toEqual({
+      align: "left",
+      firstLineIndentPx: -8,
+      spaceBeforePx: 0,
+      spaceAfterPx: 0,
+    });
+  });
+
+  it("clamps negative spacing values to zero", () => {
+    const blocks: DocxBlock[] = [
+      {
+        type: "paragraph",
+        runs: [{ text: "Hello" }],
+        paragraphStyle: {
+          spacingBeforePt: -4,
+          spacingAfterPt: -2,
+        },
+      },
+    ];
+
+    expect(docxBlocksToLayoutTextOptions(blocks)).toEqual({
+      align: "left",
+      firstLineIndentPx: 0,
+      spaceBeforePx: 0,
+      spaceAfterPx: 0,
+    });
   });
 });

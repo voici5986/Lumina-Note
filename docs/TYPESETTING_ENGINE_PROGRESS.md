@@ -431,3 +431,10 @@ pm run test:run -- src/typesetting/pdfMetrics.test.ts src/typesetting/pixelDiff.
   - Key decisions: Derive a single preview line height from the first paragraph/list/table style; auto lineHeight uses the default as a multiplier; exact/atLeast rules convert pt -> px at 96dpi with atLeast clamping.
   - Files changed: src/typesetting/docxText.ts; src/typesetting/docxText.test.ts; src/components/typesetting/TypesettingDocumentPane.tsx
   - Blockers/next steps: `pm` is unavailable; tests ran via `npm run test:run -- src/typesetting/docxText.test.ts`. Next: map alignment/indent/spacing into layout inputs.
+- 2026-01-20
+  - Task completed: M19 -> Map docx styles to layout inputs (alignment + indent + spacing) [preview layout]
+  - Key decisions: Use the first paragraph style as the preview layout source; combine left + first-line indents into a single first-line indent (allow negative for hanging); clamp spacing to >= 0; pass align/indent/spacing through the layout_text command with defaults.
+  - Files changed: src/typesetting/docxText.ts; src/typesetting/docxText.test.ts; src/components/typesetting/TypesettingDocumentPane.tsx; src/lib/tauri.ts; src/lib/tauri.typesetting.test.ts; src-tauri/src/commands/mod.rs
+  - Blockers/next steps: Map font/size and per-paragraph left/right indents to layout inputs; propagate style mapping beyond the first paragraph for pagination parity.
+  - Tests: npm run test:run -- src/typesetting/docxText.test.ts src/lib/tauri.typesetting.test.ts; C:\Users\10758\.cargo\bin\cargo.exe test (warnings: deprecated ttf_parser::Face::from_slice, unused imports).
+

@@ -67,6 +67,8 @@ export type TypesettingTextLayout = {
   lines: TypesettingTextLine[];
 };
 
+export type TypesettingParagraphAlign = "left" | "right" | "center" | "justify";
+
 const invokeTypesetting = async <T>(
   command: string,
   args?: Record<string, unknown>,
@@ -94,12 +96,30 @@ export async function getTypesettingLayoutText(params: {
   fontPath: string;
   maxWidth: number;
   lineHeight: number;
+  align?: TypesettingParagraphAlign;
+  firstLineIndent?: number;
+  spaceBefore?: number;
+  spaceAfter?: number;
 }): Promise<TypesettingTextLayout> {
+  const {
+    text,
+    fontPath,
+    maxWidth,
+    lineHeight,
+    align = "left",
+    firstLineIndent = 0,
+    spaceBefore = 0,
+    spaceAfter = 0,
+  } = params;
   return invokeTypesetting<TypesettingTextLayout>("typesetting_layout_text", {
-    text: params.text,
-    font_path: params.fontPath,
-    max_width: params.maxWidth,
-    line_height: params.lineHeight,
+    text,
+    font_path: fontPath,
+    max_width: maxWidth,
+    line_height: lineHeight,
+    align,
+    first_line_indent: firstLineIndent,
+    space_before: spaceBefore,
+    space_after: spaceAfter,
   });
 }
 

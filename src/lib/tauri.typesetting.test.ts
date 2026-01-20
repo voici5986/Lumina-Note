@@ -35,6 +35,10 @@ describe("typesetting tauri wrappers", () => {
         font_path: "C:\\fonts\\demo.ttf",
         max_width: 640,
         line_height: 22,
+        align: "left",
+        first_line_indent: 0,
+        space_before: 0,
+        space_after: 0,
       },
     );
   });

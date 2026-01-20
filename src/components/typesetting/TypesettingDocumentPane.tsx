@@ -17,6 +17,7 @@ import { decodeBase64ToBytes } from "@/typesetting/base64";
 import { docxBlocksToHtml, docxHtmlToBlocks } from "@/typesetting/docxHtml";
 import {
   docxBlocksToLineHeightPx,
+  docxBlocksToLayoutTextOptions,
   docxBlocksToPlainText,
 } from "@/typesetting/docxText";
 import { docOpFromBeforeInput } from "@/typesetting/docOps";
@@ -118,6 +119,10 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
       DEFAULT_LINE_HEIGHT_PX,
       DEFAULT_DPI,
     );
+    const layoutOptions = docxBlocksToLayoutTextOptions(
+      doc.blocks,
+      DEFAULT_DPI,
+    );
     const runId = ++layoutRunRef.current;
     const handler = setTimeout(async () => {
       const fontPath = await getTypesettingFixtureFontPath();
@@ -134,6 +139,10 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
           fontPath,
           maxWidth,
           lineHeight: lineHeightPx,
+          align: layoutOptions.align,
+          firstLineIndent: layoutOptions.firstLineIndentPx,
+          spaceBefore: layoutOptions.spaceBeforePx,
+          spaceAfter: layoutOptions.spaceAfterPx,
         });
         if (layoutRunRef.current !== runId) return;
         updateLayoutSummary(path, `Layout: ${layoutData.lines.length} lines`);
