@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TypesettingDocumentPane } from "@/components/typesetting/TypesettingDocumentPane";
 import * as tauri from "@/lib/tauri";
@@ -63,8 +63,48 @@ describe("TypesettingDocumentPane", () => {
 
     const doc = useTypesettingDocStore.getState().docs[path];
     expect(doc?.layoutCache?.lineCount).toBe(2);
+    expect(doc?.layoutCache?.contentHeightPx).toBe(40);
     expect(doc?.layoutCache?.updatedAt).toBe(new Date().toISOString());
 
+    vi.useRealTimers();
+  });
+
+  it("uses layout content height for page count", async () => {
+    vi.useFakeTimers();
+
+    const path = "C:/vault/report.docx";
+    useTypesettingDocStore.setState({
+      docs: {
+        [path]: buildDoc(path, {
+          blocks: [{ type: "paragraph", runs: [{ text: "Hello world" }] } as DocxBlock],
+        }),
+      },
+    });
+
+    const layoutSpy = vi
+      .spyOn(tauri, "getTypesettingLayoutText")
+      .mockResolvedValue({
+        lines: [
+          { start: 0, end: 5, width: 200, x_offset: 0, y_offset: 0 },
+          { start: 6, end: 12, width: 180, x_offset: 0, y_offset: 900 },
+        ],
+      });
+
+    render(<TypesettingDocumentPane path={path} />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(350);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText("Page 1 / 2")).toBeInTheDocument();
+
+    layoutSpy.mockRestore();
     vi.useRealTimers();
   });
 

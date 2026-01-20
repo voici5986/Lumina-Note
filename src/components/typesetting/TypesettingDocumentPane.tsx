@@ -153,9 +153,18 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
           spaceAfter: layoutOptions.spaceAfterPx,
         });
         if (layoutRunRef.current !== runId) return;
+        const contentHeightPx = layoutData.lines.length > 0
+          ? Math.max(
+              0,
+              layoutData.lines[layoutData.lines.length - 1].y_offset
+                + lineHeightPx
+                + layoutOptions.spaceAfterPx,
+            )
+          : 0;
         updateLayoutSummary(path, `Layout: ${layoutData.lines.length} lines`);
         updateLayoutCache(path, {
           lineCount: layoutData.lines.length,
+          contentHeightPx,
           updatedAt: new Date().toISOString(),
         });
       } catch (err) {
@@ -200,14 +209,19 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
 
   const totalPages = useMemo(() => {
     if (!pageMm) return 1;
+    const bodyHeightPx = Math.max(1, mmToPx(pageMm.body.height_mm));
+    const contentHeightPx = doc?.layoutCache?.contentHeightPx;
+    if (Number.isFinite(contentHeightPx) && contentHeightPx > 0) {
+      return Math.max(1, Math.ceil(contentHeightPx / bodyHeightPx));
+    }
     const lineCount = doc?.layoutCache?.lineCount ?? 0;
     const linesPerPage = Math.max(
       1,
-      Math.floor(mmToPx(pageMm.body.height_mm) / DEFAULT_LINE_HEIGHT_PX),
+      Math.floor(bodyHeightPx / DEFAULT_LINE_HEIGHT_PX),
     );
     const safeLineCount = Math.max(1, lineCount);
     return Math.max(1, Math.ceil(safeLineCount / linesPerPage));
-  }, [doc?.layoutCache?.lineCount, pageMm]);
+  }, [doc?.layoutCache?.contentHeightPx, doc?.layoutCache?.lineCount, pageMm]);
 
   useEffect(() => {
     setCurrentPage((prev) => Math.min(Math.max(1, prev), totalPages));

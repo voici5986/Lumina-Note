@@ -36,6 +36,7 @@ export type TypesettingStyleRefs = {
 
 export type TypesettingLayoutCache = {
   lineCount: number;
+  contentHeightPx?: number;
   updatedAt: string;
 };
 

@@ -653,7 +653,7 @@ Goal: minimize visible differences between Lumina rendering and Word for a defin
 - [x] Build diff tooling (pixel + layout metrics) and acceptance thresholds.
 - [x] Map docx styles -> layout engine inputs (font, size, line height, indent, spacing, alignment).
 - [ ] Render images/tables/headers/footers using the engine pipeline (no placeholders).
-- [ ] Drive pagination with real layout results (no fixed line-height placeholders).
+- [x] Drive pagination with real layout results (no fixed line-height placeholders).
 - [ ] Iterate until diffs are within thresholds; document known gaps.
 
 Compatibility contract (draft):
