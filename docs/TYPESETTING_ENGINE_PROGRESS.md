@@ -394,3 +394,9 @@ Plan: docs/TYPESETTING_ENGINE_PLAN.md
   - Files changed: C:\Users\10758\.codex\skills\typesetting-doc-ops\SKILL.md; docs/TYPESETTING_ENGINE_PLAN.md; docs/TYPESETTING_ENGINE_PROGRESS.md
   - Blockers/next steps: Tests not run (docs/skill-only changes).
 
+- 2026-01-20
+  - Task completed: M19 -> Define a compatibility contract (supported docx features, fonts, page sizes)
+  - Key decisions: Documented the target Word environment, supported features, font requirements, and explicit exclusions for parity testing.
+  - Files changed: docs/TYPESETTING_ENGINE_PLAN.md; docs/TYPESETTING_ENGINE_PROGRESS.md
+  - Blockers/next steps: Establish Word PDF baselines for golden fixtures on a single machine. Tests not run (docs-only).
+

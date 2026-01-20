@@ -647,10 +647,18 @@ Notes:
 
 ### M19 Word parity fitting (next phase focus)
 Goal: minimize visible differences between Lumina rendering and Word for a defined docx subset.
-- [ ] Define a compatibility contract (supported docx features, fonts, page sizes).
+- [x] Define a compatibility contract (supported docx features, fonts, page sizes).
 - [ ] Establish Word PDF baselines for golden fixtures on a single machine.
 - [ ] Build diff tooling (pixel + layout metrics) and acceptance thresholds.
 - [ ] Map docx styles -> layout engine inputs (font, size, line height, indent, spacing, alignment).
 - [ ] Render images/tables/headers/footers using the engine pipeline (no placeholders).
 - [ ] Drive pagination with real layout results (no fixed line-height placeholders).
 - [ ] Iterate until diffs are within thresholds; document known gaps.
+
+Compatibility contract (draft):
+- Target environment: Windows 11 + Word (Microsoft 365) on the same machine as Lumina.
+- Page sizes: A4 and Letter only; orientation portrait only in this phase.
+- Fonts: SimSun (zh) + Times New Roman (en) required; fall back to Noto Sans/Serif CJK when missing.
+- Supported features: paragraphs, headings (H1-H3), lists, simple tables, inline images, headers/footers, page numbers.
+- Layout controls: font size, line height, align, indent, spacing before/after, keep-with-next, widows/orphans.
+- Exclusions: floating images/text wrap, footnotes/endnotes, fields, revisions/comments, complex tables.
