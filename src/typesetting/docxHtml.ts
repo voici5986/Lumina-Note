@@ -1,7 +1,19 @@
 import type { DocxBlock, DocxRun, DocxRunStyle } from "./docxImport";
 
-export function docxBlocksToHtml(blocks: DocxBlock[]): string {
-  return blocks.map((block) => blockToHtml(block)).join("");
+export type DocxImageHtml = {
+  src: string;
+  alt?: string;
+};
+
+export type DocxHtmlOptions = {
+  imageResolver?: (embedId: string) => DocxImageHtml | null;
+};
+
+export function docxBlocksToHtml(
+  blocks: DocxBlock[],
+  options: DocxHtmlOptions = {},
+): string {
+  return blocks.map((block) => blockToHtml(block, options)).join("");
 }
 
 export function docxHtmlToBlocks(root: HTMLElement): DocxBlock[] {
@@ -21,7 +33,20 @@ export function docxHtmlToBlocks(root: HTMLElement): DocxBlock[] {
     const tag = element.tagName.toLowerCase();
 
     if (tag === "p" || tag === "div") {
-      blocks.push({ type: "paragraph", runs: extractRuns(element) });
+      const imageBlock = extractImageBlock(element);
+      if (imageBlock) {
+        blocks.push(imageBlock);
+      } else {
+        blocks.push({ type: "paragraph", runs: extractRuns(element) });
+      }
+      continue;
+    }
+
+    if (tag === "img") {
+      const embedId = element.getAttribute("data-embed-id");
+      if (embedId) {
+        blocks.push({ type: "image", embedId });
+      }
       continue;
     }
 
@@ -63,7 +88,7 @@ export function docxHtmlToBlocks(root: HTMLElement): DocxBlock[] {
   return blocks.length > 0 ? blocks : [{ type: "paragraph", runs: [{ text: "" }] }];
 }
 
-function blockToHtml(block: DocxBlock): string {
+function blockToHtml(block: DocxBlock, options: DocxHtmlOptions): string {
   switch (block.type) {
     case "paragraph":
       return `<p>${runsToHtml(block.runs)}</p>`;
@@ -72,9 +97,9 @@ function blockToHtml(block: DocxBlock): string {
     case "list":
       return listToHtml(block);
     case "table":
-      return tableToHtml(block);
+      return tableToHtml(block, options);
     case "image":
-      return `<p>[image:${escapeHtml(block.embedId)}]</p>`;
+      return imageToHtml(block, options);
     default:
       return "";
   }
@@ -88,13 +113,16 @@ function listToHtml(block: Extract<DocxBlock, { type: "list" }>): string {
   return `<${tag}>${items}</${tag}>`;
 }
 
-function tableToHtml(block: Extract<DocxBlock, { type: "table" }>): string {
+function tableToHtml(
+  block: Extract<DocxBlock, { type: "table" }>,
+  options: DocxHtmlOptions,
+): string {
   const rows = block.rows
     .map((row) => {
       const cells = row.cells
         .map((cell) => {
           const cellHtml = cell.blocks
-            .map((inner) => blockToHtml(inner))
+            .map((inner) => blockToHtml(inner, options))
             .join("");
           return `<td>${cellHtml}</td>`;
         })
@@ -103,6 +131,19 @@ function tableToHtml(block: Extract<DocxBlock, { type: "table" }>): string {
     })
     .join("");
   return `<table><tbody>${rows}</tbody></table>`;
+}
+
+function imageToHtml(
+  block: Extract<DocxBlock, { type: "image" }>,
+  options: DocxHtmlOptions,
+): string {
+  const resolved = options.imageResolver?.(block.embedId);
+  if (!resolved?.src) {
+    return `<p>[image:${escapeHtml(block.embedId)}]</p>`;
+  }
+  const src = escapeHtml(resolved.src);
+  const alt = escapeHtml(resolved.alt ?? "");
+  return `<p><img data-embed-id="${escapeHtml(block.embedId)}" src="${src}" alt="${alt}" style="max-width:100%;height:auto;" /></p>`;
 }
 
 function runsToHtml(runs: DocxRun[]): string {
@@ -192,6 +233,17 @@ function extractRuns(element: Element): DocxRun[] {
   }
 
   return runs.length > 0 ? runs : [{ text: "" }];
+}
+
+function extractImageBlock(element: HTMLElement): DocxBlock | null {
+  const img = element.querySelector("img[data-embed-id]");
+  if (!img) return null;
+  if (element.childNodes.length !== 1 || element.firstElementChild !== img) {
+    return null;
+  }
+  const embedId = img.getAttribute("data-embed-id");
+  if (!embedId) return null;
+  return { type: "image", embedId };
 }
 
 function applyInlineStyle(element: HTMLElement, style: DocxRunStyle) {

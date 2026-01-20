@@ -448,3 +448,9 @@ pm run test:run -- src/typesetting/pdfMetrics.test.ts src/typesetting/pixelDiff.
   - Key decisions: Cache contentHeightPx from layout output (last y_offset + lineHeight + spaceAfter) and derive page counts from cached content height before falling back to line-count estimates.
   - Files changed: src/components/typesetting/TypesettingDocumentPane.tsx; src/components/typesetting/TypesettingDocumentPane.test.tsx; src/stores/useTypesettingDocStore.ts; docs/TYPESETTING_ENGINE_PLAN.md; docs/TYPESETTING_ENGINE_PROGRESS.md
   - Blockers/next steps: pm is not available; tests ran via `npm run test:run -- src/components/typesetting/TypesettingDocumentPane.test.tsx`. Cargo tests not run (no Rust changes). Next: render images/tables/headers/footers in the engine pipeline and iterate diff baselines.
+- 2026-01-20
+  - Task completed: M19 -> Render images in preview HTML using docx media (partial toward engine pipeline rendering)
+  - Key decisions: Added image resolver to map docx embedIds through relationships/media to data URLs; include data-embed-id in rendered HTML and parse image-only paragraphs back into image blocks to preserve images during edits.
+  - Files changed: src/typesetting/base64.ts; src/typesetting/docxHtml.ts; src/typesetting/docxHtml.test.ts; src/components/typesetting/TypesettingDocumentPane.tsx
+  - Blockers/next steps: Engine still needs real image/table/header/footer layout+rendering for parity; WSL unavailable and pm missing, so tests ran locally via 
+pm run test:run -- src/typesetting/docxHtml.test.ts.

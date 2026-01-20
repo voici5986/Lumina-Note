@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect } from "vitest";
-import { docxHtmlToBlocks } from "./docxHtml";
+import { docxBlocksToHtml, docxHtmlToBlocks } from "./docxHtml";
 
 describe("docxHtmlToBlocks", () => {
   it("captures inline CSS styles for bold/italic/underline", () => {
@@ -118,5 +118,34 @@ describe("docxHtmlToBlocks", () => {
         items: [{ runs: [{ text: "First" }] }, { runs: [{ text: "Second" }] }],
       },
     ]);
+  });
+
+  it("parses image-only paragraphs into image blocks", () => {
+    const root = document.createElement("div");
+    root.innerHTML = `<p><img data-embed-id="rId3" src="data:image/png;base64,abc" /></p>`;
+
+    const blocks = docxHtmlToBlocks(root);
+    expect(blocks).toEqual([{ type: "image", embedId: "rId3" }]);
+  });
+
+  it("renders image blocks with resolver data and preserves embed id", () => {
+    const html = docxBlocksToHtml(
+      [{ type: "image", embedId: "rId5" }],
+      {
+        imageResolver: (embedId) =>
+          embedId === "rId5"
+            ? { src: "data:image/png;base64,abc", alt: "Logo" }
+            : null,
+      },
+    );
+
+    expect(html).toContain("data-embed-id=\"rId5\"");
+    expect(html).toContain("src=\"data:image/png;base64,abc\"");
+    expect(html).toContain("alt=\"Logo\"");
+  });
+
+  it("falls back to placeholder text when image resolver is missing", () => {
+    const html = docxBlocksToHtml([{ type: "image", embedId: "rId7" }]);
+    expect(html).toContain("[image:rId7]");
   });
 });

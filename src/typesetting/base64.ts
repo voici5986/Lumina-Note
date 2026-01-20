@@ -12,3 +12,17 @@ export function decodeBase64ToBytes(data: string): Uint8Array {
   }
   throw new Error("Base64 decoding is unavailable in this environment.");
 }
+
+export function encodeBytesToBase64(bytes: Uint8Array): string {
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(bytes).toString("base64");
+  }
+  if (typeof btoa === "function") {
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += 1) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+  throw new Error("Base64 encoding is unavailable in this environment.");
+}

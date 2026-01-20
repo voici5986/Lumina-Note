@@ -13,7 +13,7 @@ import {
   TypesettingPreviewBoxMm,
   TypesettingPreviewPageMm,
 } from "@/lib/tauri";
-import { decodeBase64ToBytes } from "@/typesetting/base64";
+import { decodeBase64ToBytes, encodeBytesToBase64 } from "@/typesetting/base64";
 import { docxBlocksToHtml, docxHtmlToBlocks } from "@/typesetting/docxHtml";
 import {
   docxBlocksToFontSizePx,
@@ -22,6 +22,7 @@ import {
   docxBlocksToPlainText,
 } from "@/typesetting/docxText";
 import { docOpFromBeforeInput } from "@/typesetting/docOps";
+import type { TypesettingDoc } from "@/stores/useTypesettingDocStore";
 
 type TypesettingDocumentPaneProps = {
   path: string;
@@ -60,6 +61,41 @@ const scaleBoxPx = (
   width: scalePx(box.width, zoom),
   height: scalePx(box.height, zoom),
 });
+
+const imageMimeType = (path: string): string | null => {
+  const ext = path.split(".").pop()?.toLowerCase();
+  switch (ext) {
+    case "png":
+      return "image/png";
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    case "gif":
+      return "image/gif";
+    default:
+      return null;
+  }
+};
+
+const resolveDocxImage = (
+  doc: TypesettingDoc,
+  embedId: string,
+): { src: string; alt?: string } | null => {
+  const target = doc.relationships[embedId];
+  if (!target) return null;
+  const normalized = target
+    .replace(/^[\\/]+/, "")
+    .replace(/^(\.\.\/)+/, "");
+  const mediaPath = normalized.startsWith("word/")
+    ? normalized
+    : `word/${normalized}`;
+  const bytes = doc.media[mediaPath];
+  if (!bytes) return null;
+  const mime = imageMimeType(mediaPath);
+  if (!mime) return null;
+  const base64 = encodeBytesToBase64(bytes);
+  return { src: `data:${mime};base64,${base64}`, alt: embedId };
+};
 
 export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) {
   const { save: saveActiveFile, markTypesettingTabDirty } = useFileStore();
@@ -177,10 +213,15 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
     return () => clearTimeout(handler);
   }, [doc, pageMm, path, updateLayoutSummary, updateLayoutCache]);
 
+  const imageResolver = useMemo(() => {
+    if (!doc) return undefined;
+    return (embedId: string) => resolveDocxImage(doc, embedId);
+  }, [doc]);
+
   const html = useMemo(() => {
     if (!doc) return "";
-    return docxBlocksToHtml(doc.blocks);
-  }, [doc]);
+    return docxBlocksToHtml(doc.blocks, { imageResolver });
+  }, [doc, imageResolver]);
 
   useEffect(() => {
     if (!editableRef.current || isEditing) return;
