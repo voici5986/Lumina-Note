@@ -438,3 +438,8 @@ pm run test:run -- src/typesetting/pdfMetrics.test.ts src/typesetting/pixelDiff.
   - Blockers/next steps: Map font/size and per-paragraph left/right indents to layout inputs; propagate style mapping beyond the first paragraph for pagination parity.
   - Tests: npm run test:run -- src/typesetting/docxText.test.ts src/lib/tauri.typesetting.test.ts; C:\Users\10758\.cargo\bin\cargo.exe test (warnings: deprecated ttf_parser::Face::from_slice, unused imports).
 
+- 2026-01-20
+  - Task completed: M19 -> Map docx styles -> layout engine inputs (font size + layout_text scaling)
+  - Key decisions: Derive preview font size from the first run style (pt -> px @ 96dpi) with a 12pt fallback; thread optional font_size through the layout_text command and scale glyph advances by font_size/units_per_em; validate positive font_size in the Tauri command.
+  - Files changed: src/typesetting/docxText.ts; src/typesetting/docxText.test.ts; src/components/typesetting/TypesettingDocumentPane.tsx; src/lib/tauri.ts; src-tauri/src/typesetting/text_layout.rs; src-tauri/src/commands/mod.rs; docs/TYPESETTING_ENGINE_PLAN.md; docs/TYPESETTING_ENGINE_PROGRESS.md
+  - Blockers/next steps: pm is unavailable (tests ran via npm). Cargo test warnings remain (deprecated ttf_parser::Face::from_slice, unused imports). Next M19 tasks: capture Word PDF baselines, render images/tables/headers/footers in the engine pipeline, drive pagination from real layout, and iterate diffs.

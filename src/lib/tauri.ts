@@ -96,6 +96,7 @@ export async function getTypesettingLayoutText(params: {
   fontPath: string;
   maxWidth: number;
   lineHeight: number;
+  fontSize?: number;
   align?: TypesettingParagraphAlign;
   firstLineIndent?: number;
   spaceBefore?: number;
@@ -106,12 +107,13 @@ export async function getTypesettingLayoutText(params: {
     fontPath,
     maxWidth,
     lineHeight,
+    fontSize,
     align = "left",
     firstLineIndent = 0,
     spaceBefore = 0,
     spaceAfter = 0,
   } = params;
-  return invokeTypesetting<TypesettingTextLayout>("typesetting_layout_text", {
+  const args: Record<string, unknown> = {
     text,
     font_path: fontPath,
     max_width: maxWidth,
@@ -120,7 +122,11 @@ export async function getTypesettingLayoutText(params: {
     first_line_indent: firstLineIndent,
     space_before: spaceBefore,
     space_after: spaceAfter,
-  });
+  };
+  if (fontSize !== undefined) {
+    args.font_size = fontSize;
+  }
+  return invokeTypesetting<TypesettingTextLayout>("typesetting_layout_text", args);
 }
 
 export async function getTypesettingExportPdfBase64(): Promise<string> {

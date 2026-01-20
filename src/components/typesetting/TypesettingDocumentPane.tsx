@@ -16,6 +16,7 @@ import {
 import { decodeBase64ToBytes } from "@/typesetting/base64";
 import { docxBlocksToHtml, docxHtmlToBlocks } from "@/typesetting/docxHtml";
 import {
+  docxBlocksToFontSizePx,
   docxBlocksToLineHeightPx,
   docxBlocksToLayoutTextOptions,
   docxBlocksToPlainText,
@@ -27,6 +28,7 @@ type TypesettingDocumentPaneProps = {
 };
 
 const DEFAULT_DPI = 96;
+const DEFAULT_FONT_SIZE_PX = 16;
 const DEFAULT_LINE_HEIGHT_PX = 20;
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2;
@@ -119,6 +121,11 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
       DEFAULT_LINE_HEIGHT_PX,
       DEFAULT_DPI,
     );
+    const fontSizePx = docxBlocksToFontSizePx(
+      doc.blocks,
+      DEFAULT_FONT_SIZE_PX,
+      DEFAULT_DPI,
+    );
     const layoutOptions = docxBlocksToLayoutTextOptions(
       doc.blocks,
       DEFAULT_DPI,
@@ -139,6 +146,7 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
           fontPath,
           maxWidth,
           lineHeight: lineHeightPx,
+          fontSize: fontSizePx,
           align: layoutOptions.align,
           firstLineIndent: layoutOptions.firstLineIndentPx,
           spaceBefore: layoutOptions.spaceBeforePx,

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { DocxBlock } from "./docxImport";
-import { docxBlocksToLayoutTextOptions, docxBlocksToLineHeightPx } from "./docxText";
+import {
+  docxBlocksToFontSizePx,
+  docxBlocksToLayoutTextOptions,
+  docxBlocksToLineHeightPx,
+} from "./docxText";
 
 describe("docxBlocksToLineHeightPx", () => {
   it("returns the default when no paragraph style is present", () => {
@@ -138,5 +142,52 @@ describe("docxBlocksToLayoutTextOptions", () => {
       spaceBeforePx: 0,
       spaceAfterPx: 0,
     });
+  });
+});
+
+describe("docxBlocksToFontSizePx", () => {
+  it("returns the default when no run size is present", () => {
+    const blocks: DocxBlock[] = [
+      { type: "paragraph", runs: [{ text: "Hello" }] },
+    ];
+
+    expect(docxBlocksToFontSizePx(blocks, 16)).toBe(16);
+  });
+
+  it("uses the first run size in points", () => {
+    const blocks: DocxBlock[] = [
+      {
+        type: "paragraph",
+        runs: [{ text: "Hello", style: { sizePt: 14 } }],
+      },
+    ];
+
+    expect(docxBlocksToFontSizePx(blocks, 16)).toBe(19);
+  });
+
+  it("searches list items and table cells for run sizes", () => {
+    const blocks: DocxBlock[] = [
+      {
+        type: "list",
+        ordered: false,
+        items: [{ runs: [{ text: "Item", style: { sizePt: 10 } }] }],
+      },
+      {
+        type: "table",
+        rows: [
+          {
+            cells: [
+              {
+                blocks: [
+                  { type: "paragraph", runs: [{ text: "Cell", style: { sizePt: 18 } }] },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ];
+
+    expect(docxBlocksToFontSizePx(blocks, 16)).toBe(13);
   });
 });

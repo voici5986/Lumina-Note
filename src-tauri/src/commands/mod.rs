@@ -138,6 +138,7 @@ pub async fn typesetting_layout_text(
     font_path: String,
     max_width: i32,
     line_height: i32,
+    font_size: Option<i32>,
     align: Option<AlignInput>,
     first_line_indent: Option<i32>,
     space_before: Option<i32>,
@@ -153,6 +154,13 @@ pub async fn typesetting_layout_text(
             "Typesetting layout requires a positive line_height".into(),
         ));
     }
+    if let Some(font_size) = font_size {
+        if font_size <= 0 {
+            return Err(AppError::InvalidPath(
+                "Typesetting layout requires a positive font_size".into(),
+            ));
+        }
+    }
     let mut manager = FontManager::new();
     let font = manager.load_from_path(&font_path).map_err(|err| {
         AppError::InvalidPath(format!("Typesetting font load failed: {err}"))
@@ -160,6 +168,7 @@ pub async fn typesetting_layout_text(
     let options = TextLayoutOptions {
         max_width,
         line_height,
+        font_size,
         align: align_input_to_paragraph(align.unwrap_or(AlignInput::Left)),
         first_line_indent: first_line_indent.unwrap_or(0),
         space_before: space_before.unwrap_or(0),
@@ -1107,6 +1116,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .expect("layout should succeed");
@@ -1121,6 +1131,7 @@ mod tests {
             fixture_font_path(),
             0,
             1200,
+            None,
             None,
             None,
             None,
@@ -1140,11 +1151,28 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .expect_err("expected invalid line_height error");
         let message = format!("{err}");
         assert!(message.contains("line_height"));
+
+        let err = typesetting_layout_text(
+            "Hello".to_string(),
+            fixture_font_path(),
+            1000,
+            1200,
+            Some(0),
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect_err("expected invalid font_size error");
+        let message = format!("{err}");
+        assert!(message.contains("font_size"));
     }
 
     #[tokio::test]
@@ -1154,6 +1182,7 @@ mod tests {
             fixture_font_path(),
             100_000,
             1200,
+            None,
             None,
             None,
             None,
@@ -1174,6 +1203,7 @@ mod tests {
             fixture_font_path(),
             1000,
             1200,
+            Some(16),
             Some(AlignInput::Right),
             Some(10),
             Some(12),

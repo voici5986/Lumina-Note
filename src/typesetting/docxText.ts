@@ -47,6 +47,19 @@ export function docxBlocksToLineHeightPx(
   }
 }
 
+export function docxBlocksToFontSizePx(
+  blocks: DocxBlock[],
+  defaultFontSizePx: number,
+  dpi = 96,
+): number {
+  const sizePt = findFirstRunFontSizePt(blocks);
+  if (!sizePt || !Number.isFinite(sizePt) || sizePt <= 0) {
+    return clampFontSize(defaultFontSizePx);
+  }
+
+  return clampFontSize(pointsToPx(sizePt, dpi));
+}
+
 export function docxBlocksToLayoutTextOptions(
   blocks: DocxBlock[],
   dpi = 96,
@@ -152,6 +165,44 @@ function findFirstParagraphStyle(
   return undefined;
 }
 
+function findFirstRunFontSizePt(blocks: DocxBlock[]): number | undefined {
+  for (const block of blocks) {
+    if (block.type === "paragraph" || block.type === "heading") {
+      for (const run of block.runs) {
+        const size = run.style?.sizePt;
+        if (Number.isFinite(size) && size && size > 0) {
+          return size;
+        }
+      }
+      continue;
+    }
+
+    if (block.type === "list") {
+      for (const item of block.items) {
+        for (const run of item.runs) {
+          const size = run.style?.sizePt;
+          if (Number.isFinite(size) && size && size > 0) {
+            return size;
+          }
+        }
+      }
+      continue;
+    }
+
+    if (block.type === "table") {
+      for (const row of block.rows) {
+        for (const cell of row.cells) {
+          const size = findFirstRunFontSizePt(cell.blocks);
+          if (size) {
+            return size;
+          }
+        }
+      }
+    }
+  }
+  return undefined;
+}
+
 function pointsToPx(points: number, dpi: number): number {
   return (points * dpi) / 72;
 }
@@ -171,5 +222,9 @@ function clampNonNegativePx(value: number): number {
 }
 
 function clampLineHeight(value: number): number {
+  return Math.max(1, Math.round(value));
+}
+
+function clampFontSize(value: number): number {
   return Math.max(1, Math.round(value));
 }
