@@ -85,8 +85,24 @@ describe("TypesettingDocumentPane", () => {
       .spyOn(tauri, "getTypesettingLayoutText")
       .mockResolvedValue({
         lines: [
-          { start: 0, end: 5, width: 200, x_offset: 0, y_offset: 0 },
-          { start: 6, end: 12, width: 180, x_offset: 0, y_offset: 900 },
+          {
+            start: 0,
+            end: 5,
+            width: 200,
+            x_offset: 0,
+            y_offset: 0,
+            start_byte: 0,
+            end_byte: 5,
+          },
+          {
+            start: 6,
+            end: 12,
+            width: 180,
+            x_offset: 0,
+            y_offset: 900,
+            start_byte: 6,
+            end_byte: 12,
+          },
         ],
       });
 
@@ -160,9 +176,33 @@ describe("TypesettingDocumentPane", () => {
     await act(async () => {
       second.resolve({
         lines: [
-          { start: 0, end: 5, width: 200, x_offset: 0, y_offset: 0 },
-          { start: 6, end: 10, width: 180, x_offset: 0, y_offset: 20 },
-          { start: 11, end: 16, width: 160, x_offset: 0, y_offset: 40 },
+          {
+            start: 0,
+            end: 5,
+            width: 200,
+            x_offset: 0,
+            y_offset: 0,
+            start_byte: 0,
+            end_byte: 5,
+          },
+          {
+            start: 6,
+            end: 10,
+            width: 180,
+            x_offset: 0,
+            y_offset: 20,
+            start_byte: 6,
+            end_byte: 10,
+          },
+          {
+            start: 11,
+            end: 16,
+            width: 160,
+            x_offset: 0,
+            y_offset: 40,
+            start_byte: 11,
+            end_byte: 16,
+          },
         ],
       });
     });
@@ -172,7 +212,17 @@ describe("TypesettingDocumentPane", () => {
 
     await act(async () => {
       first.resolve({
-        lines: [{ start: 0, end: 3, width: 120, x_offset: 0, y_offset: 0 }],
+        lines: [
+          {
+            start: 0,
+            end: 3,
+            width: 120,
+            x_offset: 0,
+            y_offset: 0,
+            start_byte: 0,
+            end_byte: 3,
+          },
+        ],
       });
     });
 

@@ -470,3 +470,9 @@ pm run test:run -- src/components/typesetting/TypesettingDocumentPane.test.tsx\)
   - Key decisions: Parse wp:extent cx/cy in EMU for image blocks; emit data-width-emu/data-height-emu plus width style for HTML rendering; preserve extents on HTML round-trip.
   - Files changed: src/typesetting/docxImport.ts; src/typesetting/docxImport.test.ts; src/typesetting/docxHtml.ts; src/typesetting/docxHtml.test.ts
   - Blockers/next steps: WSL unavailable; ran targeted tests locally via `npm run test:run -- src/typesetting/docxImport.test.ts src/typesetting/docxHtml.test.ts`. Next: render images/tables/headers/footers via the engine pipeline (beyond HTML) and iterate diffs.
+- 2026-01-20
+  - Task completed: M19 -> Add byte-range offsets to typesetting layout output (prep for engine-rendered headers/footers/images/tables)
+  - Key decisions: Derive start/end byte ranges from glyph cluster boundaries; clamp to text length; re-shape once in the command for now to compute ranges.
+  - Files changed: src-tauri/src/commands/mod.rs; src/lib/tauri.ts; src/components/typesetting/TypesettingDocumentPane.test.tsx; src/__tests__/setup.ts
+  - Blockers/next steps: pm is not available (used npm). Still need full engine pipeline rendering for images/tables/headers/footers and Word baseline PDFs.
+  - Tests: C:\Users\10758\.cargo\bin\cargo.exe test typesetting_layout_text_includes_byte_offsets (warnings: deprecated ttf_parser::Face::from_slice, unused imports); npm run test:run -- src/components/typesetting/TypesettingDocumentPane.test.tsx

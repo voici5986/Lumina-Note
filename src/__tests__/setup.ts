@@ -68,8 +68,24 @@ vi.mock('@tauri-apps/api/core', () => ({
       'typesetting_fixture_font_path': 'C:\\mock\\fonts\\katex-main-regular.ttf',
       'typesetting_layout_text': {
         lines: [
-          { start: 0, end: 5, width: 200, x_offset: 0, y_offset: 0 },
-          { start: 6, end: 12, width: 180, x_offset: 0, y_offset: 20 },
+          {
+            start: 0,
+            end: 5,
+            width: 200,
+            x_offset: 0,
+            y_offset: 0,
+            start_byte: 0,
+            end_byte: 5,
+          },
+          {
+            start: 6,
+            end: 12,
+            width: 180,
+            x_offset: 0,
+            y_offset: 20,
+            start_byte: 6,
+            end_byte: 12,
+          },
         ],
       },
     };

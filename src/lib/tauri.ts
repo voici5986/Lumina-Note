@@ -61,6 +61,8 @@ export type TypesettingTextLine = {
   width: number;
   x_offset: number;
   y_offset: number;
+  start_byte: number;
+  end_byte: number;
 };
 
 export type TypesettingTextLayout = {

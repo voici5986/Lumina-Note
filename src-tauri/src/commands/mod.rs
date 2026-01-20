@@ -1,8 +1,8 @@
 use crate::error::AppError;
 use crate::fs::{self, FileEntry, watcher};
 use crate::typesetting::{
-    layout_text_paragraph, write_empty_pdf, FontManager, ParagraphAlign, PageBox,
-    PageMargins, PageSize, PageStyle, TextLayoutOptions,
+    layout_text_paragraph, shape_mixed_text, write_empty_pdf, FontManager, Glyph,
+    ParagraphAlign, PageBox, PageMargins, PageSize, PageStyle, TextLayoutOptions,
 };
 use tauri::{AppHandle, Manager, WebviewWindowBuilder, WebviewBuilder, LogicalPosition, LogicalSize, Position, Size};
 use tauri::WebviewUrl;
@@ -43,6 +43,8 @@ pub struct TypesettingTextLine {
     pub width: i32,
     pub x_offset: i32,
     pub y_offset: i32,
+    pub start_byte: usize,
+    pub end_byte: usize,
 }
 
 #[derive(serde::Serialize, Clone, Debug)]
@@ -89,6 +91,71 @@ fn align_input_to_paragraph(align: AlignInput) -> ParagraphAlign {
         AlignInput::Center => ParagraphAlign::Center,
         AlignInput::Justify => ParagraphAlign::Justify,
     }
+}
+
+fn cluster_end_bytes(glyphs: &[Glyph], text_len: usize) -> Vec<usize> {
+    if glyphs.is_empty() {
+        return Vec::new();
+    }
+    let mut ends = vec![text_len; glyphs.len()];
+    let mut index = 0usize;
+    while index < glyphs.len() {
+        let cluster = glyphs[index].cluster as usize;
+        let mut next = index + 1;
+        while next < glyphs.len() && glyphs[next].cluster as usize == cluster {
+            next += 1;
+        }
+        let mut end_byte = if next < glyphs.len() {
+            glyphs[next].cluster as usize
+        } else {
+            text_len
+        };
+        if end_byte > text_len {
+            end_byte = text_len;
+        }
+        for slot in &mut ends[index..next] {
+            *slot = end_byte;
+        }
+        index = next;
+    }
+    ends
+}
+
+fn line_byte_ranges(
+    text: &str,
+    glyphs: &[Glyph],
+    lines: &[crate::typesetting::PositionedLine],
+) -> Vec<(usize, usize)> {
+    if lines.is_empty() {
+        return Vec::new();
+    }
+    if glyphs.is_empty() {
+        return lines.iter().map(|_| (0, 0)).collect();
+    }
+    let text_len = text.len();
+    let cluster_end = cluster_end_bytes(glyphs, text_len);
+    lines
+        .iter()
+        .map(|line| {
+            if line.end == 0 || line.start >= glyphs.len() || line.start >= line.end {
+                return (0, 0);
+            }
+            let start_index = line.start.min(glyphs.len() - 1);
+            let end_index = line.end.saturating_sub(1).min(glyphs.len() - 1);
+            let mut start_byte = glyphs[start_index].cluster as usize;
+            let mut end_byte = *cluster_end.get(end_index).unwrap_or(&text_len);
+            if start_byte > text_len {
+                start_byte = text_len;
+            }
+            if end_byte > text_len {
+                end_byte = text_len;
+            }
+            if end_byte < start_byte {
+                end_byte = start_byte;
+            }
+            (start_byte, end_byte)
+        })
+        .collect()
 }
 
 /// Typesetting preview defaults (mm). Used by the preview pane before document wiring.
@@ -178,14 +245,29 @@ pub async fn typesetting_layout_text(
         layout_text_paragraph(&font, &text, options).map_err(|err| {
             AppError::InvalidPath(format!("Typesetting layout failed: {err}"))
         })?;
+    let byte_ranges = if lines.is_empty() {
+        Vec::new()
+    } else {
+        let glyph_run = shape_mixed_text(&font, &text).map_err(|err| {
+            AppError::InvalidPath(format!("Typesetting layout failed: {err}"))
+        })?;
+        line_byte_ranges(&text, &glyph_run.glyphs, &lines)
+    };
     let lines = lines
         .into_iter()
-        .map(|line| TypesettingTextLine {
+        .enumerate()
+        .map(|(index, line)| {
+            let (start_byte, end_byte) =
+                byte_ranges.get(index).copied().unwrap_or((0, 0));
+            TypesettingTextLine {
             start: line.start,
             end: line.end,
             width: line.width,
             x_offset: line.x_offset,
             y_offset: line.y_offset,
+            start_byte,
+            end_byte,
+        }
         })
         .collect();
 
@@ -1194,6 +1276,28 @@ mod tests {
         assert_eq!(layout.lines.len(), 1);
         assert_eq!(layout.lines[0].start, 0);
         assert!(layout.lines[0].end > layout.lines[0].start);
+    }
+
+    #[tokio::test]
+    async fn typesetting_layout_text_includes_byte_offsets() {
+        let text = "Hello world";
+        let layout = typesetting_layout_text(
+            text.to_string(),
+            fixture_font_path(),
+            100_000,
+            1200,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("layout should succeed");
+
+        assert_eq!(layout.lines.len(), 1);
+        assert_eq!(layout.lines[0].start_byte, 0);
+        assert_eq!(layout.lines[0].end_byte, text.len());
     }
 
     #[tokio::test]
