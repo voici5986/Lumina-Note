@@ -454,3 +454,9 @@ pm run test:run -- src/typesetting/pdfMetrics.test.ts src/typesetting/pixelDiff.
   - Files changed: src/typesetting/base64.ts; src/typesetting/docxHtml.ts; src/typesetting/docxHtml.test.ts; src/components/typesetting/TypesettingDocumentPane.tsx
   - Blockers/next steps: Engine still needs real image/table/header/footer layout+rendering for parity; WSL unavailable and pm missing, so tests ran locally via 
 pm run test:run -- src/typesetting/docxHtml.test.ts.
+- 2026-01-20
+  - Task completed: M19 -> Render header/footer blocks in preview boxes (partial toward engine pipeline rendering)
+  - Key decisions: Render header/footer HTML with docxBlocksToHtml + imageResolver inside the page header/footer boxes; keep them read-only in the preview.
+  - Files changed: src/components/typesetting/TypesettingDocumentPane.tsx; src/components/typesetting/TypesettingDocumentPane.test.tsx
+  - Blockers/next steps: Tables/images still need engine pipeline rendering for parity; pm is unavailable so tests run via npm (\
+pm run test:run -- src/components/typesetting/TypesettingDocumentPane.test.tsx\).

@@ -223,6 +223,16 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
     return docxBlocksToHtml(doc.blocks, { imageResolver });
   }, [doc, imageResolver]);
 
+  const headerHtml = useMemo(() => {
+    if (!doc) return "";
+    return docxBlocksToHtml(doc.headerBlocks, { imageResolver });
+  }, [doc, imageResolver]);
+
+  const footerHtml = useMemo(() => {
+    if (!doc) return "";
+    return docxBlocksToHtml(doc.footerBlocks, { imageResolver });
+  }, [doc, imageResolver]);
+
   useEffect(() => {
     if (!editableRef.current || isEditing) return;
     editableRef.current.innerHTML = html;
@@ -563,7 +573,15 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
                 width: pagePx.header.width,
                 height: pagePx.header.height,
               }}
-            />
+            >
+              {headerHtml ? (
+                <div
+                  className="h-full w-full overflow-hidden px-4 py-1 text-[10px] leading-tight text-foreground"
+                  data-testid="typesetting-header"
+                  dangerouslySetInnerHTML={{ __html: headerHtml }}
+                />
+              ) : null}
+            </div>
             <div
               className="absolute border border-dotted border-muted-foreground/30"
               style={{
@@ -572,7 +590,15 @@ export function TypesettingDocumentPane({ path }: TypesettingDocumentPaneProps) 
                 width: pagePx.footer.width,
                 height: pagePx.footer.height,
               }}
-            />
+            >
+              {footerHtml ? (
+                <div
+                  className="h-full w-full overflow-hidden px-4 py-1 text-[10px] leading-tight text-foreground"
+                  data-testid="typesetting-footer"
+                  dangerouslySetInnerHTML={{ __html: footerHtml }}
+                />
+              ) : null}
+            </div>
           </div>
         )}
       </div>

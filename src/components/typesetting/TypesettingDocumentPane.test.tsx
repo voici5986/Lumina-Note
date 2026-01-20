@@ -201,6 +201,27 @@ describe("TypesettingDocumentPane", () => {
     expect(nextButton).toBeDisabled();
   });
 
+  it("renders header and footer blocks in the preview boxes", async () => {
+    const path = "C:/vault/report.docx";
+    useTypesettingDocStore.setState({
+      docs: {
+        [path]: buildDoc(path, {
+          headerBlocks: [
+            { type: "paragraph", runs: [{ text: "Header Text" }] } as DocxBlock,
+          ],
+          footerBlocks: [
+            { type: "paragraph", runs: [{ text: "Footer Text" }] } as DocxBlock,
+          ],
+        }),
+      },
+    });
+
+    render(<TypesettingDocumentPane path={path} />);
+
+    expect(await screen.findByText("Header Text")).toBeInTheDocument();
+    expect(await screen.findByText("Footer Text")).toBeInTheDocument();
+  });
+
   it("triggers list formatting commands from the toolbar", async () => {
     const path = "C:/vault/report.docx";
     useTypesettingDocStore.setState({
