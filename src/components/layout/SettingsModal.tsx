@@ -15,7 +15,6 @@ import { useLocaleStore } from "@/stores/useLocaleStore";
 import { OFFICIAL_THEMES, Theme } from "@/config/themes";
 import { loadUserThemes, getUserThemes, deleteUserTheme } from "@/config/themePlugin";
 import { X, Check, Plus, Trash2, Palette } from "lucide-react";
-import { LiquidGlassEffect } from "../effects/LiquidGlassEffect";
 import { ThemeEditor } from "../ai/ThemeEditor";
 import { WebDAVSettings } from "../settings/WebDAVSettings";
 import { UpdateChecker } from "../settings/UpdateChecker";
@@ -95,68 +94,27 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   const modal = (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* 背景遮罩 - 液态玻璃效果 */}
+      {/* 背景遮罩 */}
       <div
-        className="absolute inset-0 bg-black/30 backdrop-blur-xl"
+        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
         onClick={onClose}
-        style={{
-          backdropFilter: "blur(20px) saturate(180%)",
-          WebkitBackdropFilter: "blur(20px) saturate(180%)",
-        }}
-      >
-        {/* 雨滴效果层 */}
-        <LiquidGlassEffect />
-      </div>
+      />
 
-      {/* 设置面板 - 液态玻璃风格 */}
-      <div
-        className="relative w-[600px] max-h-[80vh] rounded-2xl shadow-2xl overflow-hidden border border-white/20"
-        style={{
-          background: "linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)",
-          backdropFilter: "blur(40px) saturate(150%)",
-          WebkitBackdropFilter: "blur(40px) saturate(150%)",
-          boxShadow: `
-            0 8px 32px rgba(0, 0, 0, 0.3),
-            inset 0 1px 0 rgba(255, 255, 255, 0.2),
-            inset 0 -1px 0 rgba(0, 0, 0, 0.1)
-          `,
-        }}
-      >
-        {/* 顶部高光 */}
-        <div
-          className="absolute inset-x-0 top-0 h-px"
-          style={{
-            background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)",
-          }}
-        />
-        {/* 标题栏 - 液态玻璃风格 */}
-        <div
-          className="relative flex items-center justify-between px-6 py-4"
-          style={{
-            borderBottom: "1px solid rgba(255,255,255,0.1)",
-            background: "linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 100%)",
-          }}
-        >
+      {/* 设置面板 - 普通卡片风格 */}
+      <div className="relative w-[600px] max-h-[80vh] rounded-xl shadow-2xl overflow-hidden border border-border bg-background/95">
+        {/* 标题栏 */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/50">
           <h2 className="text-lg font-semibold text-foreground/90">{t.settingsModal.title}</h2>
           <button
             onClick={onClose}
-            className="p-2 rounded-full transition-all hover:scale-110"
-            style={{
-              background: "rgba(255,255,255,0.1)",
-              backdropFilter: "blur(10px)",
-            }}
+            className="p-2 rounded-full transition-colors hover:bg-muted"
           >
             <X size={18} className="text-foreground/70" />
           </button>
         </div>
 
-        {/* 设置内容 - 带内容区域液态效果 */}
-        <div
-          className="p-6 space-y-8 overflow-y-auto max-h-[calc(80vh-60px)]"
-          style={{
-            background: "linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.05) 100%)",
-          }}
-        >
+        {/* 设置内容 */}
+        <div className="p-6 space-y-8 overflow-y-auto max-h-[calc(80vh-60px)]">
           {/* 主题设置 */}
           <section className="space-y-4">
             <div className="flex items-center justify-between">
@@ -165,11 +123,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </h3>
               <button
                 onClick={handleNewTheme}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-all hover:scale-105"
-                style={{
-                  background: "rgba(255,255,255,0.1)",
-                  border: "1px solid rgba(255,255,255,0.15)",
-                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-border bg-background/60 hover:bg-muted transition-colors"
               >
                 <Plus size={14} />
                 {t.settingsModal.createTheme}
@@ -185,20 +139,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   {userThemes.map((theme) => (
                     <div
                       key={theme.id}
-                      className={`relative p-3 rounded-xl transition-all text-left group ${themeId === theme.id
-                        ? "ring-2 ring-primary"
-                        : "hover:scale-[1.02]"
-                        }`}
-                      style={{
-                        background: themeId === theme.id
-                          ? "rgba(var(--primary-rgb), 0.15)"
-                          : "rgba(255,255,255,0.05)",
-                        border: "1px solid rgba(255,255,255,0.1)",
-                        backdropFilter: "blur(10px)",
-                        boxShadow: themeId === theme.id
-                          ? "0 4px 20px rgba(var(--primary-rgb), 0.2)"
-                          : "0 2px 10px rgba(0,0,0,0.1)",
-                      }}
+                      className={`relative p-3 rounded-xl transition-colors text-left group border border-border ${
+                        themeId === theme.id
+                          ? "ring-2 ring-primary bg-primary/10"
+                          : "bg-background/60 hover:bg-muted/50"
+                      }`}
                     >
                       <button
                         onClick={() => setThemeId(theme.id)}
@@ -225,7 +170,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => handleEditTheme(theme)}
-                          className="p-1 rounded hover:bg-white/20"
+                          className="p-1 rounded hover:bg-muted"
                           title={t.common.edit}
                         >
                           <Palette size={12} />
@@ -258,20 +203,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <button
                   key={theme.id}
                   onClick={() => setThemeId(theme.id)}
-                  className={`relative p-3 rounded-xl transition-all text-left ${themeId === theme.id
-                    ? "ring-2 ring-primary"
-                    : "hover:scale-[1.02]"
-                    }`}
-                  style={{
-                    background: themeId === theme.id
-                      ? "rgba(var(--primary-rgb), 0.15)"
-                      : "rgba(255,255,255,0.05)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    backdropFilter: "blur(10px)",
-                    boxShadow: themeId === theme.id
-                      ? "0 4px 20px rgba(var(--primary-rgb), 0.2)"
-                      : "0 2px 10px rgba(0,0,0,0.1)",
-                  }}
+                  className={`relative p-3 rounded-xl transition-colors text-left border border-border ${
+                    themeId === theme.id
+                      ? "ring-2 ring-primary bg-primary/10"
+                      : "bg-background/60 hover:bg-muted/50"
+                  }`}
                 >
                   {/* 颜色预览 */}
                   <div className="flex gap-1 mb-2">
@@ -317,7 +253,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </div>
               <LanguageSwitcher
                 menuAlign="right"
-                buttonClassName="bg-white/5 border-white/10 hover:bg-white/10"
+                buttonClassName="bg-background/60 border-border/60 hover:bg-muted"
               />
             </div>
 
@@ -330,12 +266,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <select
                 value={editorMode}
                 onChange={(e) => setEditorMode(e.target.value as any)}
-                className="px-3 py-1.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                style={{
-                  background: "rgba(255,255,255,0.1)",
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  backdropFilter: "blur(10px)",
-                }}
+                className="px-3 py-1.5 rounded-lg text-sm bg-background/60 border border-border focus:outline-none focus:ring-2 focus:ring-primary/50"
               >
                 <option value="live">{t.settingsModal.livePreview}</option>
                 <option value="source">{t.settingsModal.sourceMode}</option>
@@ -356,11 +287,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <p className="text-sm text-muted-foreground">{t.settingsModal.configInRightPanel}</p>
               </div>
               <span
-                className="text-sm text-foreground/70 px-3 py-1.5 rounded-lg"
-                style={{
-                  background: "rgba(255,255,255,0.1)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                }}
+                className="text-sm text-foreground/70 px-3 py-1.5 rounded-lg bg-muted/40 border border-border"
               >
                 {config.model || t.settingsModal.notConfigured}
               </span>
@@ -368,13 +295,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </section>
 
           {/* WebDAV 同步设置 */}
-          <section
-            className="rounded-xl overflow-hidden"
-            style={{
-              background: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(255,255,255,0.08)",
-            }}
-          >
+          <section className="rounded-xl overflow-hidden border border-border bg-background/60">
             <WebDAVSettings compact />
           </section>
 
