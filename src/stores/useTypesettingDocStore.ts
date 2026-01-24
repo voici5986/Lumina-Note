@@ -3,7 +3,9 @@ import { readBinaryFileBase64, writeBinaryFile } from "@/lib/tauri";
 import {
   parseDocxDocumentXml,
   parseDocxHeaderFooterXml,
+  parseDocxPageStyle,
   DocxBlock,
+  DocxPageStyle,
 } from "@/typesetting/docxImport";
 import { parseDocxStylesXml } from "@/typesetting/docxStyles";
 import {
@@ -20,6 +22,7 @@ export type TypesettingDoc = {
   blocks: DocxBlock[];
   headerBlocks: DocxBlock[];
   footerBlocks: DocxBlock[];
+  pageStyle?: DocxPageStyle;
   relationships: Record<string, string>;
   media: Record<string, Uint8Array>;
   isDirty: boolean;
@@ -89,6 +92,7 @@ const parseDocxBytes = (path: string, bytes: Uint8Array): TypesettingDoc => {
   const styleMap = parseDocxStylesXml(pkg.stylesXml);
 
   const blocks = parseDocxDocumentXml(pkg.documentXml, styleMap);
+  const pageStyle = parseDocxPageStyle(pkg.documentXml);
   const headerBlocks = pkg.headers.length > 0
     ? parseDocxHeaderFooterXml(pkg.headers[0], styleMap)
     : [];
@@ -101,6 +105,7 @@ const parseDocxBytes = (path: string, bytes: Uint8Array): TypesettingDoc => {
     blocks: blocks.length > 0 ? blocks : emptyDoc(path).blocks,
     headerBlocks,
     footerBlocks,
+    pageStyle,
     relationships: pkg.relationships,
     media: pkg.media,
     isDirty: false,

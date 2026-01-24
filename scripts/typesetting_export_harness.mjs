@@ -5,6 +5,7 @@ import { chromium } from "playwright-core";
 
 const DEFAULT_PORT = 4173;
 const DEFAULT_HOST = "127.0.0.1";
+const DEFAULT_FONT_PATH = "C:\\\\Windows\\\\Fonts\\\\simhei.ttf";
 
 function findEdgeExecutablePath() {
   const candidates = new Set();
@@ -74,6 +75,7 @@ function parseArgs(argv) {
     baseline: null,
     port: DEFAULT_PORT,
     noServer: false,
+    fontPath: null,
   };
 
   while (args.length > 0) {
@@ -88,12 +90,25 @@ function parseArgs(argv) {
       case "--no-server":
         options.noServer = true;
         break;
+      case "--font":
+        options.fontPath = args.shift() ?? null;
+        break;
       default:
         throw new Error(`Unknown option: ${flag}`);
     }
   }
 
   return { docxPath, outPdf, options };
+}
+
+function resolveFontPath(userPath) {
+  if (userPath) return userPath;
+  try {
+    if (fs.existsSync(DEFAULT_FONT_PATH)) return DEFAULT_FONT_PATH;
+  } catch {
+    // ignore
+  }
+  return null;
 }
 
 async function waitForServer(origin, timeoutMs = 30_000) {
@@ -129,6 +144,21 @@ function runDiff(baseline, candidate) {
     proc.on("exit", (code) => {
       if (code === 0) resolve();
       else reject(new Error(`pdf diff failed (code=${code})`));
+    });
+  });
+}
+
+function runMetricsDiff(baseline, candidate) {
+  const node = process.execPath ?? "node";
+  return new Promise((resolve, reject) => {
+    const proc = spawn(
+      node,
+      ["scripts/typesetting_pdf_metrics_diff.mjs", baseline, candidate],
+      { stdio: "inherit" },
+    );
+    proc.on("exit", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`pdf metrics diff failed (code=${code})`));
     });
   });
 }
@@ -170,6 +200,19 @@ async function main() {
     await page.goto(harnessUrl, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => window.__luminaTypesettingHarness, { timeout: 60_000 });
 
+    const fontPath = resolveFontPath(options.fontPath);
+    if (fontPath) {
+      const fontBase64 = fs.readFileSync(fontPath).toString("base64");
+      await page.evaluate(
+        async ({ payload, name }) => {
+          await window.__luminaTypesettingHarness.setFontBase64(payload, "SimHei", name);
+        },
+        { payload: fontBase64, name: path.basename(fontPath) },
+      );
+    } else {
+      console.warn("No CJK font found; PDF text may be missing.");
+    }
+
     const base64 = fs.readFileSync(absoluteDocx).toString("base64");
     await page.evaluate(
       async ({ payload, name }) => {
@@ -210,6 +253,7 @@ async function main() {
 
     if (options.baseline) {
       await runDiff(path.resolve(options.baseline), absolutePdf);
+      await runMetricsDiff(path.resolve(options.baseline), absolutePdf);
     }
   } finally {
     if (server) {

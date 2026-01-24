@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import {
   getTypesettingLayoutText,
@@ -8,6 +8,12 @@ import {
 describe("typesetting tauri wrappers", () => {
   beforeEach(() => {
     vi.mocked(invoke).mockClear();
+    (window as typeof window & { __TAURI__?: { core?: { invoke?: () => void } } }).__TAURI__ = {
+      core: { invoke: () => undefined },
+    };
+  });
+  afterEach(() => {
+    delete (window as typeof window & { __TAURI__?: unknown }).__TAURI__;
   });
 
   it("wraps preview command errors with context", async () => {
@@ -18,7 +24,7 @@ describe("typesetting tauri wrappers", () => {
     );
   });
 
-  it("passes layout params using snake_case keys", async () => {
+  it("passes layout params using camelCase keys", async () => {
     vi.mocked(invoke).mockResolvedValueOnce({ lines: [] });
 
     await getTypesettingLayoutText({
@@ -32,13 +38,13 @@ describe("typesetting tauri wrappers", () => {
       "typesetting_layout_text",
       {
         text: "Hello",
-        font_path: "C:\\fonts\\demo.ttf",
-        max_width: 640,
-        line_height: 22,
+        fontPath: "C:\\fonts\\demo.ttf",
+        maxWidth: 640,
+        lineHeight: 22,
         align: "left",
-        first_line_indent: 0,
-        space_before: 0,
-        space_after: 0,
+        firstLineIndent: 0,
+        spaceBefore: 0,
+        spaceAfter: 0,
       },
     );
   });

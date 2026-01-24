@@ -1,33 +1,43 @@
 import { describe, expect, it } from "vitest";
-import { getDefaultPreviewPageMm } from "./previewDefaults";
+import { buildPreviewPageMmFromDocx, getDefaultPreviewPageMm } from "./previewDefaults";
+import type { DocxPageStyle } from "./docxImport";
 
-describe("getDefaultPreviewPageMm", () => {
-  it("matches the A4 defaults used by the typesetting backend", () => {
-    const page = getDefaultPreviewPageMm();
+describe("buildPreviewPageMmFromDocx", () => {
+  it("maps margins and header/footer distances into page boxes", () => {
+    const style: DocxPageStyle = {
+      widthMm: 210,
+      heightMm: 297,
+      marginTopMm: 25,
+      marginBottomMm: 25,
+      marginLeftMm: 30,
+      marginRightMm: 20,
+      headerMm: 10,
+      footerMm: 12,
+    };
 
-    expect(page.page).toEqual({
-      x_mm: 0,
-      y_mm: 0,
-      width_mm: 210,
-      height_mm: 297,
-    });
-    expect(page.body).toEqual({
-      x_mm: 25,
-      y_mm: 37,
-      width_mm: 160,
-      height_mm: 223,
-    });
-    expect(page.header).toEqual({
-      x_mm: 25,
-      y_mm: 25,
-      width_mm: 160,
-      height_mm: 12,
-    });
-    expect(page.footer).toEqual({
-      x_mm: 25,
-      y_mm: 260,
-      width_mm: 160,
-      height_mm: 12,
-    });
+    const page = buildPreviewPageMmFromDocx(style);
+    expect(page.page.width_mm).toBe(210);
+    expect(page.page.height_mm).toBe(297);
+    expect(page.body.x_mm).toBe(30);
+    expect(page.body.y_mm).toBe(25);
+    expect(page.body.width_mm).toBe(160);
+    expect(page.body.height_mm).toBe(247);
+    expect(page.header.y_mm).toBe(10);
+    expect(page.header.height_mm).toBe(15);
+    expect(page.footer.y_mm).toBe(285);
+    expect(page.footer.height_mm).toBe(12);
+  });
+
+  it("falls back to defaults when values are missing", () => {
+    const style: DocxPageStyle = {
+      marginLeftMm: 22,
+    };
+    const fallback = getDefaultPreviewPageMm();
+    const page = buildPreviewPageMmFromDocx(style, fallback);
+
+    expect(page.page.width_mm).toBe(fallback.page.width_mm);
+    expect(page.page.height_mm).toBe(fallback.page.height_mm);
+    expect(page.body.x_mm).toBe(22);
+    expect(page.body.height_mm).toBe(fallback.body.height_mm);
   });
 });

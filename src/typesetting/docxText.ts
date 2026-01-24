@@ -7,9 +7,13 @@ import type {
 
 export type DocxTextLayoutOptions = {
   align: NonNullable<DocxParagraphStyle["alignment"]> | "left";
+  leftIndentPx: number;
+  rightIndentPx: number;
   firstLineIndentPx: number;
   spaceBeforePx: number;
   spaceAfterPx: number;
+  tabStopsPx: number[];
+  defaultTabStopPx: number;
 };
 
 export const DOCX_IMAGE_PLACEHOLDER = "\uFFFC";
@@ -66,11 +70,16 @@ export function docxBlocksToLayoutTextOptions(
   blocks: DocxBlock[],
   dpi = 96,
 ): DocxTextLayoutOptions {
+  const defaultTabStopPx = clampNonNegativePx(pointsToPx(36, dpi));
   const defaults: DocxTextLayoutOptions = {
     align: "left",
+    leftIndentPx: 0,
+    rightIndentPx: 0,
     firstLineIndentPx: 0,
     spaceBeforePx: 0,
     spaceAfterPx: 0,
+    tabStopsPx: [],
+    defaultTabStopPx,
   };
   const style = findFirstParagraphStyle(blocks);
   if (!style) {
@@ -79,20 +88,32 @@ export function docxBlocksToLayoutTextOptions(
 
   const align = style.alignment ?? "left";
   const leftIndent = finiteOrZero(style.indentLeftPt);
+  const rightIndent = finiteOrZero(style.indentRightPt);
   const firstLineIndent = finiteOrZero(style.indentFirstLinePt);
-  const firstLineIndentPx = roundPx(pointsToPx(leftIndent + firstLineIndent, dpi));
+  const leftIndentPx = clampNonNegativePx(pointsToPx(leftIndent, dpi));
+  const rightIndentPx = clampNonNegativePx(pointsToPx(rightIndent, dpi));
+  const firstLineIndentPx = roundPx(pointsToPx(firstLineIndent, dpi));
   const spaceBeforePx = clampNonNegativePx(
     pointsToPx(finiteOrZero(style.spacingBeforePt), dpi),
   );
   const spaceAfterPx = clampNonNegativePx(
     pointsToPx(finiteOrZero(style.spacingAfterPt), dpi),
   );
+  const tabStopsPt = style.tabStopsPt ?? [];
+  const tabStopsPx = tabStopsPt
+    .map((value) => clampNonNegativePx(pointsToPx(value, dpi)))
+    .filter((value) => value > 0)
+    .sort((a, b) => a - b);
 
   return {
     align,
+    leftIndentPx,
+    rightIndentPx,
     firstLineIndentPx,
     spaceBeforePx,
     spaceAfterPx,
+    tabStopsPx,
+    defaultTabStopPx,
   };
 }
 

@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect } from "vitest";
-import { parseDocxDocumentXml, parseDocxHeaderFooterXml } from "./docxImport";
+import { parseDocxDocumentXml, parseDocxHeaderFooterXml, parseDocxPageStyle } from "./docxImport";
 import { parseDocxStylesXml } from "./docxStyles";
 
 describe("parseDocxDocumentXml", () => {
@@ -195,6 +195,107 @@ describe("parseDocxDocumentXml", () => {
         indentRightPt: 18,
       });
     }
+  });
+
+  it("preserves empty paragraphs for spacing", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:body>
+          <w:p>
+            <w:pPr>
+              <w:spacing w:before="120" w:after="120" />
+            </w:pPr>
+          </w:p>
+        </w:body>
+      </w:document>`;
+
+    const blocks = parseDocxDocumentXml(xml);
+    expect(blocks).toHaveLength(1);
+    const paragraph = blocks[0];
+    expect(paragraph.type).toBe("paragraph");
+    if (paragraph.type === "paragraph") {
+      expect(paragraph.runs).toEqual([]);
+      expect(paragraph.paragraphStyle).toEqual({
+        spacingBeforePt: 6,
+        spacingAfterPt: 6,
+      });
+    }
+  });
+
+  it("parses sdt content blocks", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:body>
+          <w:sdt>
+            <w:sdtContent>
+              <w:p>
+                <w:r><w:t>Inside</w:t></w:r>
+              </w:p>
+            </w:sdtContent>
+          </w:sdt>
+        </w:body>
+      </w:document>`;
+
+    const blocks = parseDocxDocumentXml(xml);
+    expect(blocks).toHaveLength(1);
+    const paragraph = blocks[0];
+    expect(paragraph.type).toBe("paragraph");
+    if (paragraph.type === "paragraph") {
+      expect(paragraph.runs).toEqual([{ text: "Inside" }]);
+    }
+  });
+
+  it("parses tab stops from paragraph properties", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:body>
+          <w:p>
+            <w:pPr>
+              <w:tabs>
+                <w:tab w:pos="720" />
+                <w:tab w:pos="1440" />
+              </w:tabs>
+            </w:pPr>
+            <w:r><w:t>Tabbed</w:t></w:r>
+          </w:p>
+        </w:body>
+      </w:document>`;
+
+    const blocks = parseDocxDocumentXml(xml);
+    expect(blocks).toHaveLength(1);
+    const paragraph = blocks[0];
+    expect(paragraph.type).toBe("paragraph");
+    if (paragraph.type === "paragraph") {
+      expect(paragraph.paragraphStyle).toEqual({
+        tabStopsPt: [36, 72],
+      });
+    }
+  });
+
+  it("parses page size and margins from section properties", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:body>
+          <w:p><w:r><w:t>Cover</w:t></w:r></w:p>
+          <w:sectPr>
+            <w:pgSz w:w="12240" w:h="15840" />
+            <w:pgMar w:top="1440" w:bottom="1440" w:left="1800" w:right="1800" w:header="720" w:footer="720" />
+          </w:sectPr>
+        </w:body>
+      </w:document>`;
+
+    const style = parseDocxPageStyle(xml);
+    expect(style).toBeTruthy();
+    if (!style) return;
+
+    expect(style.widthMm).toBeCloseTo(215.9, 1);
+    expect(style.heightMm).toBeCloseTo(279.4, 1);
+    expect(style.marginTopMm).toBeCloseTo(25.4, 1);
+    expect(style.marginBottomMm).toBeCloseTo(25.4, 1);
+    expect(style.marginLeftMm).toBeCloseTo(31.75, 2);
+    expect(style.marginRightMm).toBeCloseTo(31.75, 2);
+    expect(style.headerMm).toBeCloseTo(12.7, 1);
+    expect(style.footerMm).toBeCloseTo(12.7, 1);
   });
 
   it("parses hanging indents as negative first-line indents", () => {

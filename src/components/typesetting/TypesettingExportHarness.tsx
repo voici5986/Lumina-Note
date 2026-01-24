@@ -8,6 +8,7 @@ const HARNESS_DEFAULT_PATH = "C:/__lumina_harness__/input.docx";
 type TypesettingHarnessApi = {
   loadDocxBase64: (base64: string, fileName?: string) => Promise<void>;
   exportPdfBase64: () => Promise<string>;
+  setFontBase64: (base64: string, fontName?: string, fileName?: string) => Promise<void>;
 };
 
 declare global {
@@ -20,6 +21,11 @@ declare global {
       exporterReady: boolean;
       ready: boolean;
     };
+    __luminaTypesettingFont?: {
+      name: string;
+      fileName: string;
+      data: string;
+    };
   }
 }
 
@@ -27,6 +33,11 @@ export function TypesettingExportHarness() {
   const { docs, openDocFromBytes } = useTypesettingDocStore();
   const [docPath, setDocPath] = useState(HARNESS_DEFAULT_PATH);
   const [exporter, setExporter] = useState<(() => Promise<Uint8Array>) | null>(null);
+  const [fontAsset, setFontAsset] = useState<{
+    name: string;
+    fileName: string;
+    data: string;
+  } | null>(null);
 
   const docReady = useMemo(() => Boolean(docs[docPath]) && Boolean(exporter), [docs, docPath, exporter]);
 
@@ -47,15 +58,24 @@ export function TypesettingExportHarness() {
     return encodeBytesToBase64(bytes);
   }, [exporter]);
 
+  const setFontBase64 = useCallback(async (base64: string, fontName?: string, fileName?: string) => {
+    setFontAsset({
+      name: fontName ?? "SimHei",
+      fileName: fileName ?? "simhei.ttf",
+      data: base64,
+    });
+  }, []);
+
   useEffect(() => {
     window.__luminaTypesettingHarness = {
       loadDocxBase64,
       exportPdfBase64,
+      setFontBase64,
     };
     return () => {
       delete window.__luminaTypesettingHarness;
     };
-  }, [exportPdfBase64, loadDocxBase64]);
+  }, [exportPdfBase64, loadDocxBase64, setFontBase64]);
 
   useEffect(() => {
     window.__luminaTypesettingReady = docReady;
@@ -75,6 +95,17 @@ export function TypesettingExportHarness() {
       delete window.__luminaTypesettingStatus;
     };
   }, [docPath, docReady, docs, exporter]);
+
+  useEffect(() => {
+    if (fontAsset) {
+      window.__luminaTypesettingFont = fontAsset;
+    } else {
+      delete window.__luminaTypesettingFont;
+    }
+    return () => {
+      delete window.__luminaTypesettingFont;
+    };
+  }, [fontAsset]);
 
   return (
     <div className="min-h-screen bg-background">

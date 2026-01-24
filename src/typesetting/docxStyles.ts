@@ -195,6 +195,26 @@ function parseParagraphStyleElement(
     }
   }
 
+  const tabsNode = findFirst(element, ["w:tabs", "tabs"]);
+  if (tabsNode) {
+    const tabStops: number[] = [];
+    const tabNodes = [
+      ...Array.from(tabsNode.getElementsByTagName("w:tab")),
+      ...Array.from(tabsNode.getElementsByTagName("tab")),
+    ];
+    for (const tab of tabNodes) {
+      const posRaw = tab.getAttribute("w:pos") ?? tab.getAttribute("pos");
+      const pos = posRaw ? Number.parseFloat(posRaw) : Number.NaN;
+      if (Number.isFinite(pos) && pos > 0) {
+        tabStops.push(pos / 20);
+      }
+    }
+    if (tabStops.length > 0) {
+      tabStops.sort((a, b) => a - b);
+      style.tabStopsPt = tabStops;
+    }
+  }
+
   return Object.keys(style).length > 0 ? style : undefined;
 }
 

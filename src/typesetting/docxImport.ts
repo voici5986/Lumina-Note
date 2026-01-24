@@ -16,6 +16,18 @@ export type DocxParagraphStyle = {
   indentFirstLinePt?: number;
   indentLeftPt?: number;
   indentRightPt?: number;
+  tabStopsPt?: number[];
+};
+
+export type DocxPageStyle = {
+  widthMm?: number;
+  heightMm?: number;
+  marginTopMm?: number;
+  marginBottomMm?: number;
+  marginLeftMm?: number;
+  marginRightMm?: number;
+  headerMm?: number;
+  footerMm?: number;
 };
 
 export type DocxRun = {
@@ -76,6 +88,68 @@ export type DocxBlock =
   | DocxImageBlock;
 
 export type DocxStyleMap = import("./docxStyles").DocxStyleMap;
+
+export function parseDocxPageStyle(xml: string): DocxPageStyle | undefined {
+  if (!xml.trim()) {
+    return undefined;
+  }
+
+  const doc = new DOMParser().parseFromString(xml, "application/xml");
+  if (doc.getElementsByTagName("parsererror").length > 0) {
+    return undefined;
+  }
+
+  const sectNodes = [
+    ...Array.from(doc.getElementsByTagName("w:sectPr")),
+    ...Array.from(doc.getElementsByTagName("sectPr")),
+  ];
+  if (sectNodes.length === 0) {
+    return undefined;
+  }
+
+  const sect = sectNodes[sectNodes.length - 1];
+  const pgSz =
+    sect.getElementsByTagName("w:pgSz")[0] ??
+    sect.getElementsByTagName("pgSz")[0];
+  const pgMar =
+    sect.getElementsByTagName("w:pgMar")[0] ??
+    sect.getElementsByTagName("pgMar")[0];
+
+  const style: DocxPageStyle = {};
+  if (pgSz) {
+    const widthPt = parseTwipAttribute(pgSz, "w");
+    const heightPt = parseTwipAttribute(pgSz, "h");
+    const orient = (pgSz.getAttribute("w:orient") ?? pgSz.getAttribute("orient"))?.toLowerCase();
+    if (widthPt !== null) {
+      style.widthMm = ptToMm(widthPt);
+    }
+    if (heightPt !== null) {
+      style.heightMm = ptToMm(heightPt);
+    }
+    if (orient === "landscape" && style.widthMm && style.heightMm && style.widthMm < style.heightMm) {
+      const temp = style.widthMm;
+      style.widthMm = style.heightMm;
+      style.heightMm = temp;
+    }
+  }
+
+  if (pgMar) {
+    const topPt = parseTwipAttribute(pgMar, "top");
+    const bottomPt = parseTwipAttribute(pgMar, "bottom");
+    const leftPt = parseTwipAttribute(pgMar, "left");
+    const rightPt = parseTwipAttribute(pgMar, "right");
+    const headerPt = parseTwipAttribute(pgMar, "header");
+    const footerPt = parseTwipAttribute(pgMar, "footer");
+    if (topPt !== null) style.marginTopMm = ptToMm(topPt);
+    if (bottomPt !== null) style.marginBottomMm = ptToMm(bottomPt);
+    if (leftPt !== null) style.marginLeftMm = ptToMm(leftPt);
+    if (rightPt !== null) style.marginRightMm = ptToMm(rightPt);
+    if (headerPt !== null) style.headerMm = ptToMm(headerPt);
+    if (footerPt !== null) style.footerMm = ptToMm(footerPt);
+  }
+
+  return Object.keys(style).length > 0 ? style : undefined;
+}
 
 export function parseDocxDocumentXml(
   xml: string,
@@ -171,6 +245,16 @@ function parseBodyBlocks(container: Element, styles?: DocxStyleMap): DocxBlock[]
         blocks.push(...paragraphBlocks);
         break;
       }
+      case "w:sdt": {
+        flushList();
+        const content =
+          element.getElementsByTagName("w:sdtContent")[0] ??
+          element.getElementsByTagName("sdtContent")[0];
+        if (content) {
+          blocks.push(...parseBodyBlocks(content, styles));
+        }
+        break;
+      }
       case "w:tbl": {
         flushList();
         blocks.push(parseTable(element, styles));
@@ -188,8 +272,9 @@ function parseBodyBlocks(container: Element, styles?: DocxStyleMap): DocxBlock[]
 function paragraphContentToBlocks(content: ParagraphContent): DocxBlock[] {
   const blocks: DocxBlock[] = [];
 
-  if (content.runs.length > 0) {
-    if (content.headingLevel !== undefined) {
+  const hasRuns = content.runs.length > 0;
+  if (hasRuns || content.images.length === 0) {
+    if (content.headingLevel !== undefined && hasRuns) {
       const heading: DocxHeadingBlock = {
         type: "heading",
         level: content.headingLevel,
@@ -384,6 +469,28 @@ function parseParagraphStyle(paragraph: Element): DocxParagraphStyle | undefined
     }
   }
 
+  const tabsNode =
+    pPr.getElementsByTagName("w:tabs")[0] ??
+    pPr.getElementsByTagName("tabs")[0];
+  if (tabsNode) {
+    const tabStops: number[] = [];
+    const tabNodes = [
+      ...Array.from(tabsNode.getElementsByTagName("w:tab")),
+      ...Array.from(tabsNode.getElementsByTagName("tab")),
+    ];
+    for (const tab of tabNodes) {
+      const posRaw = tab.getAttribute("w:pos") ?? tab.getAttribute("pos");
+      const pos = posRaw ? Number.parseFloat(posRaw) : Number.NaN;
+      if (Number.isFinite(pos) && pos > 0) {
+        tabStops.push(pos / 20);
+      }
+    }
+    if (tabStops.length > 0) {
+      tabStops.sort((a, b) => a - b);
+      style.tabStopsPt = tabStops;
+    }
+  }
+
   return Object.keys(style).length > 0 ? style : undefined;
 }
 
@@ -452,6 +559,10 @@ function parseTwipAttribute(node: Element, name: string): number | null {
   const value = Number.parseFloat(raw);
   if (!Number.isFinite(value)) return null;
   return value / 20;
+}
+
+function ptToMm(points: number): number {
+  return (points * 25.4) / 72;
 }
 
 function extractParagraphImages(paragraph: Element): DocxImageBlock[] {
@@ -703,6 +814,7 @@ function mergeParagraphStyles(
     if (style.indentFirstLinePt !== undefined) merged.indentFirstLinePt = style.indentFirstLinePt;
     if (style.indentLeftPt !== undefined) merged.indentLeftPt = style.indentLeftPt;
     if (style.indentRightPt !== undefined) merged.indentRightPt = style.indentRightPt;
+    if (style.tabStopsPt !== undefined) merged.tabStopsPt = style.tabStopsPt;
   }
   return Object.keys(merged).length > 0 ? merged : undefined;
 }

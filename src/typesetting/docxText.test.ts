@@ -93,9 +93,13 @@ describe("docxBlocksToLayoutTextOptions", () => {
 
     expect(docxBlocksToLayoutTextOptions(blocks)).toEqual({
       align: "left",
+      leftIndentPx: 0,
+      rightIndentPx: 0,
       firstLineIndentPx: 0,
       spaceBeforePx: 0,
       spaceAfterPx: 0,
+      tabStopsPx: [],
+      defaultTabStopPx: 48,
     });
   });
 
@@ -114,9 +118,13 @@ describe("docxBlocksToLayoutTextOptions", () => {
 
     expect(docxBlocksToLayoutTextOptions(blocks)).toEqual({
       align: "center",
+      leftIndentPx: 0,
+      rightIndentPx: 0,
       firstLineIndentPx: 0,
       spaceBeforePx: 16,
       spaceAfterPx: 8,
+      tabStopsPx: [],
+      defaultTabStopPx: 48,
     });
   });
 
@@ -134,9 +142,13 @@ describe("docxBlocksToLayoutTextOptions", () => {
 
     expect(docxBlocksToLayoutTextOptions(blocks)).toEqual({
       align: "left",
-      firstLineIndentPx: -8,
+      leftIndentPx: 8,
+      rightIndentPx: 0,
+      firstLineIndentPx: -16,
       spaceBeforePx: 0,
       spaceAfterPx: 0,
+      tabStopsPx: [],
+      defaultTabStopPx: 48,
     });
   });
 
@@ -154,9 +166,13 @@ describe("docxBlocksToLayoutTextOptions", () => {
 
     expect(docxBlocksToLayoutTextOptions(blocks)).toEqual({
       align: "left",
+      leftIndentPx: 0,
+      rightIndentPx: 0,
       firstLineIndentPx: 0,
       spaceBeforePx: 0,
       spaceAfterPx: 0,
+      tabStopsPx: [],
+      defaultTabStopPx: 48,
     });
   });
 });

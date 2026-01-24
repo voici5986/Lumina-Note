@@ -27,6 +27,12 @@ function ensureResizableBufferSupport() {
 
 ensureResizableBufferSupport();
 
+if (typeof window !== "undefined") {
+  (window as typeof window & { __TAURI__?: { core?: { invoke?: () => void } } }).__TAURI__ = {
+    core: { invoke: () => undefined },
+  };
+}
+
 // Mock Tauri API - 智能 Mock，根据命令名返回模拟数据
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn((cmd: string, args?: unknown) => {

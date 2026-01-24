@@ -64,7 +64,7 @@ describe("TypesettingDocumentPane", () => {
 
     const doc = useTypesettingDocStore.getState().docs[path];
     expect(doc?.layoutCache?.lineCount).toBe(2);
-    expect(doc?.layoutCache?.contentHeightPx).toBe(40);
+    expect(doc?.layoutCache?.contentHeightPx).toBe(41);
     expect(doc?.layoutCache?.updatedAt).toBe(new Date().toISOString());
 
     vi.useRealTimers();
@@ -477,7 +477,8 @@ describe("TypesettingDocumentPane", () => {
     });
 
     const text = docxBlocksToPlainText([tableBlock]);
-    const textBytes = new TextEncoder().encode(text).length;
+    const expandedText = text.replace(/\t/g, "    ");
+    const textBytes = new TextEncoder().encode(expandedText).length;
 
     const layoutSpy = vi
       .spyOn(tauri, "getTypesettingLayoutText")
