@@ -13,6 +13,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 const LIMIT: usize = 100;
+const MAX_RENDER_DEPTH: usize = 32;
 
 const IGNORE_PATTERNS: &[&str] = &[
     "node_modules/",
@@ -106,7 +107,6 @@ async fn handle(call: ToolCall, ctx: ToolContext, env: ToolEnvironment) -> Graph
     let mut truncated = false;
 
     for entry in walkdir::WalkDir::new(&search_root)
-        .follow_links(true)
         .into_iter()
         .filter_map(Result::ok)
     {
@@ -152,8 +152,12 @@ async fn handle(call: ToolCall, ctx: ToolContext, env: ToolEnvironment) -> Graph
             .push(Path::new(file).file_name().unwrap_or_default().to_string_lossy().to_string());
     }
 
+    let mut depth_truncated = false;
     let mut output = format!("{}/\n", search_root.display());
-    output.push_str(&render_dir(".", 0, &dirs, &files_by_dir));
+    output.push_str(&render_dir(".", &dirs, &files_by_dir, &mut depth_truncated));
+    if depth_truncated {
+        truncated = true;
+    }
 
     Ok(ToolOutput::text(output)
         .with_mime_type("text/plain")
@@ -199,37 +203,51 @@ fn should_ignore(path: &str, ignore_set: &Option<globset::GlobSet>) -> bool {
 
 fn render_dir(
     dir_path: &str,
-    depth: usize,
     dirs: &HashSet<String>,
     files_by_dir: &HashMap<String, Vec<String>>,
+    depth_truncated: &mut bool,
 ) -> String {
     let mut output = String::new();
-    let indent = "  ".repeat(depth);
+    let mut stack: Vec<(String, usize, bool)> = Vec::new();
+    stack.push((dir_path.to_string(), 0, false));
 
-    if depth > 0 {
-        let name = Path::new(dir_path)
-            .file_name()
-            .map(|name| name.to_string_lossy().to_string())
-            .unwrap_or_else(|| dir_path.to_string());
-        output.push_str(&format!("{}{}/\n", indent, name));
-    }
+    while let Some((current, depth, exit)) = stack.pop() {
+        if exit {
+            let mut files = files_by_dir.get(&current).cloned().unwrap_or_default();
+            files.sort();
+            let child_indent = "  ".repeat(depth + 1);
+            for file in files {
+                output.push_str(&format!("{}{}\n", child_indent, file));
+            }
+            continue;
+        }
 
-    let mut children: Vec<String> = dirs
-        .iter()
-        .filter(|dir| dir_parent(dir) == dir_path)
-        .cloned()
-        .collect();
-    children.sort();
+        let indent = "  ".repeat(depth);
+        if depth > 0 {
+            let name = Path::new(&current)
+                .file_name()
+                .map(|name| name.to_string_lossy().to_string())
+                .unwrap_or_else(|| current.to_string());
+            output.push_str(&format!("{}{}/\n", indent, name));
+        }
 
-    for child in children {
-        output.push_str(&render_dir(&child, depth + 1, dirs, files_by_dir));
-    }
+        stack.push((current.clone(), depth, true));
 
-    let mut files = files_by_dir.get(dir_path).cloned().unwrap_or_default();
-    files.sort();
-    let child_indent = "  ".repeat(depth + 1);
-    for file in files {
-        output.push_str(&format!("{}{}\n", child_indent, file));
+        if depth >= MAX_RENDER_DEPTH {
+            *depth_truncated = true;
+            continue;
+        }
+
+        let mut children: Vec<String> = dirs
+            .iter()
+            .filter(|dir| dir_parent(dir) == current)
+            .cloned()
+            .collect();
+        children.sort();
+
+        for child in children.into_iter().rev() {
+            stack.push((child, depth + 1, false));
+        }
     }
 
     output
