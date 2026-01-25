@@ -14,6 +14,7 @@ mod cef;
 mod webdav;
 mod langgraph;
 mod agent;
+mod forge_runtime;
 mod mcp;
 mod codex_vscode_host;
 mod codex_extension;

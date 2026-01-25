@@ -35,12 +35,97 @@ export interface Message {
   role: "user" | "assistant" | "system" | "tool";
   content: string;
   agent?: AgentType;
+  id?: string;
 }
 
 export interface ToolCall {
   id: string;
   name: string;
   params: Record<string, unknown>;
+}
+
+export type ForgeEventType =
+  | "TextDelta"
+  | "TextFinal"
+  | "ToolStart"
+  | "ToolUpdate"
+  | "ToolResult"
+  | "PermissionAsked"
+  | "PermissionReplied"
+  | "SessionPhaseChanged";
+
+export type ForgeSessionPhase =
+  | "UserInput"
+  | "ModelThinking"
+  | "AssistantStreaming"
+  | "ToolProposed"
+  | "ToolRunning"
+  | "ToolResult"
+  | "AssistantFinalize"
+  | "Completed"
+  | "Interrupted"
+  | "Resumed";
+
+export type ForgeToolStatus = "pending" | "running" | "completed" | "error";
+
+export type ForgePermissionReply = "once" | "always" | "reject";
+
+export interface ForgePermissionRequest {
+  permission: string;
+  patterns: string[];
+  metadata?: Record<string, unknown>;
+  always?: string[];
+}
+
+export interface ForgeToolUpdateRecord {
+  type: "output_delta" | "output_preview" | "metadata" | "progress" | "custom";
+  delta?: string;
+  stream?: string | null;
+  preview?: string;
+  truncated?: boolean;
+  metadata?: Record<string, unknown>;
+  progress?: {
+    current: number;
+    total?: number | null;
+    unit?: string | null;
+    message?: string | null;
+  };
+  custom?: unknown;
+}
+
+export interface ForgeToolAttachment {
+  name: string;
+  mimeType: string;
+  size?: number;
+  reference?: string;
+}
+
+export interface ForgeToolCallState {
+  callId: string;
+  tool: string;
+  input?: unknown;
+  status: ForgeToolStatus;
+  output: string;
+  preview?: { text: string; truncated: boolean };
+  progress?: {
+    current: number;
+    total?: number | null;
+    unit?: string | null;
+    message?: string | null;
+  };
+  metadata?: Record<string, unknown>;
+  updates: ForgeToolUpdateRecord[];
+  result?: string;
+  attachments?: ForgeToolAttachment[];
+  messageId?: string;
+  sessionId?: string;
+}
+
+export interface ForgeSessionPhaseEvent {
+  sessionId: string;
+  messageId: string;
+  from: ForgeSessionPhase;
+  to: ForgeSessionPhase;
 }
 
 /// 等待审批的工具信息
@@ -562,6 +647,184 @@ export const useRustAgentStore = create<RustAgentState>()(
         const state = get();
         
         switch (event.type) {
+          case "run_started": {
+            set({
+              status: "running",
+              error: null,
+              streamingContent: "",
+            });
+            break;
+          }
+
+          case "run_paused": {
+            set({ status: "waiting_approval" });
+            break;
+          }
+
+          case "run_resumed": {
+            set({ status: "running" });
+            break;
+          }
+
+          case "run_completed": {
+            set({ status: "completed" });
+            break;
+          }
+
+          case "run_failed": {
+            const { error } = event.data as { error: string };
+            const stats = state.taskStats;
+            set({
+              status: "error",
+              error,
+              streamingContent: "",
+              taskStats: {
+                ...stats,
+                failedTasks: stats.failedTasks + 1,
+              },
+            });
+            break;
+          }
+
+          case "run_aborted": {
+            set({
+              status: "aborted",
+              streamingContent: "",
+              pendingTool: null,
+            });
+            break;
+          }
+
+          case "text_delta": {
+            const { delta } = event.data as { delta: string };
+            set({
+              streamingContent: state.streamingContent + delta,
+              streamingAgent: "coordinator",
+            });
+            break;
+          }
+
+          case "text_final": {
+            const { text } = event.data as { text: string };
+            const stats = state.taskStats;
+            const nextMessages =
+              text && text.trim()
+                ? [
+                    ...state.messages,
+                    { role: "assistant", content: text, agent: "coordinator" as AgentType },
+                  ]
+                : state.messages;
+            set({
+              messages: nextMessages,
+              streamingContent: "",
+              taskStats: {
+                ...stats,
+                completedTasks: stats.completedTasks + 1,
+              },
+            });
+            get()._saveCurrentSession();
+            break;
+          }
+
+          case "tool_start": {
+            const { tool, input } = event.data as { tool: string; input: unknown };
+            const stats = state.taskStats;
+            set({
+              messages: [
+                ...state.messages,
+                {
+                  role: "tool",
+                  content: `🔧 ${tool}: ${JSON.stringify(input)}`,
+                },
+              ],
+              taskStats: {
+                ...stats,
+                toolCalls: stats.toolCalls + 1,
+                totalToolCalls: stats.totalToolCalls + 1,
+              },
+            });
+            break;
+          }
+
+          case "tool_result": {
+            const { tool, output } = event.data as { tool: string; output: { content?: unknown } };
+            const stats = state.taskStats;
+            const content =
+              typeof output?.content === "string"
+                ? output.content
+                : JSON.stringify(output?.content ?? output);
+            set({
+              messages: [
+                ...state.messages,
+                {
+                  role: "tool",
+                  content: `✅ ${tool}: ${content}`,
+                },
+              ],
+              taskStats: {
+                ...stats,
+                toolSuccesses: stats.toolSuccesses + 1,
+                totalToolSuccesses: stats.totalToolSuccesses + 1,
+              },
+            });
+            break;
+          }
+
+          case "tool_error": {
+            const { tool, error } = event.data as { tool: string; error: string };
+            const stats = state.taskStats;
+            set({
+              messages: [
+                ...state.messages,
+                {
+                  role: "tool",
+                  content: `❌ ${tool}: ${error}`,
+                },
+              ],
+              taskStats: {
+                ...stats,
+                toolFailures: stats.toolFailures + 1,
+                totalToolFailures: stats.totalToolFailures + 1,
+              },
+            });
+            break;
+          }
+
+          case "permission_asked": {
+            const { permission, metadata } = event.data as {
+              permission: string;
+              metadata?: Record<string, unknown>;
+            };
+            const requestId =
+              typeof metadata?.request_id === "string" ? metadata.request_id : permission;
+            set({
+              status: "waiting_approval",
+              pendingTool: {
+                requestId,
+                tool: {
+                  id: requestId,
+                  name: permission,
+                  params: metadata ?? {},
+                },
+              },
+            });
+            break;
+          }
+
+          case "permission_replied": {
+            set({ pendingTool: null });
+            break;
+          }
+
+          case "step_finish": {
+            const { tokens } = event.data as { tokens?: { input?: number; output?: number } };
+            const added = (tokens?.input ?? 0) + (tokens?.output ?? 0);
+            if (added > 0) {
+              set({ totalTokensUsed: state.totalTokensUsed + added });
+            }
+            break;
+          }
+
           case "status_change": {
             const { status } = event.data as { status: AgentStatus };
             // 只更新状态，不添加消息（消息由 complete 事件处理）
@@ -644,32 +907,6 @@ export const useRustAgentStore = create<RustAgentState>()(
                 ...stats,
                 toolCalls: stats.toolCalls + 1,
                 totalToolCalls: stats.totalToolCalls + 1,
-              },
-            });
-            break;
-          }
-
-          case "tool_result": {
-            const { result } = event.data as { 
-              result: { success: boolean; content: string; error?: string } 
-            };
-            const stats = state.taskStats;
-            set({
-              messages: [
-                ...state.messages,
-                {
-                  role: "tool",
-                  content: result.success 
-                    ? `✅ ${result.content.slice(0, 200)}${result.content.length > 200 ? "..." : ""}`
-                    : `❌ ${result.error}`,
-                },
-              ],
-              taskStats: {
-                ...stats,
-                toolSuccesses: stats.toolSuccesses + (result.success ? 1 : 0),
-                toolFailures: stats.toolFailures + (result.success ? 0 : 1),
-                totalToolSuccesses: stats.totalToolSuccesses + (result.success ? 1 : 0),
-                totalToolFailures: stats.totalToolFailures + (result.success ? 0 : 1),
               },
             });
             break;

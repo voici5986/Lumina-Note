@@ -5,6 +5,7 @@ use forge::runtime::tool::ToolContext;
 use regex::Regex;
 use serde_json::Map;
 use std::sync::Mutex;
+use uuid::Uuid;
 
 #[derive(Clone, Debug)]
 pub struct PermissionRule {
@@ -125,13 +126,17 @@ pub fn request_permission(
             message: "permission denied".to_string(),
         }),
         PermissionDecision::Ask => {
+            let request_id = Uuid::new_v4().to_string();
+            let mut metadata = metadata;
+            metadata.insert("request_id".to_string(), serde_json::Value::String(request_id.clone()));
             let request = PermissionRequest::new(permission.to_string(), vec![pattern.to_string()])
                 .with_metadata(metadata)
                 .with_always(always);
             ctx.emit(request.to_event());
-            Err(GraphError::Interrupted(vec![Interrupt::new(
+            Err(GraphError::Interrupted(vec![Interrupt::with_id(
                 request,
                 format!("permission:{}", permission),
+                request_id,
             )]))
         }
     }

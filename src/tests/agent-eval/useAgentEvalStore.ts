@@ -176,6 +176,71 @@ export const useAgentEvalStore = create<EvalState & EvalActions>((set, get) => {
           trace(type, data);
           
           switch (type) {
+            case 'tool_start':
+              console.log(`🔧 [Eval] 工具调用: ${data.tool}`);
+              toolsCalled.push({
+                name: data.tool,
+                params: data.input ?? {},
+                success: true,
+              });
+              loopIterations++;
+              break;
+
+            case 'tool_result': {
+              const lastCall = toolsCalled[toolsCalled.length - 1];
+              if (lastCall) {
+                lastCall.success = true;
+                lastCall.output = data.output?.content ?? data.output;
+              }
+              break;
+            }
+
+            case 'tool_error': {
+              const lastCall = toolsCalled[toolsCalled.length - 1];
+              if (lastCall) {
+                lastCall.success = false;
+                lastCall.output = data.error;
+              }
+              break;
+            }
+
+            case 'text_delta':
+              if (data.delta) {
+                finalOutput = (finalOutput || '') + data.delta;
+              }
+              break;
+
+            case 'text_final':
+              if (data.text) {
+                finalOutput = data.text;
+              }
+              break;
+
+            case 'step_finish':
+              tokenUsage.prompt += data.tokens?.input || 0;
+              tokenUsage.completion += data.tokens?.output || 0;
+              tokenUsage.total += (data.tokens?.input || 0) + (data.tokens?.output || 0);
+              break;
+
+            case 'run_completed':
+              console.log('✅ [Eval] 收到 run_completed 事件');
+              finalStatus = 'completed';
+              resolveAgent();
+              break;
+
+            case 'run_failed':
+              console.log('❌ [Eval] 收到 run_failed 事件:', data.error);
+              error = data.error;
+              finalStatus = 'error';
+              resolveAgent();
+              break;
+
+            case 'run_aborted':
+              console.log('⏹️ [Eval] 收到 run_aborted 事件');
+              finalStatus = 'aborted';
+              resolveAgent();
+              break;
+
             case 'tool_call':
               console.log(`🔧 [Eval] 工具调用: ${data.tool?.name}`);
               toolsCalled.push({
@@ -184,14 +249,6 @@ export const useAgentEvalStore = create<EvalState & EvalActions>((set, get) => {
                 success: true,
               });
               loopIterations++;
-              break;
-              
-            case 'tool_result':
-              const lastCall = toolsCalled[toolsCalled.length - 1];
-              if (lastCall) {
-                lastCall.success = data.result.success;
-                lastCall.output = data.result.content;
-              }
               break;
               
             case 'plan_created':

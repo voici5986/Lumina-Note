@@ -2,20 +2,27 @@
 //! 
 //! 前端调用的 Agent API
 //! 
-//! 使用 langgraph-rust 框架构建和执行 Agent 图
+//! 使用 Forge LoopNode 构建和执行 Agent 循环
 
+use crate::agent::forge_loop::{build_runtime, run_forge_loop, ForgeRunResult, ForgeRuntime, TauriEventSink};
 use crate::agent::types::*;
-use crate::agent::graph::{GraphExecutor, AgentContext, build_agent_graph};
 use crate::agent::deep_research::{
     DeepResearchConfig, DeepResearchRequest, DeepResearchState,
     DeepResearchContext, DeepResearchEvent, ResearchPhase,
     build_deep_research_graph,
 };
+use crate::forge_runtime::permissions::{default_ruleset, PermissionRule, PermissionSession as LocalPermissionSession};
+use forge::runtime::cancel::CancellationToken;
+use forge::runtime::error::Interrupt;
+use forge::runtime::event::{Event, PermissionReply};
+use forge::runtime::permission::PermissionDecision;
+use forge::runtime::session_state::RunStatus;
 use crate::langgraph::executor::{Checkpoint, ExecutionResult};
 use crate::langgraph::error::ResumeCommand;
 use tauri::{AppHandle, Emitter, State};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use uuid::Uuid;
 
 /// 工具审批响应
 #[derive(Debug, Clone)]
@@ -94,10 +101,29 @@ impl ApprovalManager {
     }
 }
 
+#[derive(Clone)]
+struct ForgeRuntimeState {
+    config: AgentConfig,
+    runtime: ForgeRuntime,
+    session_id: String,
+    message_id: String,
+    run_id: String,
+    cancel: CancellationToken,
+}
+
+struct ForgeCheckpoint {
+    checkpoint_id: String,
+    state: GraphState,
+    pending_tool_calls: Vec<ToolCall>,
+    interrupts: Vec<Interrupt>,
+}
+
 /// Agent 状态管理
 pub struct AgentState {
     current_state: Arc<Mutex<Option<GraphState>>>,
     is_running: Arc<Mutex<bool>>,
+    runtime: Arc<Mutex<Option<ForgeRuntimeState>>>,
+    checkpoint: Arc<Mutex<Option<ForgeCheckpoint>>>,
 }
 
 impl AgentState {
@@ -105,6 +131,8 @@ impl AgentState {
         Self {
             current_state: Arc::new(Mutex::new(None)),
             is_running: Arc::new(Mutex::new(false)),
+            runtime: Arc::new(Mutex::new(None)),
+            checkpoint: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -114,10 +142,6 @@ impl Default for AgentState {
         Self::new()
     }
 }
-
-/// 是否使用 langgraph-rust 框架执行
-/// 设为 true 使用新的 langgraph-rust 框架，false 使用旧的直接实现
-const USE_LANGGRAPH: bool = true;
 
 /// 启动 Agent 任务
 #[tauri::command]
@@ -145,9 +169,10 @@ pub async fn agent_start_task(
     }
     
     // 构建初始状态（使用前端传入的历史消息）
+    let messages = build_initial_messages(&task, &context);
     let initial_state = GraphState {
-        messages: context.history.clone(),
-        user_task: task,
+        messages,
+        user_task: task.clone(),
         workspace_path: context.workspace_path,
         active_note_path: context.active_note_path,
         active_note_content: context.active_note_content,
@@ -166,76 +191,50 @@ pub async fn agent_start_task(
         error: None,
     };
 
-    // 发送开始事件
-    let _ = app.emit("agent-event", AgentEvent::StatusChange {
-        status: AgentStatus::Running,
+    {
+        let mut current_state = state.current_state.lock().await;
+        *current_state = Some(initial_state.clone());
+    }
+
+    let permissions = build_permission_session(config.auto_approve);
+    let runtime = build_runtime(&initial_state.workspace_path, permissions);
+    let runtime_state = ForgeRuntimeState {
+        config: config.clone(),
+        runtime,
+        session_id: Uuid::new_v4().to_string(),
+        message_id: Uuid::new_v4().to_string(),
+        run_id: Uuid::new_v4().to_string(),
+        cancel: CancellationToken::new(),
+    };
+
+    {
+        let mut runtime_lock = state.runtime.lock().await;
+        *runtime_lock = Some(runtime_state.clone());
+        let mut checkpoint_lock = state.checkpoint.lock().await;
+        *checkpoint_lock = None;
+    }
+
+    let sink = TauriEventSink::new(app.clone());
+    sink.emit(Event::RunStarted {
+        run_id: runtime_state.run_id.clone(),
+        status: RunStatus::Running,
     });
 
-    // 根据配置选择执行方式
-    let result = if USE_LANGGRAPH {
-        // 使用 langgraph-rust 框架
-        run_with_langgraph(app.clone(), config, initial_state).await
-    } else {
-        // 使用旧的直接实现
-        run_with_legacy(app.clone(), config, initial_state).await
-    };
-    
-    match result {
-        Ok(final_state) => {
-            // 保存最终状态
-            let mut state_lock = state.current_state.lock().await;
-            *state_lock = Some(final_state);
-        }
-        Err(e) => {
-            let _ = app.emit("agent-event", AgentEvent::Error {
-                message: e.clone(),
-            });
-            let _ = app.emit("agent-event", AgentEvent::StatusChange {
-                status: AgentStatus::Error,
-            });
-        }
-    }
+    let result = run_forge_loop(
+        app.clone(),
+        config,
+        initial_state,
+        runtime_state.runtime.clone(),
+        Vec::new(),
+        runtime_state.session_id.clone(),
+        runtime_state.message_id.clone(),
+        runtime_state.cancel.clone(),
+    )
+    .await;
 
-    // 标记完成
-    {
-        let mut is_running = state.is_running.lock().await;
-        *is_running = false;
-    }
+    handle_forge_result(app.clone(), state, runtime_state, result).await?;
 
     Ok(())
-}
-
-/// 使用 langgraph-rust 框架执行
-async fn run_with_langgraph(
-    app: AppHandle,
-    config: AgentConfig,
-    initial_state: GraphState,
-) -> Result<GraphState, String> {
-    // 创建执行上下文
-    let ctx = AgentContext::new(app, config.clone());
-    
-    // 构建图
-    let graph = build_agent_graph(ctx)
-        .map_err(|e| format!("Failed to build graph: {}", e))?;
-    
-    // 配置并执行
-    let graph = graph
-        .with_max_iterations(config.max_steps * 2)
-        .with_debug(false);
-    
-    // 执行图
-    graph.invoke(initial_state).await
-        .map_err(|e| format!("Graph execution error: {}", e))
-}
-
-/// 使用旧的直接实现执行（保留兼容性）
-async fn run_with_legacy(
-    app: AppHandle,
-    config: AgentConfig,
-    initial_state: GraphState,
-) -> Result<GraphState, String> {
-    let executor = GraphExecutor::new(config);
-    executor.run(&app, initial_state).await
 }
 
 /// 中止 Agent 任务
@@ -246,19 +245,35 @@ pub async fn agent_abort(
 ) -> Result<(), String> {
     // 清除审批状态
     ApprovalManager::global().clear_approval().await;
-    
-    {
-        let mut is_running = state.is_running.lock().await;
-        if !*is_running {
-            return Ok(());
-        }
-        *is_running = false;
+
+    let runtime = { state.runtime.lock().await.clone() };
+    if let Some(runtime) = runtime {
+        runtime.cancel.cancel("user aborted");
+        let sink = TauriEventSink::new(app.clone());
+        sink.emit(Event::RunAborted {
+            run_id: runtime.run_id.clone(),
+            reason: "user aborted".to_string(),
+        });
     }
 
-    // 发送中止事件
-    let _ = app.emit("agent-event", AgentEvent::StatusChange {
-        status: AgentStatus::Aborted,
-    });
+    {
+        let mut is_running = state.is_running.lock().await;
+        *is_running = false;
+    }
+    {
+        let mut checkpoint = state.checkpoint.lock().await;
+        *checkpoint = None;
+    }
+    {
+        let mut runtime = state.runtime.lock().await;
+        *runtime = None;
+    }
+    {
+        let mut current_state = state.current_state.lock().await;
+        if let Some(ref mut current) = *current_state {
+            current.status = AgentStatus::Aborted;
+        }
+    }
 
     Ok(())
 }
@@ -267,20 +282,102 @@ pub async fn agent_abort(
 #[tauri::command]
 pub async fn agent_approve_tool(
     app: AppHandle,
-    _state: State<'_, AgentState>,
+    state: State<'_, AgentState>,
     request_id: String,
     approved: bool,
 ) -> Result<(), String> {
     println!("[Agent] 收到审批响应: request_id={}, approved={}", request_id, approved);
-    
-    // 发送审批响应
-    ApprovalManager::global().send_approval(&request_id, approved).await?;
-    
-    // 更新状态
-    let _ = app.emit("agent-event", AgentEvent::StatusChange {
-        status: AgentStatus::Running,
+
+    let runtime_state = {
+        state
+            .runtime
+            .lock()
+            .await
+            .clone()
+            .ok_or("No active Forge runtime")?
+    };
+    let checkpoint = {
+        let mut checkpoint_lock = state.checkpoint.lock().await;
+        checkpoint_lock
+            .take()
+            .ok_or("No pending approval checkpoint")?
+    };
+
+    let interrupt = checkpoint
+        .interrupts
+        .iter()
+        .find(|item| item.id == request_id)
+        .ok_or("Unknown permission request")?;
+    let request: forge::runtime::permission::PermissionRequest =
+        serde_json::from_value(interrupt.value.clone())
+            .map_err(|e| format!("Invalid permission request payload: {}", e))?;
+    let pattern = request
+        .patterns
+        .get(0)
+        .cloned()
+        .unwrap_or_else(|| request.permission.clone());
+
+    let reply = if approved {
+        PermissionReply::Once
+    } else {
+        PermissionReply::Reject
+    };
+    runtime_state
+        .runtime
+        .permissions
+        .apply_reply(&request.permission, &pattern, reply.clone());
+
+    let mut resumed_state = checkpoint.state;
+    let mut pending_calls = checkpoint.pending_tool_calls;
+    if matches!(reply, PermissionReply::Reject) {
+        if let Some(rejected) = pending_calls.first() {
+            resumed_state.messages.push(Message {
+                role: MessageRole::User,
+                content: format!("用户拒绝授权工具 {}。", rejected.name),
+                name: None,
+                tool_call_id: None,
+            });
+        }
+        if !pending_calls.is_empty() {
+            pending_calls.remove(0);
+        }
+    }
+
+    {
+        let mut is_running = state.is_running.lock().await;
+        *is_running = true;
+    }
+    {
+        let mut current_state = state.current_state.lock().await;
+        if let Some(ref mut current) = *current_state {
+            current.status = AgentStatus::Running;
+        }
+    }
+
+    let sink = TauriEventSink::new(app.clone());
+    sink.emit(Event::PermissionReplied {
+        permission: request.permission.clone(),
+        reply: reply.clone(),
     });
-    
+    sink.emit(Event::RunResumed {
+        run_id: runtime_state.run_id.clone(),
+        checkpoint_id: checkpoint.checkpoint_id.clone(),
+    });
+
+    let result = run_forge_loop(
+        app.clone(),
+        runtime_state.config.clone(),
+        resumed_state,
+        runtime_state.runtime.clone(),
+        pending_calls,
+        runtime_state.session_id.clone(),
+        runtime_state.message_id.clone(),
+        runtime_state.cancel.clone(),
+    )
+    .await;
+
+    handle_forge_result(app.clone(), state, runtime_state, result).await?;
+
     Ok(())
 }
 
@@ -289,12 +386,11 @@ pub async fn agent_approve_tool(
 pub async fn agent_get_status(
     state: State<'_, AgentState>,
 ) -> Result<AgentStatus, String> {
-    let is_running = state.is_running.lock().await;
-    if *is_running {
-        Ok(AgentStatus::Running)
-    } else {
-        Ok(AgentStatus::Idle)
+    let current_state = state.current_state.lock().await;
+    if let Some(current) = current_state.as_ref() {
+        return Ok(current.status.clone());
     }
+    Ok(AgentStatus::Idle)
 }
 
 /// 继续任务（用户回答问题后）
@@ -311,6 +407,134 @@ pub async fn agent_continue_with_answer(
         content: format!("用户回答: {}", answer),
         agent: AgentType::Coordinator,
     });
+
+    Ok(())
+}
+
+fn build_permission_session(auto_approve: bool) -> Arc<LocalPermissionSession> {
+    if auto_approve {
+        Arc::new(LocalPermissionSession::new(vec![PermissionRule::new(
+            "*",
+            "*",
+            PermissionDecision::Allow,
+        )]))
+    } else {
+        Arc::new(LocalPermissionSession::new(default_ruleset()))
+    }
+}
+
+fn build_initial_messages(task: &str, context: &TaskContext) -> Vec<Message> {
+    let mut messages = Vec::new();
+    messages.push(Message {
+        role: MessageRole::System,
+        content: build_system_prompt(context),
+        name: None,
+        tool_call_id: None,
+    });
+    messages.extend(context.history.clone());
+    messages.push(Message {
+        role: MessageRole::User,
+        content: task.to_string(),
+        name: None,
+        tool_call_id: None,
+    });
+    messages
+}
+
+fn build_system_prompt(context: &TaskContext) -> String {
+    let mut prompt = String::from(
+        "You are Lumina, a note assistant. Use the provided tools to read or edit files when needed. Be concise and accurate.",
+    );
+    prompt.push_str(&format!("\nWorkspace: {}", context.workspace_path));
+    if let Some(path) = context.active_note_path.as_deref() {
+        prompt.push_str(&format!("\nActive note: {}", path));
+    }
+    if let Some(tree) = context.file_tree.as_deref() {
+        prompt.push_str("\nFile tree:\n");
+        prompt.push_str(tree);
+    }
+    prompt
+}
+
+async fn handle_forge_result(
+    app: AppHandle,
+    state: State<'_, AgentState>,
+    runtime_state: ForgeRuntimeState,
+    result: Result<ForgeRunResult, String>,
+) -> Result<(), String> {
+    let sink = TauriEventSink::new(app.clone());
+    match result {
+        Ok(run) => {
+            let mut final_state = run.state;
+            if let Some(pending) = run.pending {
+                final_state.status = AgentStatus::WaitingApproval;
+                let checkpoint_id = Uuid::new_v4().to_string();
+                {
+                    let mut checkpoint_lock = state.checkpoint.lock().await;
+                    *checkpoint_lock = Some(ForgeCheckpoint {
+                        checkpoint_id: checkpoint_id.clone(),
+                        state: final_state.clone(),
+                        pending_tool_calls: pending.pending_tool_calls,
+                        interrupts: pending.interrupts,
+                    });
+                }
+                {
+                    let mut current_state = state.current_state.lock().await;
+                    *current_state = Some(final_state);
+                }
+                sink.emit(Event::RunPaused {
+                    run_id: runtime_state.run_id.clone(),
+                    checkpoint_id,
+                });
+                return Ok(());
+            }
+
+            final_state.status = AgentStatus::Completed;
+            {
+                let mut current_state = state.current_state.lock().await;
+                *current_state = Some(final_state);
+            }
+            sink.emit(Event::RunCompleted {
+                run_id: runtime_state.run_id.clone(),
+                status: RunStatus::Completed,
+            });
+        }
+        Err(err) => {
+            sink.emit(Event::RunFailed {
+                run_id: runtime_state.run_id.clone(),
+                error: err.clone(),
+            });
+            {
+                let mut current_state = state.current_state.lock().await;
+                if let Some(ref mut current) = *current_state {
+                    current.status = AgentStatus::Error;
+                    current.error = Some(err.clone());
+                }
+            }
+            {
+                let mut is_running = state.is_running.lock().await;
+                *is_running = false;
+            }
+            {
+                let mut runtime = state.runtime.lock().await;
+                *runtime = None;
+            }
+            return Err(err);
+        }
+    }
+
+    {
+        let mut is_running = state.is_running.lock().await;
+        *is_running = false;
+    }
+    {
+        let mut runtime = state.runtime.lock().await;
+        *runtime = None;
+    }
+    {
+        let mut checkpoint = state.checkpoint.lock().await;
+        *checkpoint = None;
+    }
 
     Ok(())
 }

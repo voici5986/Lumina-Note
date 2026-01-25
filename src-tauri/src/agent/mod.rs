@@ -8,6 +8,7 @@ pub mod llm_client;
 pub mod tools;
 pub mod graph;
 pub mod commands;
+pub mod forge_loop;
 pub mod deep_research;
 pub mod note_map;
 pub mod messages;

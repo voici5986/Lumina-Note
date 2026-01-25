@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use crate::langgraph::state::GraphState as LangGraphState;
+use forge::runtime::state::GraphState as ForgeGraphState;
 
 /// Agent 状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -339,6 +340,30 @@ impl LangGraphState for GraphState {
         self.status == AgentStatus::Completed || self.status == AgentStatus::Error
     }
     
+    fn mark_complete(&mut self) {
+        self.status = AgentStatus::Completed;
+    }
+}
+
+// ============ 实现 Forge GraphState trait ============
+
+impl ForgeGraphState for GraphState {
+    fn get_next(&self) -> Option<&str> {
+        if self.goto.is_empty() {
+            None
+        } else {
+            Some(&self.goto)
+        }
+    }
+
+    fn set_next(&mut self, next: Option<String>) {
+        self.goto = next.unwrap_or_default();
+    }
+
+    fn is_complete(&self) -> bool {
+        self.status == AgentStatus::Completed || self.status == AgentStatus::Error
+    }
+
     fn mark_complete(&mut self) {
         self.status = AgentStatus::Completed;
     }
