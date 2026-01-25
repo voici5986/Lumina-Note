@@ -1,4 +1,3 @@
-import { parseMarkdown } from "@/services/markdown/markdown";
 import { useEffect, useRef, useImperativeHandle, forwardRef, useCallback } from "react";
 import { useFileStore } from "@/stores/useFileStore";
 import { useAIStore } from "@/stores/useAIStore";
@@ -21,6 +20,7 @@ import {
 } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { Table } from "@lezer/markdown";
 import { syntaxTree } from "@codemirror/language";
 import katex from "katex";
 import { common, createLowlight } from "lowlight";
@@ -28,6 +28,8 @@ import mermaid from "mermaid";
 import {
   livePreviewPlugin,
   collapseOnSelectionFacet,
+  tableField,
+  tableEditorPlugin,
   mouseSelectingField,
   setMouseSelecting,
   shouldShowSource
@@ -196,7 +198,27 @@ const editorTheme = EditorView.theme({
 
   // === Table 样式 ===
   ".cm-table-widget": { display: "block", overflowX: "auto", cursor: "text" },
-  ".cm-table-source": { fontFamily: "'JetBrains Mono', monospace !important", whiteSpace: "pre", color: "hsl(var(--foreground))", display: "block", overflowX: "auto" },
+  ".cm-table-widget table": { borderCollapse: "collapse", width: "100%" },
+  ".cm-table-widget th, .cm-table-widget td": { border: "1px solid hsl(var(--border))", padding: "8px 12px" },
+  ".cm-table-widget th": { backgroundColor: "hsl(var(--muted))", fontWeight: "600" },
+  ".cm-table-editor": { display: "block", overflowX: "auto", cursor: "text" },
+  ".cm-table-editor table": { borderCollapse: "collapse", width: "100%" },
+  ".cm-table-editor th, .cm-table-editor td": { border: "1px solid hsl(var(--border))", padding: "8px 12px" },
+  ".cm-table-editor th": { backgroundColor: "hsl(var(--muted))", fontWeight: "600" },
+  ".cm-table-cell": { outline: "none", minWidth: "40px" },
+  ".cm-table-toolbar": { display: "flex", justifyContent: "flex-end", marginBottom: "6px" },
+  ".cm-table-source-toggle": { display: "flex", justifyContent: "flex-end", marginBottom: "6px" },
+  ".cm-table-toggle": {
+    border: "1px solid hsl(var(--border))",
+    backgroundColor: "hsl(var(--background))",
+    color: "hsl(var(--foreground))",
+    borderRadius: "6px",
+    padding: "4px 8px",
+    fontSize: "12px",
+    lineHeight: "1",
+    cursor: "pointer",
+  },
+  ".cm-table-source": { fontFamily: "'JetBrains Mono', monospace !important", whiteSpace: "pre", color: "hsl(var(--foreground))", display: "block", overflowX: "auto", backgroundColor: "rgba(59, 130, 246, 0.1)" },
 
   // 基础 Markdown 样式
   ".cm-header-1": { fontSize: "2em", fontWeight: "700", lineHeight: "1.3", color: "hsl(var(--md-heading, var(--foreground)))" },
@@ -317,19 +339,6 @@ class MathWidget extends WidgetType {
     // 预览面板：让事件穿透 (pointer-events: none)
     return !this.isPreviewPanel;
   }
-}
-
-class TableWidget extends WidgetType {
-  constructor(readonly markdown: string) { super(); }
-  eq(other: TableWidget) { return other.markdown === this.markdown; }
-  toDOM() {
-    const d = document.createElement("div");
-    d.className = "cm-table-widget reading-view prose max-w-none";
-    d.dataset.widgetType = "table";
-    d.innerHTML = parseMarkdown(this.markdown);
-    return d;
-  }
-  ignoreEvent() { return true; }
 }
 
 class CodeBlockWidget extends WidgetType {
@@ -575,49 +584,6 @@ function buildMathDecorations(state: EditorState): DecorationSet {
     }
   }
   return Decoration.set(decorations.sort((a, b) => a.from - b.from), true);
-}
-
-// 表格位置缓存
-let tablePositionsCache: { from: number, to: number }[] = [];
-
-const tableStateField = StateField.define<DecorationSet>({
-  create: buildTableDecorations,
-  update(deco, tr) {
-    if (tr.docChanged || tr.reconfigured) return buildTableDecorations(tr.state);
-    const isDragging = tr.state.field(mouseSelectingField, false);
-    const wasDragging = tr.startState.field(mouseSelectingField, false);
-    if (wasDragging && !isDragging) return buildTableDecorations(tr.state);
-    if (isDragging) return deco;
-    if (tr.selection) {
-      const oldSel = tr.startState.selection.main;
-      const newSel = tr.state.selection.main;
-      const touches = (sel: { from: number, to: number }) =>
-        tablePositionsCache.some(t => (sel.from >= t.from && sel.from <= t.to) || (sel.to >= t.from && sel.to <= t.to) || (sel.from <= t.from && sel.to >= t.to));
-      if (touches(oldSel) !== touches(newSel) || (touches(newSel) && (oldSel.from !== newSel.from || oldSel.to !== newSel.to))) {
-        return buildTableDecorations(tr.state);
-      }
-    }
-    return deco;
-  },
-  provide: f => EditorView.decorations.from(f),
-});
-
-function buildTableDecorations(state: EditorState): DecorationSet {
-  const decorations: any[] = [];
-  tablePositionsCache = [];
-  syntaxTree(state).iterate({
-    enter: (node) => {
-      if (node.name === "Table") {
-        tablePositionsCache.push({ from: node.from, to: node.to });
-        if (shouldShowSource(state, node.from, node.to)) {
-          decorations.push(Decoration.mark({ class: "cm-table-source" }).range(node.from, node.to));
-        } else {
-          decorations.push(Decoration.replace({ widget: new TableWidget(state.doc.sliceString(node.from, node.to)), block: true }).range(node.from, node.to));
-        }
-      }
-    }
-  });
-  return Decoration.set(decorations);
 }
 
 // 代码块位置缓存
@@ -1061,12 +1027,16 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
 
     const getModeExtensions = useCallback((mode: ViewMode) => {
       const imageField = vaultPath ? createImageStateField(vaultPath) : null;
-      const widgets = [mathStateField, tableStateField, codeBlockStateField, calloutStateField, highlightStateField];
+      const widgets = [mathStateField, codeBlockStateField, calloutStateField, highlightStateField];
       if (imageField) widgets.push(imageField);
       switch (mode) {
-        case 'reading': return [collapseOnSelectionFacet.of(false), readingModePlugin, ...widgets];
-        case 'live': return [collapseOnSelectionFacet.of(true), livePreviewPlugin, ...widgets];
-        case 'source': default: return [calloutStateField];
+        case 'reading':
+          return [collapseOnSelectionFacet.of(false), readingModePlugin, tableField, ...widgets];
+        case 'live':
+          return [collapseOnSelectionFacet.of(true), livePreviewPlugin, tableField, tableEditorPlugin(), ...widgets];
+        case 'source':
+        default:
+          return [calloutStateField];
       }
     }, [vaultPath]);
 
@@ -1094,7 +1064,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
           themeCompartment.of([]),
           history(),
           keymap.of([...tableKeymap, ...defaultKeymap, ...historyKeymap]),
-          markdown({ base: markdownLanguage }),
+          markdown({ base: markdownLanguage, extensions: [Table] }),
           EditorView.lineWrapping,
           editorTheme,
           mouseSelectingField,
