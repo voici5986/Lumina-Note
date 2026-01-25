@@ -1033,7 +1033,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
         case 'reading':
           return [collapseOnSelectionFacet.of(false), readingModePlugin, tableField, ...widgets];
         case 'live':
-          return [collapseOnSelectionFacet.of(true), livePreviewPlugin, tableField, tableEditorPlugin(), ...widgets];
+          return [collapseOnSelectionFacet.of(true), livePreviewPlugin, tableEditorPlugin(), ...widgets];
         case 'source':
         default:
           return [calloutStateField];
