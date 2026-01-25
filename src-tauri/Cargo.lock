@@ -1013,6 +1013,7 @@ checksum = "aa9a19cbb55df58761df49b23516a86d432839add4af60fc256da840f66ed35b"
 [[package]]
 name = "forge"
 version = "0.1.0"
+source = "git+https://github.com/blueberrycongee/forge?rev=dca3d8dbbdb0cdf7061eee827b1c298b0bbc8c3c#dca3d8dbbdb0cdf7061eee827b1c298b0bbc8c3c"
 dependencies = [
  "chrono",
  "serde",
