@@ -952,7 +952,7 @@ function CreateInputRow({ type, value, onChange, onSubmit, onCancel, level }: Cr
   return (
     <div
       data-file-tree-item="true"
-      className="flex items-center gap-1.5 py-1 px-1"
+      className="w-full flex items-center gap-1.5 py-1.5 pr-2 text-sm rounded-ui-sm"
       style={{ paddingLeft }}
     >
       {type === "folder" ? (
@@ -977,7 +977,7 @@ function CreateInputRow({ type, value, onChange, onSubmit, onCancel, level }: Cr
         onKeyDown={handleKeyDown}
         autoFocus
         placeholder={type === "file" ? "文件名" : "文件夹名"}
-        className="flex-1 ui-input h-8 px-2 border-primary/60"
+        className="flex-1 ui-input h-6 px-1.5 border-transparent bg-transparent focus-visible:border-primary/40 focus-visible:ring-1 focus-visible:ring-primary/30"
       />
       {type === "file" && <span className="text-muted-foreground text-sm">.md</span>}
     </div>
