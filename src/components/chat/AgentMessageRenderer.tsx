@@ -1,10 +1,10 @@
 /**
  * Agent 消息渲染组件
  * 
- * 将 Agent 的消息渲染为：
- * - 思考过程：折叠显示，小字灰色
- * - 工具调用：折叠卡片，小字灰色
- * - 最终回答：正常大字体，Markdown 渲染
+ * Render agent output as a strict timeline:
+ * - Thinking blocks (collapsible)
+ * - Tool calls/results (collapsible)
+ * - Text segments (Markdown)
  */
 
 import { useState, useMemo, memo } from "react";
@@ -48,94 +48,155 @@ interface ToolCallInfo {
   success?: boolean;
 }
 
-interface ThinkingBlock {
-  content: string;
-  durationHint?: string; // 如 "3s"
-}
-
-interface ParsedAgentMessage {
-  thinkingBlocks: ThinkingBlock[];
-  toolCalls: ToolCallInfo[];
-  finalAnswer: string; // attempt_completion 的 result 或清理后的文本
-  rawTextBeforeCompletion: string; // 工具调用前的说明文字（通常不显示）
-}
+type TimelinePart =
+  | { type: "text"; content: string }
+  | { type: "thinking"; content: string }
+  | { type: "tool"; tool: ToolCallInfo };
 
 // ============ 解析函数 ============
 
-/**
- * 解析 assistant 消息，提取思考、工具调用、最终回答
- */
-function parseAssistantMessage(content: string, toolResults: Map<string, { result: string; success: boolean }>): ParsedAgentMessage {
-  const thinkingBlocks: ThinkingBlock[] = [];
-  const toolCalls: ToolCallInfo[] = [];
-  let finalAnswer = "";
-  let text = content;
+const IGNORED_TAGS = new Set([
+  "task",
+  "current_note",
+  "related_notes",
+  "result",
+  "directory",
+  "recursive",
+  "paths",
+  "path",
+  "content",
+  "edits",
+  "search",
+  "replace",
+]);
 
-  // 1. 提取 thinking 块
-  const thinkingRegex = /<thinking>([\s\S]*?)<\/thinking>/g;
-  let thinkingMatch;
-  while ((thinkingMatch = thinkingRegex.exec(content)) !== null) {
-    thinkingBlocks.push({ content: thinkingMatch[1].trim() });
+function parseTagAttributes(raw: string): Record<string, string> {
+  const attrs: Record<string, string> = {};
+  const attrRegex = /(\w+)="([^"]*)"/g;
+  let match;
+  while ((match = attrRegex.exec(raw)) !== null) {
+    attrs[match[1]] = decodeHtmlEntities(match[2]);
   }
-  text = text.replace(thinkingRegex, "");
+  return attrs;
+}
 
-  // 2. 提取 attempt_completion_result（我们添加的特殊标签）
-  const completionResultMatch = text.match(/<attempt_completion_result>([\s\S]*?)<\/attempt_completion_result>/);
-  if (completionResultMatch) {
-    finalAnswer = completionResultMatch[1].trim();
-    text = text.replace(/<attempt_completion_result>[\s\S]*?<\/attempt_completion_result>/, "");
+function pushTextPart(parts: TimelinePart[], text: string, includeText: boolean) {
+  if (!includeText) return;
+  const cleaned = text.replace(/<\|end_of_thinking\|>/g, "");
+  if (cleaned.trim().length === 0) return;
+  parts.push({ type: "text", content: cleaned });
+}
+
+function appendPartsFromContent(
+  content: string,
+  parts: TimelinePart[],
+  lastToolCall: { current: ToolCallInfo | null },
+  includeText: boolean
+) {
+  const trimmed = content.trim();
+
+  // Rust Agent 格式：🔧 tool_name: {...}
+  const rustToolMatch = trimmed.match(/^🔧\s*(\w+)\s*:\s*(.+)$/);
+  if (rustToolMatch) {
+    const tool = {
+      name: rustToolMatch[1],
+      params: formatToolParams(rustToolMatch[2]),
+    };
+    parts.push({ type: "tool", tool });
+    lastToolCall.current = tool;
+    return;
   }
 
-  // 3. 提取 attempt_completion（XML 模式）
-  if (!finalAnswer) {
-    const attemptMatch = text.match(/<attempt_completion>[\s\S]*?<result>([\s\S]*?)<\/result>[\s\S]*?<\/attempt_completion>/);
-    if (attemptMatch) {
-      finalAnswer = attemptMatch[1].trim();
-    }
+  // Rust Agent 格式：✅ 结果... 或 ❌ 错误...
+  const rustSuccessMatch = trimmed.match(/^✅\s*(.+)$/);
+  if (rustSuccessMatch) {
+    const base = lastToolCall.current ?? { name: "tool", params: "" };
+    parts.push({
+      type: "tool",
+      tool: { ...base, result: rustSuccessMatch[1].trim(), success: true },
+    });
+    lastToolCall.current = null;
+    return;
+  }
+  const rustErrorMatch = trimmed.match(/^❌\s*(.+)$/);
+  if (rustErrorMatch) {
+    const base = lastToolCall.current ?? { name: "tool", params: "" };
+    parts.push({
+      type: "tool",
+      tool: { ...base, result: rustErrorMatch[1].trim(), success: false },
+    });
+    lastToolCall.current = null;
+    return;
   }
 
-  // 4. 提取工具调用
-  const nonToolTags = ["thinking", "task", "current_note", "tool_result", "tool_error", "result",
-    "directory", "recursive", "paths", "path", "content", "edits", "search", "replace",
-    "attempt_completion", "attempt_completion_result", "related_notes"];
-  const toolCallRegex = /<(\w+)>([\s\S]*?)<\/\1>/g;
+  const tagRegex = /<([a-zA-Z_][\w-]*)([^>]*)>([\s\S]*?)<\/\1>/g;
+  let lastIndex = 0;
   let match;
 
-  while ((match = toolCallRegex.exec(content)) !== null) {
-    const tagName = match[1];
-    if (!nonToolTags.includes(tagName.toLowerCase())) {
-      const params = match[2].trim();
-      // 先尝试用精确 key 匹配，再回退到工具名
-      const key = getToolCallKey(tagName, params);
-      const resultData = toolResults.get(key) || toolResults.get(tagName);
+  while ((match = tagRegex.exec(content)) !== null) {
+    const leadingText = content.slice(lastIndex, match.index);
+    pushTextPart(parts, leadingText, includeText);
 
-      toolCalls.push({
-        name: tagName,
-        params: formatToolParams(params),
-        result: resultData?.result,
-        success: resultData?.success,
+    const tagName = match[1];
+    const tagNameLower = tagName.toLowerCase();
+    const attrsRaw = match[2] ?? "";
+    const inner = match[3] ?? "";
+
+    if (tagNameLower === "thinking") {
+      const thinkingText = inner.trim();
+      if (thinkingText.length > 0) {
+        parts.push({ type: "thinking", content: thinkingText });
+      }
+    } else if (tagNameLower === "tool_result" || tagNameLower === "tool_error") {
+      const attrs = parseTagAttributes(attrsRaw);
+      const name = attrs.name ?? lastToolCall.current?.name ?? tagName;
+      const paramsRaw = attrs.params ?? lastToolCall.current?.params ?? "";
+      const params = paramsRaw ? formatToolParams(paramsRaw) : "";
+      const result = inner.trim();
+      parts.push({
+        type: "tool",
+        tool: { name, params, result, success: tagNameLower === "tool_result" },
       });
+      lastToolCall.current = null;
+    } else if (tagNameLower === "attempt_completion_result") {
+      pushTextPart(parts, inner, includeText);
+    } else if (tagNameLower === "attempt_completion") {
+      const resultMatch = inner.match(/<result>([\s\S]*?)<\/result>/);
+      const resultText = resultMatch ? resultMatch[1] : inner;
+      pushTextPart(parts, resultText, includeText);
+    } else if (!IGNORED_TAGS.has(tagNameLower)) {
+      const tool = {
+        name: tagName,
+        params: formatToolParams(inner),
+      };
+      parts.push({ type: "tool", tool });
+      lastToolCall.current = tool;
     }
+
+    lastIndex = tagRegex.lastIndex;
   }
 
-  // 5. 清理剩余文本
-  let rawTextBeforeCompletion = text
-    .replace(/<[^>]+>[\s\S]*?<\/[^>]+>/g, "") // 移除所有标签对
-    .replace(/<[^>]+>/g, "") // 移除单个标签
-    // 只压缩连续空格，保留换行符
-    .replace(/[^\S\n]+/g, " ")  // 非换行的空白字符压缩为单个空格
-    .replace(/\n{3,}/g, "\n\n") // 超过2个连续换行压缩为2个
-    .trim();
+  const trailingText = content.slice(lastIndex);
+  pushTextPart(parts, trailingText, includeText);
+}
 
-  // 移除 DeepSeek 的特殊标签
-  rawTextBeforeCompletion = rawTextBeforeCompletion.replace(/<\|end_of_thinking\|>/g, "").trim();
-
-  return {
-    thinkingBlocks,
-    toolCalls,
-    finalAnswer,
-    rawTextBeforeCompletion,
-  };
+function formatMarkdownContent(content: string): string {
+  let output = content;
+  const newlineCount = (output.match(/\n/g) || []).length;
+  const contentLength = output.length;
+  if (contentLength > 100 && newlineCount < contentLength / 200) {
+    output = output
+      .replace(/(?<!^|\n)(#{1,6}\s)/g, "\n\n$1")
+      .replace(/(?<!^|\n)(\|[^|]+\|)/g, "\n$1")
+      .replace(/(?<!^|\n)(\*\*[^*]+\*\*)/g, "\n$1")
+      .replace(/(?<!^|\n)([\u{1F300}-\u{1F9FF}]\s)/gu, "\n\n$1")
+      .replace(/(?<!^|\n)(\d+\.\s)/g, "\n$1")
+      .replace(/(?<!^|\n)(-\s+\*\*)/g, "\n$1")
+      .replace(/(---)/g, "\n$1\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+  return output;
 }
 
 /**
@@ -199,96 +260,10 @@ function getToolSummary(name: string, params: string, result?: string): string {
 }
 
 /**
- * 生成工具调用的唯一标识（工具名 + 参数摘要）
- */
-function getToolCallKey(name: string, params: string): string {
-  // 提取参数中的关键信息作为签名
-  // 格式化方式与后端 formatToolResult 保持一致
-  const signature = params
-    .replace(/\s+/g, " ")
-    .slice(0, 100);
-  return `${name}::${signature}`;
-}
-
-/**
  * 解码 HTML 实体（用于匹配后端转义的 params）
  */
 function decodeHtmlEntities(str: string): string {
   return str.replace(/&quot;/g, '"').replace(/&amp;/g, "&");
-}
-
-/**
- * 从所有消息中收集工具执行结果
- * 使用 工具名::参数摘要 作为唯一 key
- */
-function collectToolResults(messages: Message[]): Map<string, { result: string; success: boolean }> {
-  const toolResults = new Map<string, { result: string; success: boolean }>();
-
-  // 用于跟踪最近的工具调用（Rust Agent 格式）
-  let lastToolCall: { name: string; params: string } | null = null;
-
-  messages.forEach(msg => {
-    const content = getTextFromContent(msg.content);
-
-    // Rust Agent 格式：🔧 tool_name: {...}
-    if (content.startsWith('🔧')) {
-      const match = content.match(/🔧\s*(\w+):\s*(.+)/);
-      if (match) {
-        lastToolCall = { name: match[1], params: match[2] };
-      }
-      return;
-    }
-
-    // Rust Agent 格式：✅ 结果... 或 ❌ 错误...
-    if (content.startsWith('✅') && lastToolCall) {
-      const result = content.slice(1).trim();
-      const key = getToolCallKey(lastToolCall.name, lastToolCall.params);
-      toolResults.set(key, { result, success: true });
-      toolResults.set(lastToolCall.name, { result, success: true });
-      lastToolCall = null;
-      return;
-    }
-    if (content.startsWith('❌') && lastToolCall) {
-      const result = content.slice(1).trim();
-      const key = getToolCallKey(lastToolCall.name, lastToolCall.params);
-      toolResults.set(key, { result, success: false });
-      toolResults.set(lastToolCall.name, { result, success: false });
-      lastToolCall = null;
-      return;
-    }
-
-    // 提取 tool_result：<tool_result name="xxx" params="...">结果</tool_result>
-    // 或旧格式：<tool_result name="xxx">结果</tool_result>
-    const resultRegex = /<tool_result name="([^"]+)"(?:\s+params="([^"]*)")?>([\s\S]*?)<\/tool_result>/g;
-    let match;
-    while ((match = resultRegex.exec(content)) !== null) {
-      const name = match[1];
-      // 解码 HTML 实体（后端会转义引号）
-      const params = decodeHtmlEntities(match[2] || "");
-      const result = match[3].trim();
-      const key = getToolCallKey(name, params);
-      toolResults.set(key, { result, success: true });
-      // 同时保存仅用工具名的版本作为回退
-      if (!toolResults.has(name)) {
-        toolResults.set(name, { result, success: true });
-      }
-    }
-
-    // 提取 tool_error
-    const errorRegex = /<tool_error name="([^"]+)"(?:\s+params="([^"]*)")?>([\s\S]*?)<\/tool_error>/g;
-    while ((match = errorRegex.exec(content)) !== null) {
-      const name = match[1];
-      const params = decodeHtmlEntities(match[2] || "");
-      const result = match[3].trim();
-      const key = getToolCallKey(name, params);
-      toolResults.set(key, { result, success: false });
-      if (!toolResults.has(name)) {
-        toolResults.set(name, { result, success: false });
-      }
-    }
-  });
-
-  return toolResults;
 }
 
 /**
@@ -318,90 +293,9 @@ function cleanUserMessage(content: string): string {
 // ============ 子组件 ============
 
 /**
- * 过程步骤块 - 根据任务状态决定展开/折叠
- * - 当前轮次运行中：展开显示每个步骤
- * - 历史轮次或完成后：折叠成一行摘要
- */
-const ProcessStepsBlock = memo(function ProcessStepsBlock({
-  thinkingBlocks,
-  toolCalls,
-  totalSteps,
-  isCurrentRound,
-  t,
-}: {
-  thinkingBlocks: ThinkingBlock[];
-  toolCalls: ToolCallInfo[];
-  totalSteps: number;
-  isCurrentRound: boolean;  // 是否是当前执行中的轮次
-  t: any;
-}) {
-  const [manualExpanded, setManualExpanded] = useState(false);
-
-  // 只有当前轮次运行中才自动展开，历史轮次保持折叠
-  const isExpanded = isCurrentRound || manualExpanded;
-
-  // 生成摘要文字
-  const toolNames = [...new Set(toolCalls.map(t => t.name))];
-  const summaryText = toolNames.length > 0
-    ? `${toolNames.slice(0, 2).join(", ")}${toolNames.length > 2 ? "..." : ""}`
-    : "思考";
-
-  return (
-    <div className="bg-muted/20 rounded-lg overflow-hidden">
-      {/* 折叠头部 - 始终显示 */}
-      <button
-        onClick={() => setManualExpanded(!manualExpanded)}
-        className="w-full flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground/70 hover:text-muted-foreground transition-colors"
-      >
-        {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        <Wrench size={12} />
-        <span>{totalSteps} 个步骤{!isExpanded && `: ${summaryText}`}</span>
-      </button>
-
-      {/* 展开内容 */}
-      {isCurrentRound ? (
-        // 当前轮次运行中：直接渲染，不使用动画（避免重渲染时的抖动）
-        isExpanded && (
-          <div className="px-3 pb-1.5 space-y-px">
-            {thinkingBlocks.map((thinking, i) => (
-              <ThinkingCollapsible key={`thinking-${i}`} thinking={thinking} t={t} />
-            ))}
-            {toolCalls.map((tool, i) => (
-              <ToolCallCollapsible key={`tool-${i}`} tool={tool} t={t} />
-            ))}
-          </div>
-        )
-      ) : (
-        // 完成后：使用动画进行折叠/展开
-        <AnimatePresence initial={false}>
-          {isExpanded && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden"
-            >
-              <div className="px-3 pb-1.5 space-y-px">
-                {thinkingBlocks.map((thinking, i) => (
-                  <ThinkingCollapsible key={`thinking-${i}`} thinking={thinking} t={t} />
-                ))}
-                {toolCalls.map((tool, i) => (
-                  <ToolCallCollapsible key={`tool-${i}`} tool={tool} t={t} />
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      )}
-    </div>
-  );
-});
-
-/**
  * 思考块折叠组件
  */
-const ThinkingCollapsible = memo(function ThinkingCollapsible({ thinking, t }: { thinking: ThinkingBlock, t: any }) {
+const ThinkingCollapsible = memo(function ThinkingCollapsible({ thinking, t }: { thinking: string, t: any }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -423,7 +317,7 @@ const ThinkingCollapsible = memo(function ThinkingCollapsible({ thinking, t }: {
             className="overflow-hidden"
           >
             <div className="pl-5 py-1 text-[11px] text-muted-foreground/60 whitespace-pre-wrap border-l border-muted-foreground/20 ml-1.5">
-              {thinking.content}
+              {thinking}
             </div>
           </motion.div>
         )}
@@ -515,10 +409,9 @@ const TIMEOUT_THRESHOLD_MS = 2 * 60 * 1000;
 /**
  * Agent 消息列表渲染器
  * 
- * 核心逻辑：将消息按"轮次"分组
+ * 核心逻辑：将消息按"轮次"分组并按时间顺序渲染
  * - 每轮以用户消息开始
- * - 该轮内所有 assistant 消息的工具调用合并显示
- * - 最后一条 assistant 消息的 finalAnswer 作为最终回答
+ * - assistant/user 内部系统消息按原始顺序展开为时间线片段
  */
 export const AgentMessageRenderer = memo(function AgentMessageRenderer({
   messages,
@@ -534,9 +427,6 @@ export const AgentMessageRenderer = memo(function AgentMessageRenderer({
     enabled: isRunning,
   });
 
-  // 收集所有工具结果
-  const toolResults = useMemo(() => collectToolResults(messages), [messages]);
-
   const { t } = useLocaleStore();
 
   // 按轮次分组计算数据（只计算数据，不创建 JSX）
@@ -544,9 +434,7 @@ export const AgentMessageRenderer = memo(function AgentMessageRenderer({
     const result: Array<{
       userIdx: number;
       userContent: string;
-      thinkingBlocks: ThinkingBlock[];
-      toolCalls: ToolCallInfo[];
-      finalAnswer: string;
+      parts: TimelinePart[];
       roundKey: string;
       hasAIContent: boolean;
     }> = [];
@@ -565,167 +453,86 @@ export const AgentMessageRenderer = memo(function AgentMessageRenderer({
 
       if (!displayContent) return;
 
-      // 找到这轮的所有 assistant 消息
       const nextUserIdx = userMessageIndices[roundIndex + 1] ?? messages.length;
-      const assistantMessages = messages.slice(userIdx + 1, nextUserIdx).filter(m => m.role === "assistant");
+      const parts: TimelinePart[] = [];
+      const lastToolCall = { current: null as ToolCallInfo | null };
 
-      // 聚合内容
-      const allThinkingBlocks: ThinkingBlock[] = [];
-      const allToolCalls: ToolCallInfo[] = [];
-      let finalAnswer = "";
-
-      assistantMessages.forEach((msg, msgIdx) => {
+      for (let msgIdx = userIdx + 1; msgIdx < nextUserIdx; msgIdx++) {
+        const msg = messages[msgIdx];
         const content = getTextFromContent(msg.content);
 
-        // 处理 Rust Agent 的工具调用消息（格式: 🔧 tool_name: {...}）
-        if (content.startsWith('🔧')) {
-          const match = content.match(/🔧\s*(\w+):\s*(.+)/);
-          if (match) {
-            const toolName = match[1];
-            const toolParams = match[2];
-            // 查找对应的工具结果
-            const resultKey = `${toolName}::${toolParams.slice(0, 100)}`;
-            const resultData = toolResults.get(resultKey) || toolResults.get(toolName);
-            allToolCalls.push({
-              name: toolName,
-              params: toolParams,
-              result: resultData?.result,
-              success: resultData?.success,
-            });
-          }
-          return;
+        if (msg.role === "assistant") {
+          appendPartsFromContent(content, parts, lastToolCall, true);
+          continue;
         }
 
-        // 处理 Rust Agent 的工具结果消息（格式: ✅ 结果 或 ❌ 错误）
-        if (content.startsWith('✅') || content.startsWith('❌')) {
-          // 工具结果已经在 toolResults 中收集，这里跳过
-          return;
+        if (msg.role === "user" && shouldSkipUserMessage(content)) {
+          appendPartsFromContent(content, parts, lastToolCall, false);
         }
-
-        const parsed = parseAssistantMessage(content, toolResults);
-        allThinkingBlocks.push(...parsed.thinkingBlocks);
-        allToolCalls.push(...parsed.toolCalls);
-
-        // 优先使用 attempt_completion_result 或 attempt_completion 中的 result
-        if (parsed.finalAnswer) {
-          finalAnswer = parsed.finalAnswer;
-        }
-
-        // 如果没有结构化的 finalAnswer，使用纯文本
-        // 对于 Rust Agent，优先使用最后一条消息（reporter 的回复）
-        if (parsed.rawTextBeforeCompletion) {
-          const fallback = parsed.rawTextBeforeCompletion.trim();
-          if (fallback.length > 0) {
-            // 最后一条消息的优先级最高（通常是 reporter 的总结）
-            const isLastMessage = msgIdx === assistantMessages.length - 1;
-            if (isLastMessage || !finalAnswer) {
-              finalAnswer = fallback;
-            }
-          }
-        }
-      });
+      }
 
       // 使用用户消息索引作为稳定且唯一的 key
       const roundKey = `round-${userIdx}`;
 
       // 判断是否有 AI 回复内容
-      // 如果存在解析出的原始文本（即使没有结构化 finalAnswer），也应视为有回复并显示
-      const hasAIContent = allThinkingBlocks.length > 0 || allToolCalls.length > 0 || !!finalAnswer;
+      const hasAIContent = parts.length > 0;
 
       result.push({
         userIdx,
         userContent: displayContent,
-        thinkingBlocks: allThinkingBlocks,
-        toolCalls: allToolCalls,
-        finalAnswer,
+        parts,
         roundKey,
         hasAIContent,
       });
     });
 
     return result;
-  }, [messages, toolResults]);
+  }, [messages]);
 
   return (
     <div className={className}>
-      {rounds.map((round, index) => {
-        const hasProcessSteps = round.thinkingBlocks.length > 0 || round.toolCalls.length > 0;
-        const totalSteps = round.thinkingBlocks.length + round.toolCalls.length;
-        // 只有最后一轮且 Agent 正在运行时才是"当前轮次"
-        const isCurrentRound = isRunning && index === rounds.length - 1;
+      {rounds.map((round) => (
+        <div key={round.roundKey}>
+          {/* 用户消息 */}
+          <div className="flex justify-end mb-4">
+            <div className="max-w-[80%] bg-muted text-foreground rounded-2xl rounded-tr-sm px-4 py-2.5">
+              <span className="text-sm">{round.userContent}</span>
+            </div>
+          </div>
 
-        return (
-          <div key={round.roundKey}>
-            {/* 用户消息 */}
-            <div className="flex justify-end mb-4">
-              <div className="max-w-[80%] bg-muted text-foreground rounded-2xl rounded-tr-sm px-4 py-2.5">
-                <span className="text-sm">{round.userContent}</span>
+          {/* AI 回复 - 只有在有内容时才显示 */}
+          {round.hasAIContent && (
+            <div className="flex gap-3 mb-4">
+              <div className="w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center shrink-0">
+                <Bot size={16} className="text-muted-foreground" />
+              </div>
+              <div className="flex-1 min-w-0 space-y-2">
+                {round.parts.map((part, partIndex) => {
+                  const key = `${round.roundKey}-part-${partIndex}`;
+                  if (part.type === "thinking") {
+                    return <ThinkingCollapsible key={key} thinking={part.content} t={t} />;
+                  }
+                  if (part.type === "tool") {
+                    return <ToolCallCollapsible key={key} tool={part.tool} t={t} />;
+                  }
+                  if (part.type === "text") {
+                    return (
+                      <div
+                        key={key}
+                        className="prose prose-sm dark:prose-invert max-w-none leading-relaxed"
+                        dangerouslySetInnerHTML={{
+                          __html: parseMarkdown(formatMarkdownContent(part.content)),
+                        }}
+                      />
+                    );
+                  }
+                  return null;
+                })}
               </div>
             </div>
-
-            {/* AI 回复 - 只有在有内容时才显示 */}
-            {round.hasAIContent && (
-              <div className="flex gap-3 mb-4">
-                <div className="w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center shrink-0">
-                  <Bot size={16} className="text-muted-foreground" />
-                </div>
-                <div className="flex-1 min-w-0 space-y-2">
-                  {hasProcessSteps && (
-                    <ProcessStepsBlock
-                      key={`steps-${round.roundKey}`}
-                      thinkingBlocks={round.thinkingBlocks}
-                      toolCalls={round.toolCalls}
-                      totalSteps={totalSteps}
-                      isCurrentRound={isCurrentRound}
-                      t={t}
-                    />
-                  )}
-
-                  {round.finalAnswer && (
-                    <div
-                      className="prose prose-sm dark:prose-invert max-w-none leading-relaxed"
-                      dangerouslySetInnerHTML={{
-                        __html: (() => {
-                          let content = round.finalAnswer;
-
-                          // 如果内容换行符很少，尝试添加必要的换行
-                          const newlineCount = (content.match(/\n/g) || []).length;
-                          const contentLength = content.length;
-                          // 如果平均每 200 字符不到一个换行，说明换行符不足
-                          if (contentLength > 100 && newlineCount < contentLength / 200) {
-                            // 在 Markdown 标记前添加换行符
-                            content = content
-                              // 标题 (# ## ### 等)
-                              .replace(/(?<!^|\n)(#{1,6}\s)/g, '\n\n$1')
-                              // 表格行 (| xxx | xxx |)
-                              .replace(/(?<!^|\n)(\|[^|]+\|)/g, '\n$1')
-                              // 粗体段落开头 (**xxx**)
-                              .replace(/(?<!^|\n)(\*\*[^*]+\*\*)/g, '\n$1')
-                              // emoji 段落开头 (✅ 📊 💡 等)
-                              .replace(/(?<!^|\n)([\u{1F300}-\u{1F9FF}]\s)/gu, '\n\n$1')
-                              // 有序列表 (1. 2. 等)
-                              .replace(/(?<!^|\n)(\d+\.\s)/g, '\n$1')
-                              // 无序列表 (- 开头)
-                              .replace(/(?<!^|\n)(-\s+\*\*)/g, '\n$1')
-                              // 分隔线
-                              .replace(/(---)/g, '\n$1\n')
-                              // 清理多余换行
-                              .replace(/\n{3,}/g, '\n\n')
-                              .trim();
-                          }
-
-                          const html = parseMarkdown(content);
-                          return html;
-                        })()
-                      }}
-                    />
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })}
+          )}
+        </div>
+      ))}
 
       {/* 超时提示 */}
       {isRunning && isLongRunning && onRetryTimeout && (
