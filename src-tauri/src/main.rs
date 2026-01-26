@@ -18,6 +18,7 @@ mod forge_runtime;
 mod mcp;
 mod codex_vscode_host;
 mod codex_extension;
+mod node_runtime;
 
 use tauri::Manager;
 

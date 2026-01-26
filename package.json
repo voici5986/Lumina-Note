@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "bundle-node": "node scripts/bundle_node.mjs",
     "generate-latest": "ts-node scripts/generate_latest_json.ts",
     "build": "tsc && vite build",
     "preview": "vite preview",

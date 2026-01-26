@@ -9,6 +9,8 @@ dist-ssr/
 src-tauri/target/
 src-tauri/gen/
 src-tauri/build.log
+src-tauri/resources/node/node
+src-tauri/resources/node/node.exe
 
 # IDE
 .vscode/
@@ -49,3 +51,4 @@ skills/
 tmp.txt
 .plan-loop/
 scripts/plan-loop*.ps1
+.tmp_node/

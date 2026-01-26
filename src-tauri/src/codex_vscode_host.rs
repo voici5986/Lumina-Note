@@ -14,6 +14,8 @@ use tokio::sync::Mutex;
 
 static HOST_SCRIPT: &str = include_str!("../../scripts/codex-vscode-host/host.mjs");
 
+use crate::node_runtime::{current_platform, download_node_runtime, resolve_node_path};
+
 #[derive(Default)]
 struct CodexVscodeHostInner {
     child: Option<tokio::process::Child>,
@@ -102,56 +104,6 @@ fn host_script_path(app: &AppHandle) -> Result<std::path::PathBuf, AppError> {
     Ok(script_path)
 }
 
-#[cfg(windows)]
-fn node_binary_name() -> &'static str {
-    "node.exe"
-}
-
-#[cfg(not(windows))]
-fn node_binary_name() -> &'static str {
-    "node"
-}
-
-fn candidate_node_paths(resource_dir: Option<&Path>, app_data_dir: Option<&Path>) -> Vec<PathBuf> {
-    let binary = node_binary_name();
-    let mut candidates = Vec::new();
-
-    if let Some(resource_dir) = resource_dir {
-        candidates.push(resource_dir.join(binary));
-        candidates.push(resource_dir.join("node").join(binary));
-        candidates.push(resource_dir.join("node").join("bin").join(binary));
-    }
-
-    if let Some(app_data_dir) = app_data_dir {
-        candidates.push(
-            app_data_dir
-                .join("codex")
-                .join("node")
-                .join(binary),
-        );
-    }
-
-    candidates
-}
-
-fn resolve_node_path(app: &AppHandle) -> Option<PathBuf> {
-    if let Ok(env_path) = std::env::var("LUMINA_NODE_PATH") {
-        let candidate = PathBuf::from(env_path);
-        if candidate.is_file() {
-            return Some(candidate);
-        }
-    }
-
-    let resource_dir = app.path().resource_dir().ok();
-    let app_data_dir = app.path().app_data_dir().ok();
-    for candidate in candidate_node_paths(resource_dir.as_deref(), app_data_dir.as_deref()) {
-        if candidate.is_file() {
-            return Some(candidate);
-        }
-    }
-
-    None
-}
 
 fn apply_no_window_flag(cmd: &mut Command) -> bool {
     #[cfg(windows)]
@@ -194,9 +146,22 @@ pub async fn codex_vscode_host_start(
 
     let script_path = host_script_path(&app)?;
 
-    let mut cmd = match resolve_node_path(&app) {
+    let resource_dir = app.path().resource_dir().ok();
+    let app_data_dir = app.path().app_data_dir().ok();
+    let platform = current_platform();
+    let mut cmd = match resolve_node_path(resource_dir.as_deref(), app_data_dir.as_deref(), platform)
+    {
         Some(path) => Command::new(path),
-        None => Command::new("node"),
+        None => {
+            let app_data_dir = app
+                .path()
+                .app_data_dir()
+                .map_err(|e| AppError::InvalidPath(format!("Failed to get app_data_dir: {}", e)))?;
+            let downloaded = download_node_runtime(&app_data_dir)
+                .await
+                .map_err(AppError::InvalidPath)?;
+            Command::new(downloaded)
+        }
     };
     apply_no_window_flag(&mut cmd);
     cmd.arg(script_path)
@@ -270,13 +235,15 @@ pub async fn codex_vscode_host_start(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::node_runtime::{candidate_node_paths, current_platform, node_binary_name};
 
     #[test]
     fn candidate_node_paths_include_expected_locations() {
         let resource_dir = Path::new("resource-root");
         let app_data_dir = Path::new("app-data");
-        let binary = node_binary_name();
-        let candidates = candidate_node_paths(Some(resource_dir), Some(app_data_dir));
+        let platform = current_platform();
+        let binary = node_binary_name(platform);
+        let candidates = candidate_node_paths(Some(resource_dir), Some(app_data_dir), platform);
 
         assert!(candidates.contains(&resource_dir.join(binary)));
         assert!(candidates.contains(&resource_dir.join("node").join(binary)));
