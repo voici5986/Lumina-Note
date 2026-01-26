@@ -28,6 +28,8 @@ export function ProfilePreview() {
 
   const displayName = profileConfig.displayName || "未命名用户";
   const profileId = profileConfig.id;
+  const isRemoteCover = (cover?: string) =>
+    Boolean(cover && (cover.startsWith("http://") || cover.startsWith("https://") || cover.startsWith("data:")));
 
   useEffect(() => {
     let alive = true;
@@ -60,37 +62,58 @@ export function ProfilePreview() {
   return (
     <div className="flex-1 overflow-auto bg-background">
       <div className="mx-auto w-full max-w-5xl px-8 py-10">
-        <div className="flex items-start gap-6">
-          <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center overflow-hidden">
-            {profileConfig.avatarUrl ? (
-              <img src={profileConfig.avatarUrl} alt={displayName} className="h-full w-full object-cover" />
-            ) : (
-              <span className="text-2xl font-semibold text-muted-foreground">
-                {displayName.slice(0, 1) || "U"}
-              </span>
-            )}
-          </div>
-          <div className="flex-1 space-y-2">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold tracking-tight">{displayName}</h1>
-              <span className="text-xs text-muted-foreground">/u/{profileId}</span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {profileConfig.bio || "写点关于你的简介吧…"}
-            </p>
-            {links.length > 0 && (
-              <div className="flex flex-wrap gap-2 text-sm">
-                {links.map((link) => (
-                  <a
-                    key={`${link.label}-${link.url}`}
-                    href={link.url}
-                    className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-primary/40 transition"
-                  >
-                    {link.label}
-                  </a>
-                ))}
+        <div className="rounded-2xl border border-border/70 bg-muted/30 px-6 py-5 shadow-sm">
+          <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+            <div className="flex items-start gap-5">
+              <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center overflow-hidden ring-2 ring-border/60">
+                {profileConfig.avatarUrl ? (
+                  <img src={profileConfig.avatarUrl} alt={displayName} className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-2xl font-semibold text-muted-foreground">
+                    {displayName.slice(0, 1) || "U"}
+                  </span>
+                )}
               </div>
-            )}
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-3">
+                  <h1 className="text-2xl font-semibold tracking-tight">{displayName}</h1>
+                  <span className="rounded-full border border-border/60 px-2 py-0.5 text-xs text-muted-foreground">
+                    /u/{profileId}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground max-w-xl">
+                  {profileConfig.bio || "写点关于你的简介吧…"}
+                </p>
+                {links.length > 0 && (
+                  <div className="flex flex-wrap gap-2 text-sm">
+                    {links.map((link) => (
+                      <a
+                        key={`${link.label}-${link.url}`}
+                        href={link.url}
+                        className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-primary/40 transition"
+                      >
+                        {link.label}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 text-center text-xs text-muted-foreground md:text-right">
+              <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2">
+                <p className="text-base font-semibold text-foreground">{data.pinned.length}</p>
+                <p>置顶</p>
+              </div>
+              <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2">
+                <p className="text-base font-semibold text-foreground">{data.recent.length}</p>
+                <p>最近</p>
+              </div>
+              <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2">
+                <p className="text-base font-semibold text-foreground">{data.tags.length}</p>
+                <p>标签</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -115,7 +138,12 @@ export function ProfilePreview() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {data.pinned.map((note) => (
-                <article key={note.path} className="rounded-lg border border-border bg-card p-4">
+                <article key={note.path} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                  {note.cover && isRemoteCover(note.cover) && (
+                    <div className="mb-3 h-32 overflow-hidden rounded-lg border border-border/60 bg-muted">
+                      <img src={note.cover} alt={note.title} className="h-full w-full object-cover" />
+                    </div>
+                  )}
                   <h3 className="font-medium">{note.title}</h3>
                   <p className="mt-2 text-sm text-muted-foreground line-clamp-3">{note.summary}</p>
                   {note.tags.length > 0 && (
@@ -147,7 +175,16 @@ export function ProfilePreview() {
               {data.recent.map((note) => (
                 <div key={note.path} className="rounded-lg border border-border bg-card px-4 py-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-medium">{note.title}</h3>
+                    <div className="flex items-center gap-3">
+                      {note.cover && isRemoteCover(note.cover) && (
+                        <img
+                          src={note.cover}
+                          alt={note.title}
+                          className="h-10 w-10 rounded-md object-cover border border-border/60"
+                        />
+                      )}
+                      <h3 className="font-medium">{note.title}</h3>
+                    </div>
                     {note.publishAt && (
                       <span className="text-xs text-muted-foreground">{note.publishAt}</span>
                     )}
