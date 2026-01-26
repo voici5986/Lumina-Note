@@ -301,6 +301,15 @@ export default {
     themeDescription: '配色を選択、各テーマはライト/ダークモードに自動適応',
     myThemes: 'マイテーマ',
     officialThemes: '公式テーマ',
+    profile: '公開プロフィール',
+    profileDisplayName: '表示名',
+    profileDisplayNamePlaceholder: 'あなたの名前',
+    profileBio: '自己紹介',
+    profileBioPlaceholder: '短い自己紹介を入力',
+    profileAvatar: 'アバター URL',
+    profileAvatarPlaceholder: 'https://...',
+    profilePinned: 'ピン留めノート',
+    profilePinnedEmpty: 'ピン留めできるノートがありません。',
     // テーマ名と説明
     themes: {
       default: { name: 'デフォルト', description: '暖かみのあるベージュ調' },

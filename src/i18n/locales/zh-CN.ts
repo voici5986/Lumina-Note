@@ -405,6 +405,15 @@ export default {
     themeDescription: '选择界面配色方案，每套主题自动适配浅色/深色模式',
     myThemes: '我的主题',
     officialThemes: '官方主题',
+    profile: '公开主页',
+    profileDisplayName: '显示名称',
+    profileDisplayNamePlaceholder: '你的名字',
+    profileBio: '简介',
+    profileBioPlaceholder: '一句话介绍你自己',
+    profileAvatar: '头像 URL',
+    profileAvatarPlaceholder: 'https://...',
+    profilePinned: '置顶笔记',
+    profilePinnedEmpty: '暂无可置顶的笔记。',
     // 主题名称和描述
     themes: {
       default: { name: '默认', description: '温暖的米黄色调' },

@@ -405,6 +405,15 @@ export default {
     themeDescription: 'Choose color scheme, each theme auto-adapts to light/dark mode',
     myThemes: 'My Themes',
     officialThemes: 'Official Themes',
+    profile: 'Public Profile',
+    profileDisplayName: 'Display name',
+    profileDisplayNamePlaceholder: 'Your name',
+    profileBio: 'Bio',
+    profileBioPlaceholder: 'A short introduction shown on your profile',
+    profileAvatar: 'Avatar URL',
+    profileAvatarPlaceholder: 'https://...',
+    profilePinned: 'Pinned notes',
+    profilePinnedEmpty: 'No notes available to pin.',
     // Theme names and descriptions
     themes: {
       default: { name: 'Default', description: 'Warm beige tones' },

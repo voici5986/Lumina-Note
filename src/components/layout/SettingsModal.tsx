@@ -19,6 +19,7 @@ import { ThemeEditor } from "../ai/ThemeEditor";
 import { WebDAVSettings } from "../settings/WebDAVSettings";
 import { UpdateChecker } from "../settings/UpdateChecker";
 import { LanguageSwitcher } from "./LanguageSwitcher";
+import { ProfileSettingsSection } from "../settings/ProfileSettingsSection";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -30,7 +31,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { themeId, setThemeId, editorMode, setEditorMode } = useUIStore();
   const { config } = useAIStore();
   const { hideAllWebViews, showAllWebViews } = useBrowserStore();
-  const { vaultPath } = useFileStore();
+  const { vaultPath, fileTree } = useFileStore();
 
   const [showThemeEditor, setShowThemeEditor] = useState(false);
   const [editingTheme, setEditingTheme] = useState<Theme | undefined>();
@@ -274,6 +275,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </select>
             </div>
           </section>
+
+          {/* 公开主页设置 */}
+          <ProfileSettingsSection fileTree={fileTree} />
 
           {/* AI 设置预览 */}
           <section className="space-y-4">

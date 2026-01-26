@@ -301,6 +301,15 @@ export default {
     themeDescription: '選擇界面配色方案，每套主題自動適配淺色/深色模式',
     myThemes: '我的主題',
     officialThemes: '官方主題',
+    profile: '公開首頁',
+    profileDisplayName: '顯示名稱',
+    profileDisplayNamePlaceholder: '你的名字',
+    profileBio: '簡介',
+    profileBioPlaceholder: '用一句話介紹你自己',
+    profileAvatar: '頭像 URL',
+    profileAvatarPlaceholder: 'https://...',
+    profilePinned: '置頂筆記',
+    profilePinnedEmpty: '沒有可置頂的筆記。',
     // 主題名稱和描述
     themes: {
       default: { name: '預設', description: '溫暖的米黃色調' },
