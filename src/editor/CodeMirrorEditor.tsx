@@ -6,7 +6,7 @@ import { useUIStore } from "@/stores/useUIStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 import { parseLuminaLink } from "@/services/pdf/annotations";
 import { writeBinaryFile, readBinaryFileBase64 } from "@/lib/tauri";
-import { EditorState, StateField, StateEffect, Compartment } from "@codemirror/state";
+import { EditorState, StateField, StateEffect, Compartment, Prec } from "@codemirror/state";
 import { slashCommandExtensions, placeholderExtension } from "./extensions/slashCommand";
 import { SlashMenu } from "./components/SlashMenu";
 import {
@@ -740,6 +740,38 @@ const selectionBridgeField = StateField.define<DecorationSet>({
   provide: f => EditorView.decorations.from(f),
 });
 
+function selectEntireDocument(view: EditorView) {
+  const { state } = view;
+  const { doc } = state;
+  if (
+    state.selection.ranges.length === 1 &&
+    state.selection.main.from === 0 &&
+    state.selection.main.to === doc.length
+  ) {
+    return;
+  }
+  view.dispatch(state.update({ selection: { anchor: 0, head: doc.length }, userEvent: "select" }));
+}
+
+// Workaround: ensure Cmd/Ctrl+A selects the full document even when native selectAll is triggered.
+const selectAllDomHandlers = Prec.highest(EditorView.domEventHandlers({
+  beforeinput(event, view) {
+    if (event.inputType !== "selectAll") return false;
+    selectEntireDocument(view);
+    event.preventDefault();
+    return true;
+  },
+  keydown(event, view) {
+    const isMod = event.metaKey || event.ctrlKey;
+    if (!isMod || event.shiftKey || event.altKey) return false;
+    const key = event.key?.toLowerCase?.() ?? "";
+    if (key !== "a" && event.code !== "KeyA") return false;
+    selectEntireDocument(view);
+    event.preventDefault();
+    return true;
+  }
+}));
+
 function buildSelectionBridgeDecorations(state: EditorState): DecorationSet {
   if (!state.facet(collapseOnSelectionFacet)) return Decoration.none;
   const hasSelection = state.selection.ranges.some((range) => range.from !== range.to);
@@ -1064,6 +1096,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
           themeCompartment.of([]),
           history(),
           keymap.of([...tableKeymap, ...defaultKeymap, ...historyKeymap]),
+          selectAllDomHandlers,
           markdown({ base: markdownLanguage, extensions: [Table] }),
           EditorView.lineWrapping,
           editorTheme,

@@ -52,4 +52,36 @@ describe("CodeMirror live selection gap bridge", () => {
     expect(container.querySelector(".cm-selection-gap")).toBeNull();
     expect(container.querySelector(".cm-selection-bridge")).toBeNull();
   });
+
+  it("selects full document on beforeinput selectAll", () => {
+    const { view } = setupEditor("Line 1\nLine 2\nLine 3");
+    act(() => {
+      view.dispatch({ selection: { anchor: 0, head: 0 } });
+    });
+    const event = new Event("beforeinput", { bubbles: true, cancelable: true }) as InputEvent;
+    Object.defineProperty(event, "inputType", { value: "selectAll" });
+    act(() => {
+      view.contentDOM.dispatchEvent(event);
+    });
+    expect(view.state.selection.main.from).toBe(0);
+    expect(view.state.selection.main.to).toBe(view.state.doc.length);
+  });
+
+  it("selects full document on Mod-A keydown", () => {
+    const { view } = setupEditor("Alpha\nBeta\nGamma");
+    act(() => {
+      view.dispatch({ selection: { anchor: 2, head: 2 } });
+    });
+    const event = new KeyboardEvent("keydown", {
+      key: "a",
+      metaKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      view.contentDOM.dispatchEvent(event);
+    });
+    expect(view.state.selection.main.from).toBe(0);
+    expect(view.state.selection.main.to).toBe(view.state.doc.length);
+  });
 });
