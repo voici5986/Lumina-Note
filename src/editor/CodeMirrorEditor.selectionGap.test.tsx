@@ -84,4 +84,12 @@ describe("CodeMirror live selection gap bridge", () => {
     expect(view.state.selection.main.from).toBe(0);
     expect(view.state.selection.main.to).toBe(view.state.doc.length);
   });
+
+  it("enables drawSelection layer for select-all", () => {
+    const { container, view } = setupEditor("Line 1\nLine 2\nLine 3");
+    act(() => {
+      view.dispatch({ selection: { anchor: 0, head: view.state.doc.length } });
+    });
+    expect(container.querySelector(".cm-selectionLayer")).not.toBeNull();
+  });
 });

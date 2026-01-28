@@ -1,9 +1,32 @@
 import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
-const root = path.resolve(new URL("..", import.meta.url).pathname);
+const fetchWithRetry = async (url, { retries = 3, timeoutMs = 30000 } = {}) => {
+  let lastErr;
+  for (let attempt = 1; attempt <= retries; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      return res;
+    } catch (err) {
+      lastErr = err;
+      if (attempt < retries) {
+        console.warn(
+          `[bundle-node] Fetch failed (attempt ${attempt}/${retries}). Retrying...`,
+        );
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  throw lastErr;
+};
+
+const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const versionPath = path.join(root, "node-runtime-version.txt");
 const version = (await fs.readFile(versionPath, "utf8")).trim();
 
@@ -36,7 +59,7 @@ await fs.rm(tmpDir, { recursive: true, force: true });
 await fs.mkdir(extractDir, { recursive: true });
 
 console.log(`[bundle-node] Downloading ${url}`);
-const res = await fetch(url);
+const res = await fetchWithRetry(url);
 if (!res.ok) {
   throw new Error(`[bundle-node] Download failed: HTTP ${res.status}`);
 }

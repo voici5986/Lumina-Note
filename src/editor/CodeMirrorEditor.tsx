@@ -11,6 +11,7 @@ import { slashCommandExtensions, placeholderExtension } from "./extensions/slash
 import { SlashMenu } from "./components/SlashMenu";
 import {
   EditorView,
+  drawSelection,
   keymap,
   Decoration,
   DecorationSet,
@@ -1099,6 +1100,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
           selectAllDomHandlers,
           markdown({ base: markdownLanguage, extensions: [Table] }),
           EditorView.lineWrapping,
+          drawSelection(),
           editorTheme,
           mouseSelectingField,
           selectionStatePlugin,
