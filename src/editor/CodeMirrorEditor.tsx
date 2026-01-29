@@ -112,7 +112,7 @@ const editorTheme = EditorView.theme({
     maxWidth: "0",
     opacity: "0",
     transform: "scaleX(0.8)",
-    transition: "max-width 0.2s cubic-bezier(0.2, 0, 0.2, 1), opacity 0.15s ease-out, transform 0.15s ease-out",
+    transition: "opacity 0.15s ease-out, transform 0.15s ease-out",
     pointerEvents: "none",
   },
 
@@ -134,7 +134,7 @@ const editorTheme = EditorView.theme({
     opacity: "0",
     color: "hsl(var(--muted-foreground))",
     fontFamily: "'JetBrains Mono', monospace",
-    transition: "font-size 0.2s ease-out, opacity 0.2s ease-out",
+    transition: "opacity 0.2s ease-out",
   },
 
   // 块级标记 - 激活状态 (展开)
