@@ -10,6 +10,7 @@ import { persist } from "zustand/middleware";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { getAIConfig } from "@/services/ai/ai";
+import type { SelectedSkill } from "@/types/skills";
 
 // ============ 类型定义 ============
 
@@ -161,6 +162,7 @@ export interface TaskContext {
   active_note_content?: string;
   file_tree?: string;
   history?: Message[];  // 历史对话消息（多轮对话支持）
+  skills?: SelectedSkill[];
 }
 
 export interface AgentConfig {

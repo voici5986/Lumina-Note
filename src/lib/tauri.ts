@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { SkillDetail, SkillInfo } from "@/types/skills";
 import {
   exists as tauriExists,
   readDir as tauriReadDir,
@@ -415,6 +416,21 @@ export async function moveFolder(sourcePath: string, targetFolder: string): Prom
  */
 export async function openNewWindow(): Promise<void> {
   return invoke("open_new_window");
+}
+
+// ============ Agent skills ============
+
+export async function listAgentSkills(
+  workspacePath?: string
+): Promise<SkillInfo[]> {
+  return invoke("agent_list_skills", { workspace_path: workspacePath });
+}
+
+export async function readAgentSkill(
+  name: string,
+  workspacePath?: string
+): Promise<SkillDetail> {
+  return invoke("agent_read_skill", { name, workspace_path: workspacePath });
 }
 
 /**

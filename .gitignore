@@ -40,6 +40,7 @@ coverage/
 
 # Local config
 *.local
+third_party/
 
 # AI assistants
 .claude/
@@ -48,6 +49,8 @@ coverage/
 # Local Codex/skills scratch
 .tmp_codex_ext/
 skills/
+!src-tauri/resources/skills/
+!src-tauri/resources/skills/**
 tmp.txt
 .plan-loop/
 scripts/plan-loop*.ps1

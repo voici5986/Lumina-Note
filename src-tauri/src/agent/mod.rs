@@ -8,6 +8,7 @@ pub mod llm_client;
 pub mod tools;
 pub mod graph;
 pub mod commands;
+pub mod skills;
 pub mod forge_loop;
 pub mod deep_research;
 pub mod note_map;
@@ -17,3 +18,4 @@ pub mod workspace_layout;
 
 pub use commands::*;
 pub use commands::ApprovalManager;
+pub use skills::*;

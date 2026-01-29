@@ -5,6 +5,7 @@
 //! 使用 Forge LoopNode 构建和执行 Agent 循环
 
 use crate::agent::forge_loop::{build_runtime, run_forge_loop, ForgeRunResult, ForgeRuntime, TauriEventSink};
+use crate::agent::skills::{list_skills, read_skill, SkillDetail, SkillInfo};
 use crate::agent::types::*;
 use crate::agent::deep_research::{
     DeepResearchConfig, DeepResearchRequest, DeepResearchState,
@@ -166,6 +167,7 @@ pub async fn agent_start_task(
         use crate::agent::debug_log as dbg;
         dbg::log_config(&config.provider, &config.model, config.temperature);
         dbg::log_task(&task);
+        dbg::log_skills(&context.skills);
     }
     
     // 构建初始状态（使用前端传入的历史消息）
@@ -411,6 +413,27 @@ pub async fn agent_continue_with_answer(
     Ok(())
 }
 
+// ============ Skills 命令 ============
+
+/// 列出可用 skills
+#[tauri::command]
+pub async fn agent_list_skills(
+    app: AppHandle,
+    workspace_path: Option<String>,
+) -> Result<Vec<SkillInfo>, String> {
+    Ok(list_skills(&app, workspace_path.as_deref()))
+}
+
+/// 读取 skill 详情
+#[tauri::command]
+pub async fn agent_read_skill(
+    app: AppHandle,
+    name: String,
+    workspace_path: Option<String>,
+) -> Result<SkillDetail, String> {
+    read_skill(&app, workspace_path.as_deref(), &name)
+}
+
 fn build_permission_session(auto_approve: bool) -> Arc<LocalPermissionSession> {
     if auto_approve {
         Arc::new(LocalPermissionSession::new(vec![PermissionRule::new(
@@ -431,6 +454,9 @@ fn build_initial_messages(task: &str, context: &TaskContext) -> Vec<Message> {
         name: None,
         tool_call_id: None,
     });
+    if !context.skills.is_empty() {
+        messages.extend(build_skill_messages(&context.skills));
+    }
     messages.extend(context.history.clone());
     messages.push(Message {
         role: MessageRole::User,
@@ -439,6 +465,30 @@ fn build_initial_messages(task: &str, context: &TaskContext) -> Vec<Message> {
         tool_call_id: None,
     });
     messages
+}
+
+fn build_skill_messages(skills: &[SkillContext]) -> Vec<Message> {
+    skills
+        .iter()
+        .map(|skill| {
+            let title = skill.title.as_deref().unwrap_or(&skill.name);
+            let mut content = format!("Skill: {} ({})\n", title, skill.name);
+            if let Some(desc) = skill.description.as_deref() {
+                content.push_str(&format!("Description: {}\n", desc));
+            }
+            if let Some(source) = skill.source.as_deref() {
+                content.push_str(&format!("Source: {}\n", source));
+            }
+            content.push_str("Instructions:\n");
+            content.push_str(&skill.prompt);
+            Message {
+                role: MessageRole::System,
+                content,
+                name: None,
+                tool_call_id: None,
+            }
+        })
+        .collect()
 }
 
 fn build_system_prompt(context: &TaskContext) -> String {

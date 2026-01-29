@@ -302,6 +302,19 @@ pub enum AgentEvent {
     },
 }
 
+/// Skill context injected from frontend
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillContext {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub prompt: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+}
+
 /// 任务上下文（从前端传入）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskContext {
@@ -319,6 +332,9 @@ pub struct TaskContext {
     /// 历史对话消息（多轮对话支持）
     #[serde(default)]
     pub history: Vec<Message>,
+    /// Skills (text-only for now)
+    #[serde(default)]
+    pub skills: Vec<SkillContext>,
 }
 
 // ============ 实现 LangGraph GraphState trait ============

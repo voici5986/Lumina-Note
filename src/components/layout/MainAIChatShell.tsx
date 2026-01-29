@@ -12,6 +12,8 @@ import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { processMessageWithFiles } from "@/hooks/useChatSend";
 import { parseMarkdown } from "@/services/markdown/markdown";
 import { join } from "@/lib/path";
+import { listAgentSkills, readAgentSkill } from "@/lib/tauri";
+import type { SelectedSkill, SkillInfo } from "@/types/skills";
 import {
   ArrowUp,
   Bot,
@@ -119,6 +121,11 @@ export function MainAIChatShell() {
   const [showFilePicker, setShowFilePicker] = useState(false);
   const [filePickerQuery, setFilePickerQuery] = useState("");
   const [referencedFiles, setReferencedFiles] = useState<ReferencedFile[]>([]);
+  const [skills, setSkills] = useState<SkillInfo[]>([]);
+  const [selectedSkills, setSelectedSkills] = useState<SelectedSkill[]>([]);
+  const [skillQuery, setSkillQuery] = useState("");
+  const [showSkillMenu, setShowSkillMenu] = useState(false);
+  const [skillsLoading, setSkillsLoading] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [enableWebSearch, setEnableWebSearch] = useState(false); // 网络搜索开关
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -129,6 +136,14 @@ export function MainAIChatShell() {
       setShowHistory(false);
     }
   }, [isCodexMode, showHistory]);
+
+  useEffect(() => {
+    if (chatMode !== "agent") {
+      setSelectedSkills([]);
+      setShowSkillMenu(false);
+      setSkillQuery("");
+    }
+  }, [chatMode]);
 
   // 随机选择一个 emoji（组件挂载时确定）
   const [welcomeEmoji] = useState(() =>
@@ -280,6 +295,33 @@ export function MainAIChatShell() {
 
   const { vaultPath, currentFile, currentContent, fileTree, openFile } = useFileStore();
 
+  // 加载可用 skills（仅 Agent 模式）
+  useEffect(() => {
+    let active = true;
+    if (chatMode !== "agent") {
+      setShowSkillMenu(false);
+      return;
+    }
+    setSkillsLoading(true);
+    listAgentSkills(vaultPath || undefined)
+      .then((items) => {
+        if (!active) return;
+        setSkills(items);
+      })
+      .catch((err) => {
+        if (!active) return;
+        console.warn("[Skills] Failed to load skills:", err);
+        setSkills([]);
+      })
+      .finally(() => {
+        if (!active) return;
+        setSkillsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [chatMode, vaultPath]);
+
   const { isRecording, interimText, toggleRecording } = useSpeechToText((text: string) => {
     setInput((prev) => (prev ? prev + " " + text : text));
   });
@@ -355,6 +397,9 @@ export function MainAIChatShell() {
       if (!target.closest('[data-file-picker]')) {
         setShowFilePicker(false);
       }
+      if (!target.closest('[data-skill-menu]') && !target.closest('textarea')) {
+        setShowSkillMenu(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -417,6 +462,66 @@ export function MainAIChatShell() {
     return null;
   }, []);
 
+  const filteredSkills = useMemo(() => {
+    if (!skills.length) return [];
+    const q = skillQuery.trim().toLowerCase();
+    if (!q) return skills.slice(0, 8);
+    return skills
+      .filter((skill) =>
+        skill.name.toLowerCase().includes(q) ||
+        skill.title.toLowerCase().includes(q) ||
+        (skill.description?.toLowerCase().includes(q) ?? false)
+      )
+      .slice(0, 8);
+  }, [skills, skillQuery]);
+
+  const handleInputChange = useCallback((value: string) => {
+    setInput(value);
+    if (chatMode !== "agent") {
+      setSkillQuery("");
+      setShowSkillMenu(false);
+      return;
+    }
+    const match = value.match(/(?:^|\s)\/([^\s]*)$/);
+    if (match) {
+      setSkillQuery(match[1] ?? "");
+      setShowSkillMenu(true);
+    } else {
+      setSkillQuery("");
+      setShowSkillMenu(false);
+    }
+  }, [chatMode]);
+
+  const handleSelectSkill = useCallback(async (skill: SkillInfo) => {
+    if (selectedSkills.some((s) => s.name === skill.name)) {
+      setShowSkillMenu(false);
+      setSkillQuery("");
+      setInput((prev) =>
+        prev.replace(/(?:^|\s)\/[^\s]*$/, (match) => (match.startsWith(" ") ? " " : ""))
+      );
+      return;
+    }
+    try {
+      const detail = await readAgentSkill(skill.name, vaultPath || undefined);
+      const nextSkill: SelectedSkill = {
+        name: detail.info.name,
+        title: detail.info.title,
+        description: detail.info.description,
+        prompt: detail.prompt,
+        source: detail.info.source,
+      };
+      setSelectedSkills((prev) => [...prev, nextSkill]);
+    } catch (err) {
+      console.warn("[Skills] Failed to load skill detail:", err);
+    } finally {
+      setShowSkillMenu(false);
+      setSkillQuery("");
+      setInput((prev) =>
+        prev.replace(/(?:^|\s)\/[^\s]*$/, (match) => (match.startsWith(" ") ? " " : ""))
+      );
+    }
+  }, [selectedSkills, vaultPath]);
+
   // 发送消息
   const handleSend = useCallback(async () => {
     console.log("[handleSend] Called, chatMode:", chatMode, "input:", input, "isLoading:", isLoading);
@@ -442,6 +547,7 @@ export function MainAIChatShell() {
     setInput("");
     const files = [...referencedFiles];
     setReferencedFiles([]);
+    setShowSkillMenu(false);
 
     const { displayMessage, fullMessage } = await processMessageWithFiles(message, files);
 
@@ -484,7 +590,9 @@ export function MainAIChatShell() {
         workspace_path: vaultPath || "",
         active_note_path: currentFile || undefined,
         active_note_content: currentFile ? currentContent : undefined,
+        skills: selectedSkills.length > 0 ? selectedSkills : undefined,
       });
+      setSelectedSkills([]);
     } else {
       const currentFileInfo = currentFile ? {
         path: currentFile,
@@ -493,10 +601,26 @@ export function MainAIChatShell() {
       } : undefined;
       await sendMessageStream(fullMessage, currentFileInfo, displayMessage);
     }
-  }, [input, chatMode, isLoading, vaultPath, currentFile, currentContent, referencedFiles, rustStartTask, sendMessageStream, isOnlyWebLink, startResearch, enableWebSearch, config]);
+  }, [input, chatMode, isLoading, vaultPath, currentFile, currentContent, referencedFiles, rustStartTask, sendMessageStream, isOnlyWebLink, startResearch, enableWebSearch, config, selectedSkills]);
 
   // 键盘事件
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showSkillMenu && chatMode === "agent") {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (filteredSkills.length > 0) {
+          handleSelectSkill(filteredSkills[0]);
+        } else {
+          setShowSkillMenu(false);
+        }
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setShowSkillMenu(false);
+        return;
+      }
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -572,6 +696,7 @@ export function MainAIChatShell() {
     if (chatMode === "codex") {
       return;
     }
+    setSelectedSkills([]);
     if (chatMode === "research") {
       // Research 模式: 重置当前研究会话，准备新研究
       resetResearch();
@@ -982,11 +1107,42 @@ export function MainAIChatShell() {
                   }`}
               >
                 {/* 输入文本区域 */}
-                <div className="p-4 pb-2">
+                <div className="p-4 pb-2 relative">
+                  {chatMode === "agent" && showSkillMenu && (
+                    <div
+                      data-skill-menu
+                      className="absolute left-4 right-4 bottom-full mb-2 bg-background border border-border rounded-lg shadow-lg z-50 overflow-hidden"
+                    >
+                      <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border flex items-center justify-between">
+                        <span>{t.ai.skillsTitle}</span>
+                        {skillsLoading && <span className="text-[10px]">{t.ai.skillsLoading}</span>}
+                      </div>
+                      <div className="max-h-56 overflow-y-auto">
+                        {filteredSkills.length === 0 ? (
+                          <div className="px-3 py-3 text-xs text-muted-foreground text-center">
+                            {t.ai.skillsEmpty}
+                          </div>
+                        ) : (
+                          filteredSkills.map((skill) => (
+                            <button
+                              key={`${skill.source ?? "skill"}:${skill.name}`}
+                              onClick={() => handleSelectSkill(skill)}
+                              className="w-full px-3 py-2 text-sm text-left hover:bg-accent transition-colors"
+                            >
+                              <div className="font-medium text-foreground">{skill.title}</div>
+                              <div className="text-xs text-muted-foreground truncate">
+                                {skill.description || skill.name}
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
                   <textarea
                     ref={textareaRef}
                     value={input}
-                    onChange={(e) => setInput(e.target.value)}
+                    onChange={(e) => handleInputChange(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder={chatMode === "research" ? researchPlaceholder : chatMode === "agent" ? t.ai.agentInputPlaceholder : t.ai.chatInputPlaceholder}
                     className="w-full resize-none outline-none text-foreground placeholder:text-muted-foreground min-h-[40px] max-h-[200px] bg-transparent text-base leading-relaxed"
@@ -994,6 +1150,26 @@ export function MainAIChatShell() {
                     autoFocus
                   />
                 </div>
+
+                {/* 已选中的 skills */}
+                {chatMode === "agent" && selectedSkills.length > 0 && (
+                  <div className="px-4 pt-1 flex flex-wrap gap-1">
+                    {selectedSkills.map((skill) => (
+                      <div
+                        key={`selected-${skill.name}`}
+                        className="flex items-center gap-1 px-2 py-1 bg-emerald-500/10 text-emerald-700 rounded-md text-xs"
+                      >
+                        <span className="font-medium">{skill.title}</span>
+                        <button
+                          onClick={() => setSelectedSkills((prev) => prev.filter((s) => s.name !== skill.name))}
+                          className="hover:bg-emerald-500/20 rounded p-0.5"
+                        >
+                          <X size={10} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* 已引用的文件标签 */}
                 {referencedFiles.length > 0 && (

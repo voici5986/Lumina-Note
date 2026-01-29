@@ -125,6 +125,8 @@ fn main() {
             agent::agent_approve_tool,
             agent::agent_get_status,
             agent::agent_continue_with_answer,
+            agent::agent_list_skills,
+            agent::agent_read_skill,
             // Agent debug commands
             agent::agent_enable_debug,
             agent::agent_disable_debug,
