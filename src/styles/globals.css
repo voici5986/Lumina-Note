@@ -32,6 +32,8 @@ body.resizing iframe[data-codex-iframe="true"] {
   --muted-foreground: 220 10% 45%;  /* 暖灰文字 */
   --accent: 220 16% 92%;  /* 暖灰强调 */
   --accent-foreground: 222 22% 18%;
+  --popover: var(--background);
+  --popover-foreground: var(--foreground);
   --primary: 200 70% 45%;  /* 柔和灰蓝 */
   --primary-foreground: 220 24% 98%;
   --border: 220 16% 84%;  /* 暖边框 */
