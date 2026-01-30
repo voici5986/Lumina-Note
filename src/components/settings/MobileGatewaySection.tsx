@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Link2, Copy, Power } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 
 interface MobileGatewayStatus {
@@ -144,6 +145,19 @@ export function MobileGatewaySection() {
                       <Copy size={12} />
                       {copied ? t.settingsModal.mobileGatewayCopied : t.settingsModal.mobileGatewayCopy}
                     </button>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-md border border-border bg-background p-2">
+                      <QRCodeSVG
+                        value={status.pairing_payload}
+                        size={120}
+                        level="M"
+                        includeMargin
+                      />
+                    </div>
+                    <div className="text-[10px] text-foreground/70">
+                      {t.settingsModal.mobileGatewayQrHint}
+                    </div>
                   </div>
                   <div className="text-[10px] text-foreground/70 break-all">
                     {status.pairing_payload}

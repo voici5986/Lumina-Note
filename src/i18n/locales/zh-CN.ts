@@ -488,6 +488,7 @@ export default {
     mobileGatewayAddresses: 'WebSocket 地址',
     mobileGatewayToken: '配对令牌',
     mobileGatewayPairingPayload: '配对信息',
+    mobileGatewayQrHint: '用手机扫码完成配对。',
     mobileGatewayCopy: '复制',
     mobileGatewayCopied: '已复制',
     about: '关于',

@@ -487,6 +487,7 @@ export default {
     mobileGatewayAddresses: 'WebSocket URLs',
     mobileGatewayToken: 'Pairing token',
     mobileGatewayPairingPayload: 'Pairing payload',
+    mobileGatewayQrHint: 'Scan this QR code on your phone to pair.',
     mobileGatewayCopy: 'Copy',
     mobileGatewayCopied: 'Copied',
     about: 'About',

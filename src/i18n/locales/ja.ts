@@ -382,6 +382,7 @@ export default {
     mobileGatewayAddresses: 'WebSocket URL',
     mobileGatewayToken: 'ペアリングトークン',
     mobileGatewayPairingPayload: 'ペアリング情報',
+    mobileGatewayQrHint: 'スマホでQRを読み取ってペアリングします。',
     mobileGatewayCopy: 'コピー',
     mobileGatewayCopied: 'コピー済み',
     about: 'このアプリについて',

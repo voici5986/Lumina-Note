@@ -382,6 +382,7 @@ export default {
     mobileGatewayAddresses: 'WebSocket 位址',
     mobileGatewayToken: '配對權杖',
     mobileGatewayPairingPayload: '配對資訊',
+    mobileGatewayQrHint: '用手機掃碼完成配對。',
     mobileGatewayCopy: '複製',
     mobileGatewayCopied: '已複製',
     about: '關於',
