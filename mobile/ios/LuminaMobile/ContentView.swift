@@ -86,6 +86,75 @@ private let sampleSessions: [AgentSession] = [
 ]
 
 struct ContentView: View {
+    @AppStorage("lumina_paired") private var isPaired = false
+
+    var body: some View {
+        if isPaired {
+            SessionListView()
+        } else {
+            PairingView(isPaired: $isPaired)
+        }
+    }
+}
+
+struct PairingView: View {
+    @Binding var isPaired: Bool
+    @State private var payload = ""
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "qrcode.viewfinder")
+                .font(.system(size: 64))
+                .foregroundStyle(.blue)
+
+            Text("Pair with Desktop")
+                .font(.title2)
+                .fontWeight(.semibold)
+
+            Text("Scan the QR code shown in Lumina Desktop > Settings > Mobile Connect.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+
+            Button(action: {}) {
+                Text("Scan QR")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .padding(.horizontal, 32)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Or paste pairing payload")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                TextField("{ \"token\": ... }", text: $payload)
+                    .textFieldStyle(.roundedBorder)
+            }
+            .padding(.horizontal, 32)
+
+            Button(action: {
+                let trimmed = payload.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    isPaired = true
+                }
+            }) {
+                Text("Pair")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .padding(.horizontal, 32)
+            .disabled(payload.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemGroupedBackground))
+    }
+}
+
+struct SessionListView: View {
     @State private var sessions = sampleSessions
     @State private var searchText = ""
 

@@ -1,5 +1,6 @@
 package com.luminanote.mobile
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -23,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
@@ -44,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -114,6 +117,19 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun LuminaMobileApp() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var isPaired by remember { mutableStateOf(PairingPrefs.isPaired(context)) }
+
+    if (!isPaired) {
+        PairingScreen(
+            onPaired = {
+                PairingPrefs.setPaired(context, true)
+                isPaired = true
+            }
+        )
+        return
+    }
+
     val sessions = remember { mutableStateListOf(*sampleSessions().toTypedArray()) }
     var search by remember { mutableStateOf("") }
     var activeSessionId by remember { mutableStateOf<String?>(null) }
@@ -151,6 +167,57 @@ fun LuminaMobileApp() {
                     sessions[index] = updated
                 }
             )
+        }
+    }
+}
+
+@Composable
+private fun PairingScreen(onPaired: () -> Unit) {
+    var payload by remember { mutableStateOf("") }
+
+    Scaffold { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .background(Color(0xFFF2F2F7))
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.QrCodeScanner,
+                contentDescription = null,
+                tint = Color(0xFF007AFF),
+                modifier = Modifier.size(72.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Pair with Desktop", fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "Scan the QR code shown in Lumina Desktop > Settings > Mobile Connect.",
+                textAlign = TextAlign.Center,
+                color = Color(0xFF8E8E93)
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            Button(onClick = {}) {
+                Text("Scan QR")
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            TextField(
+                value = payload,
+                onValueChange = { payload = it },
+                placeholder = { Text("Paste pairing payload") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(onClick = {
+                if (payload.trim().isNotEmpty()) {
+                    onPaired()
+                }
+            }) {
+                Text("Pair")
+            }
         }
     }
 }
@@ -363,5 +430,22 @@ private fun MessageBubble(message: Message) {
                 fontSize = 10.sp
             )
         }
+    }
+}
+
+private object PairingPrefs {
+    private const val PREFS = "lumina_mobile"
+    private const val KEY_PAIRED = "paired"
+
+    fun isPaired(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_PAIRED, false)
+    }
+
+    fun setPaired(context: Context, paired: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_PAIRED, paired)
+            .apply()
     }
 }
