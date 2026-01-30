@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { createBoundsSnapshot, shouldUpdateBounds, type BoundsSnapshot } from "./bounds";
+import { useBrowserStore } from "@/stores/useBrowserStore";
 
 type Props = {
   url: string | null;
@@ -15,6 +16,7 @@ export function CodexEmbeddedWebview({
   className,
   closeOnUnmount = true,
 }: Props) {
+  const globalHidden = useBrowserStore((s) => s.globalHidden);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const lastBoundsRef = useRef<BoundsSnapshot | null>(null);
   const boundsRetryRef = useRef<{ timer: number | null; count: number }>({
@@ -22,6 +24,7 @@ export function CodexEmbeddedWebview({
     count: 0,
   });
   const [created, setCreated] = useState(false);
+  const shouldShow = visible && !globalHidden;
 
   const syncBounds = async () => {
     if (!containerRef.current) return;
@@ -119,7 +122,7 @@ export function CodexEmbeddedWebview({
   }, [url]);
 
   useEffect(() => {
-    if (!visible) {
+    if (!shouldShow) {
       invoke("set_codex_webview_visible", { visible: false }).catch(() => {});
       return;
     }
@@ -140,7 +143,7 @@ export function CodexEmbeddedWebview({
       }
     }, 120);
     return () => window.clearInterval(interval);
-  }, [created, visible]);
+  }, [created, shouldShow]);
 
   useEffect(() => {
     if (!created) return;
