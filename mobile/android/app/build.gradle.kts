@@ -7,6 +7,16 @@ android {
     namespace = "com.luminanote.mobile"
     compileSdk = 34
 
+    signingConfigs {
+        create("release") {
+            val homeDir = System.getProperty("user.home")
+            storeFile = file("$homeDir/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.luminanote.mobile"
         minSdk = 24
@@ -18,6 +28,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
