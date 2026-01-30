@@ -104,6 +104,13 @@ export function useVoiceNote() {
         resetSilenceTimer();
         return;
       }
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        alert("语音输入需要开启麦克风和语音识别权限，请在系统设置中授权。");
+      } else if (event.error === "audio-capture") {
+        alert("未检测到麦克风设备，请检查麦克风连接或系统设置。");
+      } else if (event.error === "network") {
+        alert("语音识别需要联网，请检查网络连接。");
+      }
       setIsRecording(false);
       setStatus("idle");
     };
@@ -170,7 +177,20 @@ export function useVoiceNote() {
   }, [config]);
 
   // 开始录音
-  const startRecording = useCallback(() => {
+  const ensureMicPermission = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia) return true;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+      return true;
+    } catch (err) {
+      console.error("Microphone permission denied", err);
+      alert("无法获取麦克风权限，请在系统设置中允许麦克风访问。");
+      return false;
+    }
+  }, []);
+
+  const startRecording = useCallback(async () => {
     const recognition = recognitionRef.current;
     if (!recognition) {
       alert("当前环境不支持语音输入");
@@ -188,6 +208,12 @@ export function useVoiceNote() {
     setStatus("recording");
     
     try {
+      const ok = await ensureMicPermission();
+      if (!ok) {
+        setIsRecording(false);
+        setStatus("idle");
+        return;
+      }
       recognition._shouldContinue = true;
       recognition.start();
       setIsRecording(true);
@@ -197,7 +223,7 @@ export function useVoiceNote() {
       setIsRecording(false);
       setStatus("idle");
     }
-  }, [vaultPath, resetSilenceTimer]);
+  }, [vaultPath, resetSilenceTimer, ensureMicPermission]);
 
   // 停止录音并保存
   const stopRecording = useCallback(async () => {
