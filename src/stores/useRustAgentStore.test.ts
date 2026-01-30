@@ -313,5 +313,68 @@ describe('useRustAgentStore', () => {
       const hasLateMessage = finalMessages.some((msg) => msg.content === 'late-message');
       expect(hasLateMessage).toBe(true);
     });
+
+    it('should not overwrite messages after session switch during compaction', async () => {
+      const store = useRustAgentStore.getState();
+
+      useRustAgentStore.setState({
+        sessions: [
+          {
+            id: 'default-rust-session',
+            title: '新对话',
+            messages: [
+              { role: 'user', content: 's1-m1' },
+              { role: 'assistant', content: 's1-m2' },
+              { role: 'user', content: 's1-m3' },
+              { role: 'assistant', content: 's1-m4' },
+              { role: 'user', content: 's1-m5' },
+              { role: 'assistant', content: 's1-m6' },
+              { role: 'user', content: 's1-m7' },
+            ],
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            totalTokensUsed: 0,
+          },
+          {
+            id: 'rust-session-2',
+            title: 'Session 2',
+            messages: [{ role: 'user', content: 's2-m1' }],
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            totalTokensUsed: 0,
+          },
+        ],
+        currentSessionId: 'default-rust-session',
+        messages: [
+          { role: 'user', content: 's1-m1' },
+          { role: 'assistant', content: 's1-m2' },
+          { role: 'user', content: 's1-m3' },
+          { role: 'assistant', content: 's1-m4' },
+          { role: 'user', content: 's1-m5' },
+          { role: 'assistant', content: 's1-m6' },
+          { role: 'user', content: 's1-m7' },
+        ],
+        pendingCompaction: true,
+      });
+
+      let resolveCall: ((value: { content: string }) => void) | null = null;
+      const callPromise = new Promise<{ content: string }>((resolve) => {
+        resolveCall = resolve;
+      });
+      callLLMMock.mockReturnValue(callPromise);
+
+      const compactionPromise = store._compactSession();
+
+      act(() => {
+        store.switchSession('rust-session-2');
+      });
+
+      resolveCall?.({ content: '- summary' });
+      await compactionPromise;
+
+      const stateAfter = useRustAgentStore.getState();
+      expect(stateAfter.currentSessionId).toBe('rust-session-2');
+      expect(stateAfter.messages).toEqual([{ role: 'user', content: 's2-m1' }]);
+    });
   });
 });
