@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.luminanote.mobile
 
 import android.Manifest
@@ -67,9 +69,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import com.google.mlkit.vision.barcode.Barcode
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -268,7 +270,7 @@ private class MobileGatewayStore(private val context: Context) {
             } else if (type == "error") {
                 val message = json.optJSONObject("data")?.optString("message") ?: "Unknown error"
                 errorMessage = message
-                appendIncoming("Error: $message", streaming = false)
+                appendIncoming("Error: $message", streaming = false, sessionId = null)
             } else if (type == "session_list") {
                 val data = json.optJSONObject("data") ?: return
                 val list = data.optJSONArray("sessions") ?: JSONArray()

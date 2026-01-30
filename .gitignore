@@ -4,6 +4,8 @@ node_modules/
 # Build
 dist/
 dist-ssr/
+mobile/android/.gradle/
+mobile/android/app/build/
 
 # Tauri build
 src-tauri/target/
@@ -41,6 +43,7 @@ coverage/
 
 # Local config
 *.local
+mobile/android/local.properties
 third_party/
 
 # AI assistants
