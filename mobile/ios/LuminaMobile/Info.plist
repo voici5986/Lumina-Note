@@ -20,6 +20,8 @@
   <array>
     <string>UIInterfaceOrientationPortrait</string>
   </array>
+  <key>NSCameraUsageDescription</key>
+  <string>Allow Lumina Mobile to scan QR codes for pairing.</string>
   <key>NSLocalNetworkUsageDescription</key>
   <string>Allow Lumina Mobile to connect to your desktop on the same Wi-Fi network.</string>
 </dict>

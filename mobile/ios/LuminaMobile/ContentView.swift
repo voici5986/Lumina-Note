@@ -87,19 +87,21 @@ private let sampleSessions: [AgentSession] = [
 
 struct ContentView: View {
     @AppStorage("lumina_paired") private var isPaired = false
+    @AppStorage("lumina_pairing_payload") private var pairingPayload = ""
 
     var body: some View {
         if isPaired {
             SessionListView()
         } else {
-            PairingView(isPaired: $isPaired)
+            PairingView(isPaired: $isPaired, pairingPayload: $pairingPayload)
         }
     }
 }
 
 struct PairingView: View {
     @Binding var isPaired: Bool
-    @State private var payload = ""
+    @Binding var pairingPayload: String
+    @State private var showScanner = false
 
     var body: some View {
         VStack(spacing: 16) {
@@ -118,7 +120,7 @@ struct PairingView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
 
-            Button(action: {}) {
+            Button(action: { showScanner = true }) {
                 Text("Scan QR")
                     .frame(maxWidth: .infinity)
             }
@@ -129,13 +131,13 @@ struct PairingView: View {
                 Text("Or paste pairing payload")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-                TextField("{ \"token\": ... }", text: $payload)
+                TextField("{ \"token\": ... }", text: $pairingPayload)
                     .textFieldStyle(.roundedBorder)
             }
             .padding(.horizontal, 32)
 
             Button(action: {
-                let trimmed = payload.trimmingCharacters(in: .whitespacesAndNewlines)
+                let trimmed = pairingPayload.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !trimmed.isEmpty {
                     isPaired = true
                 }
@@ -145,12 +147,28 @@ struct PairingView: View {
             }
             .buttonStyle(.bordered)
             .padding(.horizontal, 32)
-            .disabled(payload.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .disabled(pairingPayload.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemGroupedBackground))
+        .sheet(isPresented: $showScanner) {
+            ZStack(alignment: .topTrailing) {
+                QRScannerView { code in
+                    pairingPayload = code
+                    isPaired = true
+                    showScanner = false
+                }
+                Button(action: { showScanner = false }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 28))
+                        .foregroundStyle(.white)
+                        .padding(16)
+                }
+            }
+            .ignoresSafeArea()
+        }
     }
 }
 
