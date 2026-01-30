@@ -1086,7 +1086,8 @@ export const useRustAgentStore = create<RustAgentState>()(
             const outputTokens = tokens?.output ?? 0;
             const added = inputTokens + outputTokens;
             if (added > 0) {
-              const shouldCompact = state.autoCompactEnabled && shouldAutoCompact(added);
+              const totalAfter = state.totalTokensUsed + added;
+              const shouldCompact = state.autoCompactEnabled && shouldAutoCompact(totalAfter);
               set({
                 totalTokensUsed: state.totalTokensUsed + added,
                 lastTokenUsage: {
