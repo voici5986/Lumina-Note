@@ -21,7 +21,7 @@ use forge::runtime::event::{Event, EventSink, PermissionReply};
 use forge::runtime::permission::PermissionDecision;
 use forge::runtime::session_state::RunStatus;
 use std::sync::Arc;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
