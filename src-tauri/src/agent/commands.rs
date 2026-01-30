@@ -94,7 +94,7 @@ pub async fn agent_start_task(
     }
     
     // 构建初始状态（使用前端传入的历史消息）
-    let messages = build_initial_messages(&task, &context);
+    let messages = build_initial_messages(&task, &context, &config.provider);
     let initial_state = GraphState {
         messages,
         user_task: task.clone(),
@@ -369,11 +369,11 @@ fn build_permission_session(auto_approve: bool) -> Arc<LocalPermissionSession> {
     }
 }
 
-fn build_initial_messages(task: &str, context: &TaskContext) -> Vec<Message> {
+fn build_initial_messages(task: &str, context: &TaskContext, provider: &str) -> Vec<Message> {
     let mut messages = Vec::new();
     messages.push(Message {
         role: MessageRole::System,
-        content: build_system_prompt(context),
+        content: build_system_prompt(context, provider),
         name: None,
         tool_call_id: None,
     });
@@ -414,10 +414,30 @@ fn build_skill_messages(skills: &[SkillContext]) -> Vec<Message> {
         .collect()
 }
 
-fn build_system_prompt(context: &TaskContext) -> String {
-    let mut prompt = String::from(
-        "You are Lumina, a note assistant. Use the provided tools to read or edit files when needed. Be concise and accurate.",
-    );
+const PROMPT_DEFAULT: &str =
+    "You are Lumina, a note assistant. Use the provided tools to read or edit files when needed. Be concise and accurate.";
+const PROMPT_OPENAI: &str =
+    "You are Lumina, a note assistant. Use tools to inspect files and make edits; do not guess. Be concise, accurate, and action-oriented.";
+const PROMPT_ANTHROPIC: &str =
+    "You are Lumina, a note assistant. Prefer clarifying questions when requirements are ambiguous, then use tools to read or edit files. Be concise and accurate.";
+const PROMPT_GEMINI: &str =
+    "You are Lumina, a note assistant. Keep responses brief and structured. Use tools to read or edit files when needed and avoid guessing.";
+const PROMPT_OLLAMA: &str =
+    "You are Lumina, a note assistant. Keep responses brief and avoid unnecessary tool calls. Use tools to read or edit files when needed and avoid guessing.";
+
+fn base_system_prompt(provider: &str) -> &'static str {
+    match provider {
+        "openai" => PROMPT_OPENAI,
+        "anthropic" => PROMPT_ANTHROPIC,
+        "gemini" => PROMPT_GEMINI,
+        "ollama" => PROMPT_OLLAMA,
+        "deepseek" | "moonshot" | "groq" => PROMPT_OPENAI,
+        _ => PROMPT_DEFAULT,
+    }
+}
+
+fn build_system_prompt(context: &TaskContext, provider: &str) -> String {
+    let mut prompt = String::from(base_system_prompt(provider));
     prompt.push_str(&format!("\nWorkspace: {}", context.workspace_path));
     if let Some(path) = context.active_note_path.as_deref() {
         prompt.push_str(&format!("\nActive note: {}", path));
