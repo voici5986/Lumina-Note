@@ -14,6 +14,7 @@ vi.mock('@/lib/tauri', () => ({
     readFile: vi.fn((path: string) => Promise.resolve(`# ${path}\n\nMock content for ${path}`)),
     saveFile: vi.fn(() => Promise.resolve()),
     createFile: vi.fn(() => Promise.resolve()),
+    createDir: vi.fn(() => Promise.resolve()),
 }));
 
 import { useFileStore } from './useFileStore';

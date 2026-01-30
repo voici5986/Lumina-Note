@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { FileEntry, listDirectory, readFile, saveFile, createFile } from "@/lib/tauri";
+import { FileEntry, listDirectory, readFile, saveFile, createFile, createDir } from "@/lib/tauri";
 import { VideoNoteFile, parseVideoNoteMd } from '@/types/videoNote';
 import { invoke } from '@tauri-apps/api/core';
 import { useFavoriteStore } from "@/stores/useFavoriteStore";
@@ -200,6 +200,16 @@ export const useFileStore = create<FileState>()(
       setVaultPath: async (path: string) => {
         set({ vaultPath: path, isLoadingTree: true });
         try {
+          try {
+            await createDir(`${path}/.lumina`);
+          } catch (error) {
+            console.warn("Failed to ensure workspace skills dir:", error);
+          }
+          try {
+            await createDir(`${path}/.lumina/skills`);
+          } catch (error) {
+            console.warn("Failed to ensure workspace skills dir:", error);
+          }
           const tree = await listDirectory(path);
           set({ fileTree: tree, isLoadingTree: false });
           try {

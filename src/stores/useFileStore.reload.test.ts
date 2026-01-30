@@ -5,6 +5,7 @@ vi.mock("@/lib/tauri", () => ({
   readFile: vi.fn(),
   saveFile: vi.fn(),
   createFile: vi.fn(),
+  createDir: vi.fn(() => Promise.resolve()),
 }));
 
 import { readFile } from "@/lib/tauri";
