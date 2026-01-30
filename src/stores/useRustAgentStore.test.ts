@@ -4,6 +4,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { act } from '@testing-library/react';
 
+const callLLMMock = vi.hoisted(() => vi.fn());
+
 // Mock dependencies before importing the store
 vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn(() => Promise.resolve(() => {})),
@@ -13,12 +15,34 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
 }));
 
-vi.mock('@/lib/ai', () => ({
+vi.mock('@/services/ai/ai', () => ({
   getAIConfig: vi.fn(() => ({
     provider: 'openai',
     model: 'gpt-4',
     apiKey: 'test-key',
+    baseUrl: undefined,
   })),
+}));
+
+vi.mock('@/services/llm', () => ({
+  callLLM: callLLMMock,
+  PROVIDER_REGISTRY: {
+    openai: {
+      models: [
+        { id: 'gpt-4', contextWindow: 8192 },
+        { id: 'custom', contextWindow: 8192 },
+      ],
+    },
+  },
+}));
+
+vi.mock('@/stores/useLocaleStore', () => ({
+  getCurrentTranslations: () => ({
+    ai: { contextSummaryTitle: 'Context Summary' },
+    prompts: {
+      contextSummary: { system: 'Summarize the conversation.' },
+    },
+  }),
 }));
 
 // Import after mocks
@@ -29,6 +53,7 @@ describe('useRustAgentStore', () => {
     // Reset store state before each test
     const store = useRustAgentStore.getState();
     store.clearChat();
+    callLLMMock.mockReset();
     
     // Reset to initial session
     useRustAgentStore.setState({
@@ -42,6 +67,10 @@ describe('useRustAgentStore', () => {
       }],
       currentSessionId: 'default-rust-session',
       totalTokensUsed: 0,
+      autoCompactEnabled: true,
+      pendingCompaction: false,
+      isCompacting: false,
+      lastTokenUsage: null,
     });
   });
 
@@ -242,6 +271,48 @@ describe('useRustAgentStore', () => {
       });
       
       expect(useRustAgentStore.getState().error).toBe('Something went wrong');
+    });
+  });
+
+  describe('_compactSession', () => {
+    it.fails('should preserve messages added during compaction', async () => {
+      const store = useRustAgentStore.getState();
+
+      const baseMessages = [
+        { role: 'user', content: 'm1' },
+        { role: 'assistant', content: 'm2' },
+        { role: 'user', content: 'm3' },
+        { role: 'assistant', content: 'm4' },
+        { role: 'user', content: 'm5' },
+        { role: 'assistant', content: 'm6' },
+        { role: 'user', content: 'm7' },
+        { role: 'assistant', content: 'm8' },
+      ];
+
+      useRustAgentStore.setState({
+        messages: baseMessages,
+        pendingCompaction: true,
+      });
+
+      let resolveCall: ((value: { content: string }) => void) | null = null;
+      const callPromise = new Promise<{ content: string }>((resolve) => {
+        resolveCall = resolve;
+      });
+      callLLMMock.mockReturnValue(callPromise);
+
+      const compactionPromise = store._compactSession();
+
+      useRustAgentStore.setState((state) => ({
+        messages: [...state.messages, { role: 'user', content: 'late-message' }],
+      }));
+
+      resolveCall?.({ content: '- summary' });
+      await compactionPromise;
+
+      const finalMessages = useRustAgentStore.getState().messages;
+      const hasLateMessage = finalMessages.some((msg) => msg.content === 'late-message');
+      console.log('[Test] compaction late-message retained:', hasLateMessage, 'messageCount:', finalMessages.length);
+      expect(hasLateMessage).toBe(true);
     });
   });
 });
