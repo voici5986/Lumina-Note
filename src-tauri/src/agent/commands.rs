@@ -21,6 +21,7 @@ use forge::runtime::event::{Event, EventSink, PermissionReply};
 use forge::runtime::permission::PermissionDecision;
 use forge::runtime::session_state::RunStatus;
 use std::sync::Arc;
+use std::{fs, path::Path};
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::Mutex;
 use uuid::Uuid;
@@ -377,6 +378,14 @@ fn build_initial_messages(task: &str, context: &TaskContext, provider: &str) -> 
         name: None,
         tool_call_id: None,
     });
+    if let Some(content) = load_agent_instructions(&context.workspace_path) {
+        messages.push(Message {
+            role: MessageRole::System,
+            content,
+            name: None,
+            tool_call_id: None,
+        });
+    }
     if !context.skills.is_empty() {
         messages.extend(build_skill_messages(&context.skills));
     }
@@ -424,6 +433,7 @@ const PROMPT_GEMINI: &str =
     "You are Lumina, a note assistant. Keep responses brief and structured. Use tools to read or edit files when needed and avoid guessing.";
 const PROMPT_OLLAMA: &str =
     "You are Lumina, a note assistant. Keep responses brief and avoid unnecessary tool calls. Use tools to read or edit files when needed and avoid guessing.";
+const DEFAULT_AGENT_INSTRUCTIONS: &str = "Project instructions (edit this file as needed):\n- Follow existing note/project conventions.\n- Prefer minimal, correct changes.\n- Ask before making broad refactors.";
 
 fn base_system_prompt(provider: &str) -> &'static str {
     match provider {
@@ -447,6 +457,22 @@ fn build_system_prompt(context: &TaskContext, provider: &str) -> String {
         prompt.push_str(tree);
     }
     prompt
+}
+
+fn load_agent_instructions(workspace_path: &str) -> Option<String> {
+    let dir = Path::new(workspace_path).join(".lumina");
+    let file_path = dir.join("AGENT.md");
+    if file_path.exists() {
+        return fs::read_to_string(file_path).ok();
+    }
+    if let Err(err) = fs::create_dir_all(&dir) {
+        eprintln!("[Agent] Failed to create .lumina dir: {}", err);
+        return Some(DEFAULT_AGENT_INSTRUCTIONS.to_string());
+    }
+    if let Err(err) = fs::write(&file_path, DEFAULT_AGENT_INSTRUCTIONS) {
+        eprintln!("[Agent] Failed to write AGENT.md: {}", err);
+    }
+    Some(DEFAULT_AGENT_INSTRUCTIONS.to_string())
 }
 
 async fn handle_forge_result(
