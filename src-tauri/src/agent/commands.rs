@@ -14,7 +14,7 @@ use crate::agent::types::*;
 use crate::forge_runtime::permissions::{default_ruleset, PermissionRule, PermissionSession as LocalPermissionSession};
 use crate::langgraph::error::ResumeCommand;
 use crate::langgraph::executor::{Checkpoint, ExecutionResult};
-use crate::mobile_gateway::emit_agent_event;
+use crate::mobile_gateway::{emit_agent_event, MobileGatewayState};
 use forge::runtime::cancel::CancellationToken;
 use forge::runtime::error::Interrupt;
 use forge::runtime::event::{Event, EventSink, PermissionReply};
@@ -22,7 +22,7 @@ use forge::runtime::permission::PermissionDecision;
 use forge::runtime::session_state::RunStatus;
 use std::sync::Arc;
 use std::{fs, path::Path};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
@@ -84,6 +84,12 @@ pub async fn agent_start_task(
             return Err("Agent is already running".to_string());
         }
         *is_running = true;
+    }
+
+    if let Some(mobile_state) = app.try_state::<MobileGatewayState>() {
+        mobile_state
+            .set_current_session_id(context.mobile_session_id.clone())
+            .await;
     }
 
     // 调试日志：记录配置和任务

@@ -195,13 +195,16 @@ impl MobileGatewayState {
         self.sessions.lock().await.clone()
     }
 
-    async fn set_current_session_id(&self, session_id: Option<String>) {
+    pub async fn set_current_session_id(&self, session_id: Option<String>) {
         let mut guard = self.current_session_id.lock().await;
         *guard = session_id;
     }
 
-    async fn get_current_session_id(&self) -> Option<String> {
-        self.current_session_id.lock().await.clone()
+    fn get_current_session_id_snapshot(&self) -> Option<String> {
+        match self.current_session_id.try_lock() {
+            Ok(guard) => guard.clone(),
+            Err(_) => None,
+        }
     }
 }
 
@@ -220,7 +223,10 @@ pub fn emit_agent_event(app: &AppHandle, event: AgentEvent) {
 pub fn emit_agent_event_payload(app: &AppHandle, payload: Value) {
     let _ = app.emit("agent-event", payload.clone());
     let state = app.state::<MobileGatewayState>();
-    let session_id = tauri::async_runtime::block_on(state.get_current_session_id());
+    if state.events.receiver_count() == 0 {
+        return;
+    }
+    let session_id = state.get_current_session_id_snapshot();
     state.broadcast_agent_event(session_id, payload);
 }
 
@@ -563,14 +569,10 @@ async fn handle_connection(
                                 command_id: command_id.clone(),
                                 status: "accepted".to_string(),
                             });
-                            app.state::<MobileGatewayState>()
-                                .set_current_session_id(Some(session_id))
-                                .await;
-
                             let app_handle = app.clone();
                             let out_tx_clone = out_tx.clone();
                             tokio::spawn(async move {
-                                let context = build_task_context(workspace_path, context);
+                                let context = build_task_context(workspace_path, context, Some(session_id));
                                 let agent_state = app_handle.state::<AgentState>();
                                 let result = agent_start_task(
                                     app_handle.clone(),
@@ -613,7 +615,11 @@ async fn handle_connection(
     writer.abort();
 }
 
-fn build_task_context(workspace_path: String, context: Option<MobileTaskContext>) -> TaskContext {
+fn build_task_context(
+    workspace_path: String,
+    context: Option<MobileTaskContext>,
+    mobile_session_id: Option<String>,
+) -> TaskContext {
     let context = context.unwrap_or_default();
     TaskContext {
         workspace_path,
@@ -624,6 +630,7 @@ fn build_task_context(workspace_path: String, context: Option<MobileTaskContext>
         resolved_links: Vec::new(),
         history: Vec::new(),
         skills: Vec::new(),
+        mobile_session_id,
     }
 }
 

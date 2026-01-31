@@ -177,6 +177,7 @@ export interface TaskContext {
   file_tree?: string;
   history?: Message[];  // 历史对话消息（多轮对话支持）
   skills?: SelectedSkill[];
+  mobile_session_id?: string;
 }
 
 export interface AgentConfig {
@@ -531,6 +532,14 @@ export const useRustAgentStore = create<RustAgentState>()(
       // 启动任务
       startTask: async (task: string, context: TaskContext) => {
         const aiConfig = getAIConfig();
+
+        if (!aiConfig.apiKey && aiConfig.provider !== "ollama") {
+          set({
+            status: "error",
+            error: "请先在设置中配置 API Key",
+          });
+          return;
+        }
         
         // 调试：打印配置
         console.log("[RustAgent] 当前配置:", {

@@ -335,6 +335,8 @@ pub struct TaskContext {
     /// Skills (text-only for now)
     #[serde(default)]
     pub skills: Vec<SkillContext>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mobile_session_id: Option<String>,
 }
 
 // ============ 实现 LangGraph GraphState trait ============

@@ -5,6 +5,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { act } from '@testing-library/react';
 
 const callLLMMock = vi.hoisted(() => vi.fn());
+const getAIConfigMock = vi.hoisted(() => vi.fn(() => ({
+  provider: 'openai',
+  model: 'gpt-4',
+  apiKey: 'test-key',
+  baseUrl: undefined,
+})));
 
 // Mock dependencies before importing the store
 vi.mock('@tauri-apps/api/event', () => ({
@@ -16,12 +22,7 @@ vi.mock('@tauri-apps/api/core', () => ({
 }));
 
 vi.mock('@/services/ai/ai', () => ({
-  getAIConfig: vi.fn(() => ({
-    provider: 'openai',
-    model: 'gpt-4',
-    apiKey: 'test-key',
-    baseUrl: undefined,
-  })),
+  getAIConfig: getAIConfigMock,
 }));
 
 vi.mock('@/services/llm', () => ({
@@ -190,6 +191,24 @@ describe('useRustAgentStore', () => {
       expect(afterClear.messages).toEqual([]);
       expect(afterClear.status).toBe('idle');
       expect(afterClear.error).toBe(null);
+    });
+  });
+
+  describe('startTask', () => {
+    it('should fail fast when api key is missing', async () => {
+      getAIConfigMock.mockReturnValueOnce({
+        provider: 'openai',
+        model: 'gpt-4',
+        apiKey: '',
+        baseUrl: undefined,
+      });
+
+      const store = useRustAgentStore.getState();
+      await store.startTask('hello', { workspace_path: '/tmp' });
+
+      const state = useRustAgentStore.getState();
+      expect(state.status).toBe('error');
+      expect(state.error).toContain('API Key');
     });
   });
 

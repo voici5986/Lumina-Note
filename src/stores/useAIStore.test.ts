@@ -1,0 +1,80 @@
+/**
+ * useAIStore 测试
+ */
+import { describe, it, expect, beforeEach, vi } from "vitest";
+
+const callLLMStreamMock = vi.hoisted(() => vi.fn());
+const getAIConfigMock = vi.hoisted(() =>
+  vi.fn(() => ({
+    provider: "moonshot",
+    model: "kimi-k2-0711-preview",
+    apiKey: "sk-test-key",
+    temperature: 0.5,
+    routing: { enabled: false, targetIntents: ["chat"] },
+  }))
+);
+
+vi.mock("@/services/llm", () => ({
+  callLLMStream: callLLMStreamMock.mockImplementation(async function* () {
+    yield { type: "text", text: "pong" };
+    yield { type: "usage", inputTokens: 1, outputTokens: 1, totalTokens: 2 };
+  }),
+}));
+
+vi.mock("@/services/ai/ai", () => ({
+  getAIConfig: getAIConfigMock,
+  setAIConfig: vi.fn(),
+  chat: vi.fn(),
+  parseFileReferences: vi.fn(() => []),
+  parseEditSuggestions: vi.fn(() => []),
+  applyEdit: vi.fn((content: string) => content),
+}));
+
+vi.mock("@/lib/tauri", () => ({
+  readFile: vi.fn(async () => ""),
+}));
+
+vi.mock("@/stores/useLocaleStore", () => ({
+  getCurrentTranslations: () => ({
+    prompts: {
+      chat: {
+        system: "You are Lumina.",
+        contextFiles: "Context files:",
+      },
+    },
+  }),
+}));
+
+// Import after mocks
+import { useAIStore } from "./useAIStore";
+
+describe("useAIStore sendMessageStream", () => {
+  beforeEach(() => {
+    callLLMStreamMock.mockClear();
+    useAIStore.setState({
+      config: {
+        provider: "moonshot",
+        model: "kimi-k2-0711-preview",
+        apiKey: "",
+        temperature: 0.5,
+        routing: { enabled: false, targetIntents: ["chat"] },
+      },
+      messages: [],
+      sessions: [],
+      currentSessionId: null,
+      error: null,
+      isStreaming: false,
+      streamingContent: "",
+      streamingReasoning: "",
+      pendingEdits: [],
+      referencedFiles: [],
+    });
+  });
+
+  it("should use runtime config apiKey for streaming", async () => {
+    await useAIStore.getState().sendMessageStream("hello");
+
+    expect(callLLMStreamMock).toHaveBeenCalledTimes(1);
+    expect(useAIStore.getState().error).toBeNull();
+  });
+});
