@@ -43,6 +43,7 @@ final class MobileGatewayStore: ObservableObject {
 
     private var webSocketTask: URLSessionWebSocketTask?
     private var lastSessionId: String?
+    private var pendingSessionCreateTitle: String?
 
     init() {
         let defaults = UserDefaults.standard
@@ -118,15 +119,11 @@ final class MobileGatewayStore: ObservableObject {
     }
 
     func requestSessionCreate(title: String? = nil) {
-        var data: [String: Any] = [:]
-        if let title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            data["title"] = title
+        if !ensureConnected() {
+            pendingSessionCreateTitle = title
+            return
         }
-        let payload: [String: Any] = [
-            "type": "session_create",
-            "data": data
-        ]
-        sendJSON(payload)
+        sendSessionCreate(title: title)
     }
 
     func setActiveSession(_ id: String?) {
@@ -142,6 +139,33 @@ final class MobileGatewayStore: ObservableObject {
             "data": ["token": token, "device_name": "iOS"]
         ]
         sendJSON(payload)
+    }
+
+    private func sendSessionCreate(title: String?) {
+        var data: [String: Any] = [:]
+        if let title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            data["title"] = title
+        }
+        let payload: [String: Any] = [
+            "type": "session_create",
+            "data": data
+        ]
+        sendJSON(payload)
+    }
+
+    private func ensureConnected() -> Bool {
+        if webSocketTask != nil && connectionStatus == "Paired" {
+            return true
+        }
+        if webSocketTask != nil && (connectionStatus == "Connecting" || connectionStatus == "Connected") {
+            return false
+        }
+        if !pairingPayload.isEmpty {
+            connect()
+        } else {
+            errorMessage = "Not paired"
+        }
+        return false
     }
 
     private func sendJSON(_ payload: [String: Any]) {
@@ -203,13 +227,17 @@ final class MobileGatewayStore: ObservableObject {
 
         if type == "paired" {
             connectionStatus = "Paired"
+            if let pendingTitle = pendingSessionCreateTitle {
+                pendingSessionCreateTitle = nil
+                sendSessionCreate(title: pendingTitle)
+            }
             return
         }
 
         if type == "error" {
             let message = (json["data"] as? [String: Any])?["message"] as? String ?? "Unknown error"
             errorMessage = message
-            appendIncoming("Error: \(message)", streaming: false)
+            appendIncoming("Error: \(message)", streaming: false, sessionId: nil)
             return
         }
 

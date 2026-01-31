@@ -87,3 +87,44 @@ struct QRScannerView: UIViewControllerRepresentable {
 
     func updateUIViewController(_ uiViewController: QRScannerViewController, context: Context) {}
 }
+
+struct QRScannerContainer: View {
+    let onCodeFound: (String) -> Void
+
+    var body: some View {
+        ZStack {
+            QRScannerView(onCodeFound: onCodeFound)
+            ScanOverlay()
+        }
+    }
+}
+
+private struct ScanOverlay: View {
+    @State private var lineOffset: CGFloat = 0
+
+    var body: some View {
+        GeometryReader { proxy in
+            let side = min(proxy.size.width, proxy.size.height) * 0.6
+            let originY = (proxy.size.height - side) / 2
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.green, lineWidth: 2)
+                    .frame(width: side, height: side)
+                    .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
+
+                Rectangle()
+                    .fill(Color.green)
+                    .frame(width: max(side - 12, 0), height: 2)
+                    .position(x: proxy.size.width / 2, y: originY + 6 + lineOffset)
+            }
+            .onAppear {
+                lineOffset = 0
+                withAnimation(.linear(duration: 1.8).repeatForever(autoreverses: true)) {
+                    lineOffset = max(side - 12, 0)
+                }
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}

@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -57,11 +58,20 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.border
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -172,6 +182,7 @@ private class MobileGatewayStore(private val context: Context) {
     val sessions = mutableStateListOf<AgentSession>()
 
     private var lastSessionId: String? = null
+    private var pendingSessionCreateTitle: String? = null
 
     init {
         if (isPaired && pairingPayload.isNotBlank()) {
@@ -239,14 +250,11 @@ private class MobileGatewayStore(private val context: Context) {
     }
 
     fun requestSessionCreate(title: String? = null) {
-        val data = JSONObject()
-        if (!title.isNullOrBlank()) {
-            data.put("title", title)
+        if (!ensureConnected()) {
+            pendingSessionCreateTitle = title
+            return
         }
-        val payload = JSONObject()
-            .put("type", "session_create")
-            .put("data", data)
-        webSocket?.send(payload.toString())
+        sendSessionCreate(title)
     }
 
     fun setActiveSession(id: String?) {
@@ -267,6 +275,32 @@ private class MobileGatewayStore(private val context: Context) {
         webSocket?.send(payload.toString())
     }
 
+    private fun sendSessionCreate(title: String?) {
+        val data = JSONObject()
+        if (!title.isNullOrBlank()) {
+            data.put("title", title)
+        }
+        val payload = JSONObject()
+            .put("type", "session_create")
+            .put("data", data)
+        webSocket?.send(payload.toString())
+    }
+
+    private fun ensureConnected(): Boolean {
+        if (webSocket != null && connectionStatus == "Paired") {
+            return true
+        }
+        if (webSocket != null && (connectionStatus == "Connecting" || connectionStatus == "Connected")) {
+            return false
+        }
+        if (pairingPayload.isNotBlank()) {
+            connect()
+        } else {
+            errorMessage = "Not paired"
+        }
+        return false
+    }
+
     private fun handleIncoming(text: String) {
         try {
             val json = JSONObject(text)
@@ -278,6 +312,10 @@ private class MobileGatewayStore(private val context: Context) {
                 handleAgentEvent(event, sessionId)
             } else if (type == "paired") {
                 connectionStatus = "Paired"
+                pendingSessionCreateTitle?.let { title ->
+                    pendingSessionCreateTitle = null
+                    sendSessionCreate(title)
+                }
             } else if (type == "error") {
                 val message = json.optJSONObject("data")?.optString("message") ?: "Unknown error"
                 errorMessage = message
@@ -513,6 +551,24 @@ private fun QrScannerView(onResult: (String) -> Unit) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val previewView = remember { PreviewView(context) }
     var hasResult by remember { mutableStateOf(false) }
+    val transition = rememberInfiniteTransition(label = "scan-line")
+    val scanProgress by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "scan-progress"
+    )
+    val boxSize = 240.dp
+    val lineHeight = 2.dp
+    val density = LocalDensity.current
+    val lineOffset = with(density) {
+        val boxPx = boxSize.toPx()
+        val linePx = lineHeight.toPx()
+        ((boxPx - linePx) * scanProgress).toDp()
+    }
 
     androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
         val executor = ContextCompat.getMainExecutor(context)
@@ -559,7 +615,23 @@ private fun QrScannerView(onResult: (String) -> Unit) {
         }
     }
 
-    AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
+    Box(modifier = Modifier.fillMaxSize()) {
+        AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .size(boxSize)
+                .border(2.dp, Color(0xFF00C853), RoundedCornerShape(16.dp))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(lineHeight)
+                    .offset(y = lineOffset)
+                    .background(Color(0xFF00C853), RectangleShape)
+            )
+        }
+    }
 }
 
 private fun processImageProxy(

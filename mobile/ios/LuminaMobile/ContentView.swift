@@ -119,13 +119,13 @@ struct PairingView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemGroupedBackground))
-        .sheet(isPresented: $showScanner) {
-            ZStack(alignment: .topTrailing) {
-                QRScannerView { code in
-                    store.applyPairingPayload(code)
-                    showScanner = false
-                }
-                Button(action: { showScanner = false }) {
+            .sheet(isPresented: $showScanner) {
+                ZStack(alignment: .topTrailing) {
+                    QRScannerContainer { code in
+                        store.applyPairingPayload(code)
+                        showScanner = false
+                    }
+                    Button(action: { showScanner = false }) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 28))
                         .foregroundStyle(.white)
