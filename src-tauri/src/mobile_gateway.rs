@@ -484,8 +484,26 @@ async fn handle_connection(
                                 }
                             };
 
-                            let workspace_path = app.state::<MobileGatewayState>().get_workspace().await;
-                            let agent_config = app.state::<MobileGatewayState>().get_agent_config().await;
+                            let state = app.state::<MobileGatewayState>();
+                            let mut workspace_path = state.get_workspace().await;
+                            let mut agent_config = state.get_agent_config().await;
+
+                            if workspace_path.is_none() || agent_config.is_none() {
+                                if let Some(settings) = load_settings(&app) {
+                                    if workspace_path.is_none() {
+                                        if let Some(path) = settings.workspace_path.clone() {
+                                            state.set_workspace(Some(path.clone())).await;
+                                            workspace_path = Some(path);
+                                        }
+                                    }
+                                    if agent_config.is_none() {
+                                        if let Some(config) = settings.agent_config.clone() {
+                                            state.set_agent_config(Some(config.clone())).await;
+                                            agent_config = Some(config);
+                                        }
+                                    }
+                                }
+                            }
 
                             let workspace_path = match workspace_path {
                                 Some(path) => path,

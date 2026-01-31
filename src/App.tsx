@@ -135,7 +135,7 @@ function App() {
   if (IS_TYPESETTING_HARNESS) {
     return <TypesettingExportHarness />;
   }
-  const { vaultPath, setVaultPath, currentFile, save, createNewFile, tabs, activeTabIndex, fileTree, refreshFileTree, openAIMainTab } = useFileStore();
+  const { vaultPath, setVaultPath, currentFile, save, createNewFile, tabs, activeTabIndex, fileTree, refreshFileTree, openAIMainTab, syncMobileWorkspace } = useFileStore();
   const { pendingDiff } = useAIStore();
   const { buildIndex } = useNoteIndexStore();
   const { initialize: initializeRAG, config: ragConfig } = useRAGStore();
@@ -169,6 +169,12 @@ function App() {
       refreshFileTree().finally(() => setIsLoadingVault(false));
     }
   }, []);
+
+  // 兼容兜底：确保移动端网关拿到当前 workspace
+  useEffect(() => {
+    if (!vaultPath) return;
+    syncMobileWorkspace({ path: vaultPath, force: true });
+  }, [vaultPath, syncMobileWorkspace]);
 
   // 启动文件监听器，自动刷新文件树
   useEffect(() => {
