@@ -7,6 +7,8 @@ dist-ssr/
 mobile/android/.gradle/
 mobile/android/app/build/
 mobile/ios/build/
+gradle-*/
+scripts/run-ios-sim.sh
 
 # Tauri build
 src-tauri/target/
