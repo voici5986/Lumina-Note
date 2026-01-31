@@ -214,6 +214,43 @@ impl Default for MobileGatewayState {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+    use tokio::time::{timeout, Duration};
+
+    #[tokio::test]
+    async fn session_snapshot_returns_value_when_unlocked() {
+        let state = MobileGatewayState::new();
+        state.set_current_session_id(Some("session-1".to_string())).await;
+        assert_eq!(
+            state.get_current_session_id_snapshot(),
+            Some("session-1".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn session_snapshot_never_blocks_when_locked() {
+        let state = Arc::new(MobileGatewayState::new());
+        state
+            .set_current_session_id(Some("session-2".to_string()))
+            .await;
+
+        let _guard = state.current_session_id.lock().await;
+        let state_clone = Arc::clone(&state);
+
+        let result = timeout(
+            Duration::from_millis(50),
+            tokio::task::spawn_blocking(move || state_clone.get_current_session_id_snapshot()),
+        )
+        .await
+        .expect("snapshot call blocked");
+
+        assert!(result.unwrap().is_none());
+    }
+}
+
 pub fn emit_agent_event(app: &AppHandle, event: AgentEvent) {
     let payload = serde_json::to_value(&event)
         .unwrap_or_else(|_| json!({ "type": "unknown", "data": null }));
