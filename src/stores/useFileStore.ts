@@ -150,6 +150,7 @@ interface FileState {
 
   // Workspace actions
   clearVault: () => void;
+  syncMobileWorkspace: (options?: { path?: string; force?: boolean }) => Promise<void>;
 }
 
 // 用户编辑的 debounce 时间（毫秒）
@@ -160,6 +161,9 @@ let lastUserEditTime = 0;
 const MAX_UNDO_HISTORY = 50;
 
 const isDocxPath = (path: string) => path.toLowerCase().endsWith(".docx");
+
+const MOBILE_WORKSPACE_SYNC_INTERVAL = 10_000;
+let lastMobileWorkspaceSync: { path: string | null; at: number } = { path: null, at: 0 };
 
 // 限制 undoStack 大小的辅助函数
 function trimUndoStack(stack: HistoryEntry[]): HistoryEntry[] {
@@ -212,11 +216,7 @@ export const useFileStore = create<FileState>()(
           }
           const tree = await listDirectory(path);
           set({ fileTree: tree, isLoadingTree: false });
-          try {
-            await invoke("mobile_set_workspace", { workspace_path: path });
-          } catch (error) {
-            console.warn("Failed to sync mobile workspace:", error);
-          }
+          await get().syncMobileWorkspace({ path, force: true });
         } catch (error) {
           console.error("Failed to load vault:", error);
           set({ isLoadingTree: false });
@@ -233,6 +233,7 @@ export const useFileStore = create<FileState>()(
           const tree = await listDirectory(vaultPath);
           set({ fileTree: tree, isLoadingTree: false });
           useFavoriteStore.getState().pruneMissing(tree);
+          void get().syncMobileWorkspace();
         } catch (error) {
           console.error("Failed to refresh file tree:", error);
           set({ isLoadingTree: false });
@@ -1770,6 +1771,21 @@ export const useFileStore = create<FileState>()(
           navigationHistory: [],
           navigationIndex: -1,
         });
+      },
+
+      syncMobileWorkspace: async (options) => {
+        const path = options?.path ?? get().vaultPath;
+        if (!path) return;
+        const now = Date.now();
+        if (!options?.force && lastMobileWorkspaceSync.path === path && now - lastMobileWorkspaceSync.at < MOBILE_WORKSPACE_SYNC_INTERVAL) {
+          return;
+        }
+        try {
+          await invoke("mobile_set_workspace", { workspace_path: path });
+          lastMobileWorkspaceSync = { path, at: now };
+        } catch (error) {
+          console.warn("Failed to sync mobile workspace:", error);
+        }
       },
 
       // Reload file if it's currently open (for external updates like database edits)
