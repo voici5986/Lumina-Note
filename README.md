@@ -4,94 +4,94 @@
 
 # Lumina Note
 
-**本地优先的 AI 笔记应用**
+**Local-first AI Note-taking App**
 
-你的笔记数据完全存储在本地，AI Agent 帮你自动整理、搜索、编辑。
+Your notes stay on your device. AI Agent helps you organize, search, and edit automatically.
 
 [![GitHub Release](https://img.shields.io/github/v/release/blueberrycongee/Lumina-Note?style=flat-square)](https://github.com/blueberrycongee/Lumina-Note/releases)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square)](LICENSE)
 [![Tauri](https://img.shields.io/badge/Tauri-v2-24C8DB?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
 
-**Language**: 简体中文 · [English](./README.en.md) · [日本語](./README.ja.md)
+**Language**: English · [简体中文](./README.zh-CN.md) · [日本語](./README.ja.md)
 
 </div>
 
 ---
 
-## 下载安装
+## Download
 
-前往 [Releases](https://github.com/blueberrycongee/Lumina-Note/releases) 下载最新版本：
+Go to [Releases](https://github.com/blueberrycongee/Lumina-Note/releases) to download the latest version:
 
-| 平台 | 下载 |
-|------|------|
-| Windows | `.msi` 或 `.exe` |
+| Platform | Download |
+|----------|----------|
+| Windows | `.msi` or `.exe` |
 | macOS (Intel) | `x64.dmg` |
 | macOS (Apple Silicon) | `aarch64.dmg` |
 
 ---
 
-## 界面预览
+## Screenshots
 
 <p align="center">
   <img src="docs/screenshots/ai-agent.png" alt="AI Agent" width="800" />
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/knowledge-graph.png" alt="知识图谱" width="800" />
+  <img src="docs/screenshots/knowledge-graph.png" alt="Knowledge Graph" width="800" />
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/editor-latex.png" alt="编辑器" width="800" />
+  <img src="docs/screenshots/editor-latex.png" alt="Editor" width="800" />
 </p>
 
 ---
 
-## 核心特性
+## Features
 
-### AI 助手
-- 多模式：对话 / Agent / Deep Research / Codex（侧边栏内嵌 VS Code 扩展）
-- 理解你的意图，自动执行读取、编辑、搜索等任务
-- 支持多家模型提供商：OpenAI / Anthropic (Claude) / DeepSeek / Gemini / Moonshot / Groq / OpenRouter / Ollama
-- 内置本地 RAG 语义搜索，基于你的笔记库回答问题
+### AI Assistant
+- Modes: Chat / Agent / Deep Research / Codex (embedded VS Code extension in the sidebar)
+- Understands your intent and automatically executes read, edit, search tasks
+- Supports multiple providers: OpenAI / Anthropic (Claude) / DeepSeek / Gemini / Moonshot / Groq / OpenRouter / Ollama
+- Built-in local RAG semantic search based on your note vault
 
-### 编辑器
-- 源码 / 实时预览 / 阅读三种模式
-- 双向链接 `[[WikiLinks]]`，构建知识网络
-- LaTeX 公式、Mermaid 图表、代码高亮
-- 分栏编辑，图片粘贴
+### Editor
+- Source / Live Preview / Reading modes
+- Bidirectional links `[[WikiLinks]]` to build knowledge networks
+- LaTeX formulas, Mermaid diagrams, code highlighting
+- Split pane editing, image paste
 
-### 知识图谱
-- 可视化笔记间的关联关系
-- 文件夹层级、双向链接自动解析
-- 物理引擎驱动，支持拖拽和缩放
+### Knowledge Graph
+- Visualize connections between notes
+- Auto-parse folder hierarchy and bidirectional links
+- Physics engine driven, supports drag and zoom
 
-### PDF 阅读器
-- 高亮、下划线、笔记批注
-- 批注自动保存为 Markdown
-- 选中内容发送给 AI 对话
+### PDF Reader
+- Highlight, underline, and annotate
+- Annotations auto-saved as Markdown
+- Send selected content to AI chat
 
-### 更多功能
-- B 站视频笔记（弹幕同步时间戳）
-- 语音输入（实时转文字）
-- 数据库视图（表格/看板）
-- WebDAV 同步
-- 闪卡复习
-- 15 套主题
-
----
-
-## 快速开始
-
-1. 下载并安装应用
-2. 首次启动时选择一个文件夹作为笔记库
-3. 在右侧 AI 面板配置模型与 API Key
-4. 开始使用
+### More Features
+- Bilibili video notes (danmaku timestamp sync)
+- Voice input (real-time transcription)
+- Database views (table/kanban)
+- WebDAV sync
+- Flashcard review
+- 15 themes
 
 ---
 
-## 从源码构建
+## Quick Start
 
-需要 Node.js 20+（推荐 20.11.1）和 Rust 1.70+
+1. Download and install the app
+2. Select a folder as your note vault on first launch
+3. Configure your model and API key in the right-side AI panel
+4. Start using
+
+---
+
+## Build from Source
+
+Requires Node.js 20+ (recommended 20.11.1) and Rust 1.70+
 
 ```bash
 git clone https://github.com/blueberrycongee/Lumina-Note.git
@@ -102,17 +102,17 @@ npm run tauri dev
 
 ---
 
-## 技术栈
+## Tech Stack
 
-- **框架**: Tauri v2 (Rust + WebView)
-- **前端**: React 18, TypeScript, Tailwind CSS
-- **编辑器**: CodeMirror 6
-- **状态管理**: Zustand
-- **向量数据库**: SQLite
+- **Framework**: Tauri v2 (Rust + WebView)
+- **Frontend**: React 18, TypeScript, Tailwind CSS
+- **Editor**: CodeMirror 6
+- **State Management**: Zustand
+- **Vector Database**: SQLite
 
 ---
 
-## 贡献者
+## Contributors
 
 <a href="https://github.com/blueberrycongee/Lumina-Note/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=blueberrycongee/Lumina-Note" />
@@ -120,7 +120,7 @@ npm run tauri dev
 
 ---
 
-## 许可证
+## License
 
 [Apache License 2.0](LICENSE)
 

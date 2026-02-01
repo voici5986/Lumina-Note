@@ -12,7 +12,7 @@ Your notes stay on your device. AI Agent helps you organize, search, and edit au
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square)](LICENSE)
 [![Tauri](https://img.shields.io/badge/Tauri-v2-24C8DB?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
 
-**Language**: [简体中文](./README.md) · English · [日本語](./README.ja.md)
+**Language**: English · [简体中文](./README.zh-CN.md) · [日本語](./README.ja.md)
 
 </div>
 

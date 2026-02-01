@@ -12,7 +12,7 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square)](LICENSE)
 [![Tauri](https://img.shields.io/badge/Tauri-v2-24C8DB?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
 
-**Language**: [简体中文](./README.md) · [English](./README.en.md) · 日本語
+**Language**: [English](./README.md) · [简体中文](./README.zh-CN.md) · 日本語
 
 </div>
 
