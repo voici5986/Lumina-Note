@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useAIStore } from "@/stores/useAIStore";
 import { useRustAgentStore } from "@/stores/useRustAgentStore";
 import { useRAGStore } from "@/stores/useRAGStore";
@@ -145,7 +146,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
 
   if (!isOpen) return null;
 
-  return (
+  const modal = (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* 背景遮罩 */}
       <div
@@ -997,4 +998,6 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
       </div>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(modal, document.body) : modal;
 }
