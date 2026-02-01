@@ -61,6 +61,32 @@ body.resizing iframe[data-codex-iframe="true"] {
   --border: 220 14% 28%;  /* 暖边框 */
 }
 
+@layer base {
+  select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    border-color: hsl(var(--border));
+    padding-right: 2rem;
+    background-image:
+      linear-gradient(45deg, transparent 50%, hsl(var(--muted-foreground)) 50%),
+      linear-gradient(135deg, hsl(var(--muted-foreground)) 50%, transparent 50%),
+      linear-gradient(to right, transparent, transparent);
+    background-position:
+      calc(100% - 16px) 52%,
+      calc(100% - 12px) 52%,
+      100% 0;
+    background-size: 4px 4px, 4px 4px, 2.5rem 2.5rem;
+    background-repeat: no-repeat;
+  }
+
+  select option {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+}
+
 @layer components {
   .ui-app-bg {
     background:
@@ -1209,4 +1235,3 @@ mark {
   padding: 0;
   display: block;
 }
-
