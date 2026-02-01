@@ -515,6 +515,12 @@ function App() {
   // VS Code 风格：拖动可以折叠/展开面板
   const LEFT_MIN_WIDTH = 200;  // store 中的最小值
   const RIGHT_MIN_WIDTH = 280; // store 中的最小值
+  const MAIN_MIN_WIDTH = 480;
+  const MAIN_RESTORE_WIDTH = 520;
+
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const ribbonRef = useRef<HTMLDivElement>(null);
+  const [isMainCollapsed, setIsMainCollapsed] = useState(false);
 
   // 累计拖拽距离（用于折叠状态下展开）
   const dragAccumulatorRef = useRef(0);
@@ -557,6 +563,34 @@ function App() {
     [rightSidebarWidth, setRightSidebarWidth, toggleRightSidebar]
   );
 
+  const getAvailableMainWidth = useCallback(() => {
+    const totalWidth = layoutRef.current?.getBoundingClientRect().width ?? window.innerWidth;
+    const ribbonWidth = ribbonRef.current?.getBoundingClientRect().width ?? 0;
+    const leftWidth = leftSidebarOpen ? leftSidebarWidth : 0;
+    const rightWidth = rightSidebarOpen ? rightSidebarWidth : 0;
+    return totalWidth - ribbonWidth - leftWidth - rightWidth;
+  }, [leftSidebarOpen, leftSidebarWidth, rightSidebarOpen, rightSidebarWidth]);
+
+  useEffect(() => {
+    const updateMainCollapse = () => {
+      if (!rightSidebarOpen) {
+        if (isMainCollapsed) setIsMainCollapsed(false);
+        return;
+      }
+
+      const availableWidth = getAvailableMainWidth();
+      if (!isMainCollapsed && availableWidth < MAIN_MIN_WIDTH) {
+        setIsMainCollapsed(true);
+      } else if (isMainCollapsed && availableWidth >= MAIN_RESTORE_WIDTH) {
+        setIsMainCollapsed(false);
+      }
+    };
+
+    updateMainCollapse();
+    window.addEventListener("resize", updateMainCollapse);
+    return () => window.removeEventListener("resize", updateMainCollapse);
+  }, [getAvailableMainWidth, isMainCollapsed, rightSidebarOpen]);
+
   // Welcome screen when no vault is open
   if (!vaultPath) {
     return <WelcomeScreen onOpenVault={handleOpenVault} />;
@@ -565,9 +599,11 @@ function App() {
   return (
     <div className="h-full flex flex-col bg-background ui-app-bg">
       <TitleBar />
-      <div className="flex-1 flex overflow-hidden transition-colors duration-300">
+      <div ref={layoutRef} className="flex-1 flex overflow-hidden transition-colors duration-300">
         {/* Left Ribbon (Icon Bar) */}
-        <Ribbon />
+        <div ref={ribbonRef} className="flex-shrink-0">
+          <Ribbon />
+        </div>
 
         {/* Left Sidebar (File Tree) */}
         <div
@@ -588,7 +624,11 @@ function App() {
         </div>
 
         {/* Main content - switches between Editor, Graph, Split, Diff, VideoNote and AI Chat based on state */}
-        <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <main
+          className={`flex flex-col overflow-hidden min-w-0 transition-[width,opacity] duration-200 ${
+            isMainCollapsed ? "flex-none w-0 opacity-0 pointer-events-none" : "flex-1 w-auto opacity-100"
+          }`}
+        >
           {pendingDiff && activeTab?.type !== "ai-chat" ? (
             // Show diff view when there's a pending AI edit (non chat context)
             <DiffViewWrapper />
@@ -698,9 +738,10 @@ function App() {
 
         {/* Right Sidebar */}
         <div
-          className={`flex-shrink-0 transition-all duration-300 ease-out overflow-hidden ${rightSidebarOpen ? "opacity-100" : "w-0 opacity-0"
-            }`}
-          style={{ width: rightSidebarOpen ? rightSidebarWidth : 0 }}
+          className={`transition-all duration-300 ease-out overflow-hidden ${
+            rightSidebarOpen ? "opacity-100" : "w-0 opacity-0"
+          } ${isMainCollapsed && rightSidebarOpen ? "flex-1" : "flex-shrink-0"}`}
+          style={{ width: rightSidebarOpen && !isMainCollapsed ? rightSidebarWidth : rightSidebarOpen ? undefined : 0 }}
         >
           <RightPanel />
         </div>
