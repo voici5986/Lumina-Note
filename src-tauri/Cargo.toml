@@ -35,14 +35,6 @@ forge = { git = "https://github.com/blueberrycongee/forge", rev = "7f2b5291cac2e
 tokio-tungstenite = "0.21"
 if-addrs = "0.6"
 
-# CEF Integration (Chromium Embedded Framework)
-# Note: CEF requires Ninja build tool to compile
-# Install Ninja first: choco install ninja (Windows) or brew install ninja (macOS)
-# Then run: cargo build --release
-# 
-# For now, we use placeholder implementation that will be replaced with real CEF
-# when Ninja is available. The CEF commands are already defined in src-tauri/src/cef/
-
 # RAG / Vector Storage
 rusqlite = { version = "0.32", features = ["bundled"] }
 bincode = "1.3"
