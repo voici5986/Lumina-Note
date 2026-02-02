@@ -41,3 +41,9 @@
 - Scope: `scripts/typesetting_export_harness.mjs`.
 - Impact: Enables perf timing capture and layout JSON export during headless PDF runs.
 - Rollback: Remove the new flags and report output logic.
+
+## 2026-02-02 (failure repro registry)
+- Change: Add placeholder registry for minimized failure docx repro cases.
+- Scope: `tests/typesetting/failures/README.md`, `tests/typesetting/failures/manifest.json`.
+- Impact: Provides a structured place to track minimal mismatch repros.
+- Rollback: Remove the failure repro folder and manifest.
