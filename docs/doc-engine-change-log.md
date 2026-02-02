@@ -5,3 +5,9 @@
 - Scope: `scripts/generate_docx_samples.py`, `tests/typesetting/samples/*`.
 - Impact: Establishes 10 baseline docx fixtures for render comparison and future OpenOffice diffing.
 - Rollback: Remove `tests/typesetting/samples/` fixtures and delete `scripts/generate_docx_samples.py`.
+
+## 2026-02-02 (baseline comparison tooling)
+- Change: Add OpenOffice rendering and pixel-diff scripts for docx baseline comparison.
+- Scope: `scripts/typesetting_openoffice_render.mjs`, `scripts/typesetting_pixel_diff.mjs`, `scripts/typesetting_baseline_compare.mjs`.
+- Impact: Enables OpenOffice-based PDF rendering, pixel-level diffing via pdftoppm, and combined structural+visual comparisons.
+- Rollback: Remove the new scripts; existing pdf diff tooling remains intact.
