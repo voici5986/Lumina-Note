@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Mic, Square } from "lucide-react";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { useFileStore } from "@/stores/useFileStore";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 /**
  * 语音输入悬浮球
@@ -11,6 +12,7 @@ import { useFileStore } from "@/stores/useFileStore";
  */
 export function VoiceInputBall() {
   const { currentFile } = useFileStore();
+  const { t } = useLocaleStore();
 
   // 拖拽状态
   const [position, setPosition] = useState<{ x: number; y: number }>(() => ({
@@ -140,7 +142,7 @@ export function VoiceInputBall() {
         className={`w-11 h-11 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 border border-border
           ${isRecording ? "bg-red-500 text-white animate-pulse" : "bg-background text-muted-foreground hover:bg-accent"}
         `}
-        title={isRecording ? "点击停止语音输入" : "点击开始语音输入（10 秒无说话自动停止）"}
+        title={isRecording ? t.speech.stopRecordingHint : t.speech.startRecordingHint}
       >
         {isRecording ? <Square size={18} fill="currentColor" /> : <Mic size={18} />}
       </button>

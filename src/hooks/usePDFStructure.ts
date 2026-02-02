@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import type { PDFStructure, PDFElement, ParseStatus, ParseBackend } from "@/types/pdf";
 import { parsePDF } from "@/services/pdf";
+import { getCurrentTranslations } from "@/stores/useLocaleStore";
 
 /**
  * PDF 结构解析 Hook
@@ -28,9 +29,10 @@ export function usePDFStructure() {
       if (backend === 'none') {
         // 使用模拟数据
         await new Promise(resolve => setTimeout(resolve, 500));
+        const t = getCurrentTranslations();
         result = {
           success: true,
-          structure: generateMockStructure(),
+          structure: generateMockStructure(t),
           fromCache: false,
         };
       } else {
@@ -55,12 +57,14 @@ export function usePDFStructure() {
         setStructure(result.structure);
         setParseStatus('done');
       } else {
-        setParseError(result.error || '解析失败');
+        const t = getCurrentTranslations();
+        setParseError(result.error || t.pdfViewer.parseFailed);
         setParseStatus('error');
       }
     } catch (err) {
       console.error('Failed to parse PDF structure:', err);
-      setParseError(err instanceof Error ? err.message : '解析失败');
+      const t = getCurrentTranslations();
+      setParseError(err instanceof Error ? err.message : t.pdfViewer.parseFailed);
       setParseStatus('error');
     }
   }, []);
@@ -99,7 +103,7 @@ export function usePDFStructure() {
 }
 
 // 生成模拟结构数据（用于开发测试）
-function generateMockStructure(): PDFStructure {
+function generateMockStructure(t: ReturnType<typeof getCurrentTranslations>): PDFStructure {
   return {
     pageCount: 1,
     pages: [
@@ -113,21 +117,21 @@ function generateMockStructure(): PDFStructure {
             type: 'text',
             bbox: [50, 50, 300, 80],
             pageIndex: 1,
-            content: '这是一段模拟的文本内容',
+            content: t.pdfViewer.mockText,
           },
           {
             id: 'mock-text-2',
             type: 'text',
             bbox: [50, 100, 400, 150],
             pageIndex: 1,
-            content: '这是另一段更长的模拟文本内容，用于测试元素识别和交互功能。',
+            content: t.pdfViewer.mockLongText,
           },
           {
             id: 'mock-image-1',
             type: 'image',
             bbox: [50, 200, 250, 350],
             pageIndex: 1,
-            caption: '图 1: 示例图片',
+            caption: t.pdfViewer.mockImageCaption,
           },
         ],
       },

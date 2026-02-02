@@ -46,6 +46,7 @@ import { join } from "@/lib/path";
 import { RainbowText } from "@/components/ui/rainbow-text";
 import { FavIcon } from "@/components/ui/fav-icon";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 // ============ 子组件 ============
 
@@ -114,6 +115,7 @@ function ProgressSteps({
   crawlingProgress: { current: number; total: number };
   readingProgress: { current: number; total: number };
 }) {
+  const { t } = useLocaleStore();
   return (
     <div className="space-y-2">
       {RESEARCH_PHASES.map((phase) => {
@@ -126,11 +128,11 @@ function ProgressSteps({
         // 额外信息
         let extra = "";
         if (phase === "analyzing_topic" && keywords.length > 0) {
-          extra = `关键词: ${keywords.join(", ")}`;
+          extra = `${t.deepResearch.keywordsLabel}: ${keywords.join(", ")}`;
         } else if (phase === "searching_notes" && foundNotes.length > 0) {
-          extra = `找到 ${foundNotes.length} 篇笔记`;
+          extra = t.deepResearch.notesFound.replace('{count}', String(foundNotes.length));
         } else if (phase === "searching_web" && webSearchResults.length > 0) {
-          extra = `找到 ${webSearchResults.length} 个结果`;
+          extra = t.deepResearch.webResultsFound.replace('{count}', String(webSearchResults.length));
         } else if (phase === "crawling_web" && crawlingProgress.total > 0) {
           extra = `${crawlingProgress.current}/${crawlingProgress.total}`;
         } else if (
@@ -172,6 +174,7 @@ function NoteList({
   notes: NoteReference[];
   maxShow?: number;
 }) {
+  const { t } = useLocaleStore();
   const [showAll, setShowAll] = useState(false);
   const displayNotes = showAll ? notes : notes.slice(0, maxShow);
 
@@ -180,7 +183,7 @@ function NoteList({
   return (
     <div className="mt-3 pt-3 border-t border-border">
       <div className="text-xs text-muted-foreground mb-2">
-        📚 相关笔记 ({notes.length})
+        📚 {t.deepResearch.relatedNotes.replace('{count}', String(notes.length))}
       </div>
       <div className="space-y-1">
         {displayNotes.map((note) => (
@@ -202,7 +205,9 @@ function NoteList({
           className="text-xs text-primary hover:underline mt-1"
           onClick={() => setShowAll(!showAll)}
         >
-          {showAll ? "收起" : `显示全部 ${notes.length} 篇`}
+          {showAll
+            ? t.deepResearch.collapse
+            : t.deepResearch.showAllNotes.replace('{count}', String(notes.length))}
         </button>
       )}
     </div>
@@ -217,6 +222,7 @@ function WebSearchResultsList({
   results: WebSearchResult[];
   isSearching?: boolean;
 }) {
+  const { t } = useLocaleStore();
   if (!isSearching && results.length === 0) return null;
 
   return (
@@ -229,8 +235,8 @@ function WebSearchResultsList({
           <Globe className="w-4 h-4 mr-2" />
           <span>
             {isSearching
-              ? "正在搜索网络..."
-              : `找到 ${results.length} 个网络结果`}
+              ? t.deepResearch.webSearching
+              : t.deepResearch.webResultsFound.replace('{count}', String(results.length))}
           </span>
         </RainbowText>
       </div>
@@ -274,7 +280,7 @@ function WebSearchResultsList({
       </ul>
       {results.length > 10 && (
         <div className="text-xs text-muted-foreground mt-1">
-          + {results.length - 10} 个其他结果
+          {t.deepResearch.moreResults.replace('{count}', String(results.length - 10))}
         </div>
       )}
     </div>
@@ -291,6 +297,7 @@ function CrawlingPagesList({
   crawlingProgress: { current: number; total: number };
   isCrawling?: boolean;
 }) {
+  const { t } = useLocaleStore();
   if (!isCrawling && crawlingProgress.total === 0) return null;
 
   // 当前正在爬取的页面
@@ -307,8 +314,10 @@ function CrawlingPagesList({
           <BookOpen className="w-4 h-4 mr-2" />
           <span>
             {isCrawling
-              ? `正在阅读网页 (${crawlingProgress.current}/${crawlingProgress.total})...`
-              : `已阅读 ${crawlingProgress.total} 个网页`}
+              ? t.deepResearch.crawlingProgress
+                  .replace('{current}', String(crawlingProgress.current))
+                  .replace('{total}', String(crawlingProgress.total))
+              : t.deepResearch.crawledPages.replace('{count}', String(crawlingProgress.total))}
           </span>
         </RainbowText>
       </div>
@@ -371,6 +380,7 @@ function ClarificationPanel({
   onSubmit: (clarification: string) => void;
   onSkip: () => void;
 }) {
+  const { t } = useLocaleStore();
   const [input, setInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -395,7 +405,7 @@ function ClarificationPanel({
         <MessageCircleQuestion className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
         <div>
           <div className="font-medium text-sm text-amber-700 dark:text-amber-400">
-            需要更多信息
+            {t.deepResearch.clarifyTitle}
           </div>
           <div className="text-sm text-foreground mt-1">{question}</div>
         </div>
@@ -425,7 +435,7 @@ function ClarificationPanel({
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="输入您的说明..."
+          placeholder={t.deepResearch.clarifyPlaceholder}
           className="flex-1 px-3 py-2 text-sm border border-border rounded-md 
                      bg-background focus:outline-none focus:ring-1 focus:ring-primary"
           onKeyDown={(e) => {
@@ -458,7 +468,7 @@ function ClarificationPanel({
           onClick={onSkip}
           className="text-xs text-muted-foreground hover:text-foreground"
         >
-          跳过，使用原始输入继续
+          {t.deepResearch.clarifySkip}
         </button>
       </div>
     </div>
@@ -530,6 +540,7 @@ export function DeepResearchCard({ className, chatId }: DeepResearchCardProps) {
     reset,
     selectedSessionId,
   } = useDeepResearchStore();
+  const { t } = useLocaleStore();
 
   // 显示逻辑：
   // 1. 如果是从历史中选择的会话（selectedSessionId 存在），始终显示
@@ -642,7 +653,7 @@ ${reportContent}`;
         <Microscope className="w-5 h-5 text-primary" />
         <div className="flex-1 min-w-0">
           <div className="font-medium text-sm truncate">
-            Deep Research: {topic}
+            {t.deepResearch.cardTitle.replace('{topic}', topic)}
           </div>
           <div className="text-xs text-muted-foreground">
             {phaseMessage}
@@ -744,7 +755,7 @@ ${reportContent}`;
                   <div className="mt-3">
                     {!showReport && phase !== "completed" && (
                       <div className="text-xs text-muted-foreground mb-2">
-                        📝 报告生成中...
+                        📝 {t.deepResearch.reportGenerating}
                       </div>
                     )}
                     <div className="max-h-96 overflow-y-auto rounded-md border border-border p-4 bg-background">
@@ -768,7 +779,7 @@ ${reportContent}`;
                     )}
                     onClick={() => setShowReport(false)}
                   >
-                    进度详情
+                    {t.deepResearch.progressDetails}
                   </button>
                   <button
                     className={cn(
@@ -779,7 +790,7 @@ ${reportContent}`;
                     )}
                     onClick={() => setShowReport(true)}
                   >
-                    查看报告
+                    {t.deepResearch.viewReport}
                   </button>
                 </div>
               )}
@@ -793,14 +804,14 @@ ${reportContent}`;
                       onClick={handleCopy}
                     >
                       <Copy className="w-3 h-3" />
-                      复制
+                      {t.common.copy}
                     </button>
                     <button
                       className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-muted hover:bg-muted/80"
                       onClick={handleSaveClick}
                     >
                       <Save className="w-3 h-3" />
-                      保存为笔记
+                      {t.deepResearch.saveAsNote}
                     </button>
                   </>
                 )}
@@ -811,7 +822,7 @@ ${reportContent}`;
                     onClick={abortResearch}
                   >
                     <X className="w-3 h-3" />
-                    取消
+                    {t.common.cancel}
                   </button>
                 )}
 
@@ -820,7 +831,7 @@ ${reportContent}`;
                     className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-muted hover:bg-muted/80 ml-auto"
                     onClick={reset}
                   >
-                    关闭
+                    {t.common.close}
                   </button>
                 )}
 
@@ -853,12 +864,12 @@ ${reportContent}`;
               className="bg-background rounded-lg border border-border shadow-xl p-4 w-80"
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="font-medium text-sm mb-3">保存研究报告</h3>
+              <h3 className="font-medium text-sm mb-3">{t.deepResearch.saveDialogTitle}</h3>
               <input
                 type="text"
                 value={saveFileName}
                 onChange={(e) => setSaveFileName(e.target.value)}
-                placeholder="输入文件名..."
+                placeholder={t.deepResearch.saveFilePlaceholder}
                 className="w-full px-3 py-2 text-sm border border-border rounded-md bg-muted/50 focus:outline-none focus:ring-1 focus:ring-primary mb-3"
                 autoFocus
                 onKeyDown={(e) => {
@@ -871,14 +882,14 @@ ${reportContent}`;
                   onClick={() => setShowSaveDialog(false)}
                   className="px-3 py-1.5 text-xs rounded-md bg-muted hover:bg-muted/80"
                 >
-                  取消
+                  {t.common.cancel}
                 </button>
                 <button
                   onClick={handleSave}
                   disabled={isSaving || !saveFileName.trim()}
                   className="px-3 py-1.5 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 >
-                  {isSaving ? "保存中..." : "保存"}
+                  {isSaving ? t.deepResearch.saving : t.common.save}
                 </button>
               </div>
             </motion.div>

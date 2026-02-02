@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 /**
  * 简单的语音转文字 Hook，基于 Web Speech API。
@@ -7,6 +8,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 export function useSpeechToText(appendText: (text: string) => void) {
   const [isRecording, setIsRecording] = useState(false);
   const recognitionRef = useRef<any | null>(null);
+  const { t } = useLocaleStore();
 
   useEffect(() => {
     const SpeechRecognitionImpl =
@@ -47,7 +49,7 @@ export function useSpeechToText(appendText: (text: string) => void) {
   const toggleRecording = useCallback(() => {
     const recognition = recognitionRef.current;
     if (!recognition) {
-      alert("当前环境不支持语音输入");
+      alert(t.speech.unsupported);
       return;
     }
 
@@ -63,7 +65,7 @@ export function useSpeechToText(appendText: (text: string) => void) {
         setIsRecording(false);
       }
     }
-  }, [isRecording]);
+  }, [isRecording, t.speech.unsupported]);
 
   return { isRecording, toggleRecording };
 }

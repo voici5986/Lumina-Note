@@ -7,6 +7,7 @@
 
 import type { Message, MessageContent, LLMConfig, LLMOptions, LLMResponse, LLMProvider } from "../types";
 import { llmFetchJson } from "../httpClient";
+import { getCurrentTranslations } from "@/stores/useLocaleStore";
 
 // Gemini 消息部分的类型
 type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
@@ -45,7 +46,8 @@ export class GeminiProvider implements LLMProvider {
     });
 
     if (!result.ok || !result.data) {
-      throw new Error(`Gemini API 错误: ${result.error}`);
+      const t = getCurrentTranslations();
+      throw new Error(t.ai.providerError.replace("{provider}", "Gemini").replace("{error}", String(result.error)));
     }
 
     const data = result.data;
@@ -112,9 +114,10 @@ export class GeminiProvider implements LLMProvider {
 
     // Gemini 要求第一条消息必须是 user
     if (contents.length > 0 && contents[0].role === "model") {
+      const t = getCurrentTranslations();
       contents.unshift({
         role: "user",
-        parts: [{ text: "请继续" }],
+        parts: [{ text: t.common.continue }],
       });
     }
 

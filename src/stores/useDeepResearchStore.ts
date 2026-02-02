@@ -8,6 +8,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentTranslations } from "@/stores/useLocaleStore";
 
 // ============ 类型定义 ============
 
@@ -225,7 +226,7 @@ export const useDeepResearchStore = create<DeepResearchState>()(
       topic,
       startedAt: new Date(),
       phase: "init",
-      phaseMessage: "准备开始研究...",
+      phaseMessage: getCurrentTranslations().deepResearch.phaseMessages.init,
       keywords: [],
       foundNotes: [],
       webSearchResults: [],
@@ -296,7 +297,7 @@ export const useDeepResearchStore = create<DeepResearchState>()(
         currentSession: {
           ...currentSession,
           phase: "analyzing_topic",
-          phaseMessage: "收到澄清，继续分析...",
+          phaseMessage: getCurrentTranslations().deepResearch.phaseMessages.resumed,
           clarification: null,
         },
       });
@@ -591,19 +592,7 @@ export function cleanupDeepResearchListener() {
 
 /** 获取阶段显示名称 */
 export function getPhaseLabel(phase: ResearchPhase): string {
-  const labels: Record<ResearchPhase, string> = {
-    init: "初始化",
-    analyzing_topic: "分析主题",
-    waiting_for_clarification: "等待澄清",
-    searching_notes: "搜索笔记",
-    searching_web: "搜索网络",
-    crawling_web: "爬取网页",
-    reading_notes: "阅读笔记",
-    generating_outline: "生成大纲",
-    writing_report: "撰写报告",
-    completed: "完成",
-    error: "错误",
-  };
+  const labels = getCurrentTranslations().deepResearch.phases as Record<ResearchPhase, string>;
   return labels[phase] || phase;
 }
 

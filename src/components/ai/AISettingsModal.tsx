@@ -17,22 +17,6 @@ interface TestResult {
   latency?: number;
 }
 
-// 常见错误信息映射
-const ERROR_MESSAGES: Record<string, string> = {
-  "401": "API Key 无效或已过期",
-  "403": "API Key 权限不足",
-  "404": "API 端点不存在，请检查 Base URL",
-  "429": "请求过于频繁，请稍后再试",
-  "500": "服务器内部错误",
-  "502": "网关错误，服务暂时不可用",
-  "503": "服务暂时不可用",
-  "timeout": "连接超时，请检查网络或服务器地址",
-  "network": "网络连接失败，请检查网络设置",
-  "invalid_key": "API Key 格式不正确",
-  "no_key": "请先输入 API Key",
-  "connection_refused": "连接被拒绝，请检查服务是否运行",
-};
-
 interface AISettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -52,6 +36,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
   } = useRAGStore();
   const { hideAllWebViews, showAllWebViews } = useBrowserStore();
   const { t } = useLocaleStore();
+  const errorMessages = t.aiSettings.errors;
 
   // 测试连接状态
   const [testResult, setTestResult] = useState<TestResult>({ status: "idle" });
@@ -73,26 +58,26 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
     ];
     
     for (const [pattern, code] of statusCodePatterns) {
-      if (pattern.test(errorStr) && ERROR_MESSAGES[code]) {
-        return ERROR_MESSAGES[code];
+      if (pattern.test(errorStr) && errorMessages[code]) {
+        return errorMessages[code];
       }
     }
     
     // 检查常见错误关键词
-    if (errorLower.includes("timeout")) return ERROR_MESSAGES.timeout;
-    if (errorLower.includes("econnrefused") || errorLower.includes("connection refused")) return ERROR_MESSAGES.connection_refused;
-    if (errorLower.includes("unauthorized") || errorLower.includes("invalid api key") || errorLower.includes("invalid_api_key")) return ERROR_MESSAGES["401"];
-    if (errorLower.includes("network error") || errorLower.includes("failed to fetch")) return ERROR_MESSAGES.network;
+    if (errorLower.includes("timeout")) return errorMessages.timeout;
+    if (errorLower.includes("econnrefused") || errorLower.includes("connection refused")) return errorMessages.connection_refused;
+    if (errorLower.includes("unauthorized") || errorLower.includes("invalid api key") || errorLower.includes("invalid_api_key")) return errorMessages["401"];
+    if (errorLower.includes("network error") || errorLower.includes("failed to fetch")) return errorMessages.network;
     
     // 返回原始错误（截断过长的）
     return errorStr.length > 100 ? errorStr.slice(0, 100) + "..." : errorStr;
-  }, []);
+  }, [errorMessages]);
 
   // 测试 API 连接
   const testConnection = useCallback(async () => {
     // 检查 API Key（Ollama 除外）
     if (config.provider !== "ollama" && !config.apiKey) {
-      setTestResult({ status: "error", message: ERROR_MESSAGES.no_key });
+      setTestResult({ status: "error", message: errorMessages.no_key });
       return;
     }
 
@@ -113,13 +98,13 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
       if (response.content) {
         setTestResult({
           status: "success",
-          message: `连接成功`,
+          message: t.aiSettings.testSuccess,
           latency,
         });
       } else {
         setTestResult({
           status: "error",
-          message: "服务响应异常，未返回内容",
+          message: t.aiSettings.testResponseEmpty,
         });
       }
     } catch (error) {
@@ -176,7 +161,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
               <span>🤖 {t.aiSettings.mainModel}</span>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">服务商</label>
+              <label className="text-xs text-muted-foreground block mb-1">{t.aiSettings.provider}</label>
               <select
                 value={config.provider}
                 onChange={(e) => {
@@ -227,22 +212,22 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                   {testResult.status === "testing" ? (
                     <>
                       <Loader2 size={12} className="animate-spin" />
-                      测试中
+                      {t.aiSettings.testing}
                     </>
                   ) : testResult.status === "success" ? (
                     <>
                       <Check size={12} />
-                      {testResult.latency ? `${(testResult.latency / 1000).toFixed(1)}s` : "成功"}
+                      {testResult.latency ? `${(testResult.latency / 1000).toFixed(1)}s` : t.aiSettings.testSuccessShort}
                     </>
                   ) : testResult.status === "error" ? (
                     <>
                       <X size={12} />
-                      失败
+                      {t.aiSettings.testFailed}
                     </>
                   ) : (
                     <>
                       <Zap size={12} />
-                      测试
+                      {t.aiSettings.testButton}
                     </>
                   )}
                 </button>
@@ -257,13 +242,13 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
               {testResult.status === "success" && (
                 <div className="mt-1.5 text-xs text-green-500 bg-green-500/10 rounded px-2 py-1.5 flex items-center gap-1.5">
                   <Check size={12} />
-                  <span>连接成功，API 配置有效</span>
+                  <span>{t.aiSettings.testSuccessDetail}</span>
                 </div>
               )}
             </div>
 
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">模型</label>
+              <label className="text-xs text-muted-foreground block mb-1">{t.aiSettings.model}</label>
               <select
                 value={
                   PROVIDER_REGISTRY[config.provider as LLMProviderType]?.models.some(m => m.id === config.model)
@@ -290,7 +275,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
 
             {config.model === "custom" && (
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">自定义模型 ID</label>
+                <label className="text-xs text-muted-foreground block mb-1">{t.aiSettings.customModelId}</label>
                 <input
                   type="text"
                   value={config.customModelId || ""}
@@ -338,7 +323,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
             <div className="flex items-center justify-between text-xs font-medium text-foreground">
               <span className="flex items-center gap-1">
                 <Zap size={16} className="text-amber-500" />
-                动态路由 (Intent Routing)
+                {t.aiSettings.dynamicRouting}
               </span>
               <label className="flex items-center gap-1 cursor-pointer">
                 <input
@@ -360,23 +345,23 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                   }}
                   className="w-3 h-3"
                 />
-                <span className="text-xs text-muted-foreground">启用</span>
+                <span className="text-xs text-muted-foreground">{t.aiSettings.enable}</span>
               </label>
             </div>
 
             {config.routing?.enabled && (
               <div className="space-y-4 pl-2 border-l-2 border-muted ml-1">
                 <div className="text-xs text-muted-foreground">
-                  配置意图识别模型和路由规则。
+                  {t.aiSettings.routingDescription}
                 </div>
 
                 {/* 1. 意图识别模型配置 */}
                 <div className="space-y-2">
-                  <div className="text-xs font-medium text-foreground">🧠 意图识别模型 (Intent Model)</div>
-                  <div className="text-[10px] text-muted-foreground mb-1">用于分析用户意图 (Chat/Search/Edit/...)</div>
+                  <div className="text-xs font-medium text-foreground">🧠 {t.aiSettings.intentModel}</div>
+                  <div className="text-[10px] text-muted-foreground mb-1">{t.aiSettings.intentModelDesc}</div>
                   
                   <div>
-                    <label className="text-xs text-muted-foreground block mb-1">服务商</label>
+                    <label className="text-xs text-muted-foreground block mb-1">{t.aiSettings.provider}</label>
                     <select
                       value={config.routing.intentProvider || config.provider}
                       onChange={(e) => {
@@ -404,7 +389,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
 
                   <div>
                     <label className="text-xs text-muted-foreground block mb-1">
-                      API Key <span className="text-muted-foreground">(留空则使用主 Key)</span>
+                      {t.aiSettings.apiKey} <span className="text-muted-foreground">({t.aiSettings.useMainKey})</span>
                     </label>
                     <input
                       type="password"
@@ -421,7 +406,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                   </div>
 
                   <div>
-                    <label className="text-xs text-muted-foreground block mb-1">模型</label>
+                    <label className="text-xs text-muted-foreground block mb-1">{t.aiSettings.model}</label>
                     <select
                       value={
                         PROVIDER_REGISTRY[(config.routing.intentProvider || config.provider) as LLMProviderType]?.models.some(m => m.id === config.routing?.intentModel)
@@ -453,7 +438,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
 
                   {config.routing.intentModel === "custom" && (
                     <div>
-                      <label className="text-xs text-muted-foreground block mb-1">自定义模型 ID</label>
+                      <label className="text-xs text-muted-foreground block mb-1">{t.aiSettings.customModelId}</label>
                       <input
                         type="text"
                         value={config.routing.intentCustomModelId || ""}
@@ -461,9 +446,9 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                           const currentRouting = config.routing!;
                           setConfig({ 
                             routing: { ...currentRouting, intentCustomModelId: e.target.value } 
-                          });
-                        }}
-                        placeholder="例如：deepseek-ai/DeepSeek-V3"
+                        });
+                      }}
+                        placeholder={t.aiSettings.customModelHint}
                         className="w-full text-xs p-2 rounded border border-border bg-background"
                       />
                     </div>
@@ -472,7 +457,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                   {config.routing.intentModel === "custom" && (
                     <div>
                       <label className="text-xs text-muted-foreground block mb-1">
-                        Base URL <span className="text-muted-foreground">(可选)</span>
+                        {t.aiSettings.baseUrl} <span className="text-muted-foreground">({t.aiSettings.baseUrlOptional})</span>
                       </label>
                       <input
                         type="text"
@@ -492,11 +477,11 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
 
                 {/* 2. 聊天模型配置 */}
                 <div className="space-y-2 pt-2 border-t border-border/50">
-                  <div className="text-xs font-medium text-foreground">💬 聊天模型 (Chat Model)</div>
-                  <div className="text-[10px] text-muted-foreground mb-1">用于 Chat 模式和简单任务 (如闲聊、搜索)</div>
+                  <div className="text-xs font-medium text-foreground">💬 {t.aiSettings.chatModel}</div>
+                  <div className="text-[10px] text-muted-foreground mb-1">{t.aiSettings.chatModelDesc}</div>
                   
                   <div>
-                    <label className="text-xs text-muted-foreground block mb-1">服务商</label>
+                    <label className="text-xs text-muted-foreground block mb-1">{t.aiSettings.provider}</label>
                     <select
                       value={config.routing.chatProvider || ""}
                       onChange={(e) => {
@@ -530,7 +515,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                       }}
                       className="w-full text-xs p-2 rounded border border-border bg-background"
                     >
-                      <option value="">🔄 跟随主模型 (默认)</option>
+                      <option value="">🔄 {t.aiSettings.followMainModel}</option>
                       {Object.entries(PROVIDER_REGISTRY).map(([key, meta]) => (
                         <option key={key} value={key}>
                           {meta.label}
@@ -542,13 +527,13 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                   {!config.routing.chatProvider ? (
                     <div className="p-2 bg-muted/50 rounded border border-border/50 text-[10px] text-muted-foreground">
                       <AlertTriangle size={12} className="text-amber-500 inline mr-1" />
-                      未配置专用聊天模型，将使用主模型处理所有任务。建议配置轻量级模型（如 GPT-4o-mini, Gemini Flash）以降低成本并提高速度。
+                      {t.aiSettings.noChatModelWarning}
                     </div>
                   ) : (
                     <>
                       <div>
                         <label className="text-xs text-muted-foreground block mb-1">
-                          API Key <span className="text-muted-foreground">(留空则使用主 Key)</span>
+                          {t.aiSettings.apiKey} <span className="text-muted-foreground">({t.aiSettings.useMainKey})</span>
                         </label>
                         <input
                           type="password"
@@ -565,7 +550,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                       </div>
 
                       <div>
-                        <label className="text-xs text-muted-foreground block mb-1">模型</label>
+                        <label className="text-xs text-muted-foreground block mb-1">{t.aiSettings.model}</label>
                         <select
                           value={
                             PROVIDER_REGISTRY[config.routing.chatProvider as LLMProviderType]?.models.some(m => m.id === config.routing?.chatModel)
@@ -597,7 +582,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
 
                       {config.routing.chatModel === "custom" && (
                         <div>
-                          <label className="text-xs text-muted-foreground block mb-1">自定义模型 ID</label>
+                          <label className="text-xs text-muted-foreground block mb-1">{t.aiSettings.customModelId}</label>
                           <input
                             type="text"
                             value={config.routing.chatCustomModelId || ""}
@@ -607,7 +592,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                                 routing: { ...currentRouting, chatCustomModelId: e.target.value } 
                               });
                             }}
-                            placeholder="例如：deepseek-ai/DeepSeek-V3"
+                            placeholder={t.aiSettings.customModelHint}
                             className="w-full text-xs p-2 rounded border border-border bg-background"
                           />
                         </div>
@@ -616,7 +601,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                       {config.routing.chatModel === "custom" && (
                         <div>
                           <label className="text-xs text-muted-foreground block mb-1">
-                            Base URL <span className="text-muted-foreground">(可选)</span>
+                            {t.aiSettings.baseUrl} <span className="text-muted-foreground">({t.aiSettings.baseUrlOptional})</span>
                           </label>
                           <input
                             type="text"
@@ -638,15 +623,15 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
 
                 {/* 3. 路由规则说明 */}
                 <div className="space-y-2 pt-2 border-t border-border/50">
-                  <div className="text-xs font-medium text-foreground">📋 路由规则</div>
+                  <div className="text-xs font-medium text-foreground">📋 {t.aiSettings.routingRules}</div>
                   <div className="text-[10px] text-muted-foreground">
-                    系统将自动使用"聊天模型"处理以下任务，以节省成本并提高速度：
+                    {t.aiSettings.routingRulesDesc}
                     <ul className="list-disc list-inside mt-1 space-y-0.5 text-muted-foreground/80">
-                      <li>💬 闲聊 (Chat) - 日常对话、灵感启发</li>
-                      <li>🔍 搜索 (Search) - 知识检索、信息查询</li>
+                      <li>💬 {t.aiSettings.chatTask}</li>
+                      <li>🔍 {t.aiSettings.searchTask}</li>
                     </ul>
                     <div className="mt-1 text-[10px] opacity-70">
-                      * 其他复杂任务（如编辑、整理、写作）将始终使用"主模型"以保证质量。
+                      * {t.aiSettings.otherTasksNote}
                     </div>
                   </div>
                 </div>
@@ -686,7 +671,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
             <div className="flex items-center justify-between text-xs font-medium text-foreground">
               <span className="flex items-center gap-1">
                 <Tag size={12} />
-                语义搜索 (RAG)
+                {t.aiSettings.semanticSearch}
               </span>
               <label className="flex items-center gap-1 cursor-pointer">
                 <input
@@ -695,7 +680,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                   onChange={(e) => setRAGConfig({ enabled: e.target.checked })}
                   className="w-3 h-3"
                 />
-                <span className="text-xs text-muted-foreground">启用</span>
+                <span className="text-xs text-muted-foreground">{t.aiSettings.enable}</span>
               </label>
             </div>
 
@@ -705,14 +690,14 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                 <div className="flex items-center justify-between text-xs mb-1">
                   <span className="text-muted-foreground">
                     {ragIsIndexing
-                      ? `正在索引${
+                      ? `${t.aiSettings.indexing}${
                           typeof indexStatus?.progress === "number"
-                            ? `：${Math.round(indexStatus.progress * 100)}%`
+                            ? `: ${Math.round(indexStatus.progress * 100)}%`
                             : "..."
                         }`
                       : indexStatus
-                        ? `已索引 ${indexStatus.totalChunks ?? 0} 个片段`
-                        : "尚未建立索引"}
+                        ? t.aiSettings.indexed.replace('{count}', String(indexStatus.totalChunks ?? 0))
+                        : t.aiSettings.notIndexed}
                   </span>
                   <div className="flex gap-2">
                     <button
@@ -721,7 +706,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                       disabled={ragIsIndexing}
                       className="px-2 py-1 rounded border border-border text-xs hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      重新索引
+                      {t.aiSettings.rebuildIndex}
                     </button>
                     {ragIsIndexing && (
                       <button
@@ -729,14 +714,14 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                         onClick={cancelIndex}
                         className="px-2 py-1 rounded border border-red-500/60 text-xs text-red-500 hover:bg-red-500/10"
                       >
-                        取消索引
+                        {t.aiSettings.cancelIndex}
                       </button>
                     )}
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs text-muted-foreground block mb-1">Embedding 服务</label>
+                  <label className="text-xs text-muted-foreground block mb-1">{t.aiSettings.embeddingService}</label>
                   <select
                     value={ragConfig.embeddingProvider}
                     onChange={(e) => {
@@ -753,15 +738,15 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                     className="w-full text-xs p-2 rounded border border-border bg-background"
                   >
                     <option value="openai">OpenAI</option>
-                    <option value="ollama">Ollama (本地)</option>
+                    <option value="ollama">{t.aiSettings.ollamaLocalLabel}</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="text-xs text-muted-foreground block mb-1">
-                    Embedding API Key
+                    {t.aiSettings.embeddingApiKey}
                     {ragConfig.embeddingProvider === "ollama" && (
-                      <span className="text-muted-foreground/60 ml-1">(可选)</span>
+                      <span className="text-muted-foreground/60 ml-1">({t.aiSettings.apiKeyOptional})</span>
                     )}
                   </label>
                   <input
@@ -776,7 +761,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                 </div>
 
                 <div>
-                  <label className="text-xs text-muted-foreground block mb-1">Embedding Base URL</label>
+                  <label className="text-xs text-muted-foreground block mb-1">{t.aiSettings.embeddingBaseUrl}</label>
                   <input
                     type="text"
                     value={ragConfig.embeddingBaseUrl || ""}
@@ -791,7 +776,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                 </div>
 
                 <div>
-                  <label className="text-xs text-muted-foreground block mb-1">Embedding 模型</label>
+                  <label className="text-xs text-muted-foreground block mb-1">{t.aiSettings.embeddingModel}</label>
                   <input
                     type="text"
                     value={ragConfig.embeddingModel}
@@ -803,8 +788,8 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
 
                 <div>
                   <label className="text-xs text-muted-foreground block mb-1">
-                    向量维度
-                    <span className="text-muted-foreground/60 ml-1">(可选)</span>
+                    {t.aiSettings.vectorDimensions}
+                    <span className="text-muted-foreground/60 ml-1">({t.aiSettings.apiKeyOptional})</span>
                   </label>
                   <input
                     type="number"
@@ -814,7 +799,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                         embeddingDimensions: e.target.value ? parseInt(e.target.value) : undefined,
                       })
                     }
-                    placeholder="如 1024（留空使用默认）"
+                    placeholder={t.aiSettings.dimensionsHint}
                     className="w-full text-xs p-2 rounded border border-border bg-background"
                   />
                 </div>
@@ -822,7 +807,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                 {/* Reranker Settings */}
                 <div className="border-t border-border pt-3 mt-2">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium">重排序 (Reranker)</span>
+                    <span className="text-xs font-medium">{t.aiSettings.reranker}</span>
                     <label className="flex items-center gap-1">
                       <input
                         type="checkbox"
@@ -830,14 +815,14 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                         onChange={(e) => setRAGConfig({ rerankerEnabled: e.target.checked })}
                         className="w-3 h-3"
                       />
-                      <span className="text-xs text-muted-foreground">启用</span>
+                      <span className="text-xs text-muted-foreground">{t.aiSettings.enable}</span>
                     </label>
                   </div>
 
                   {ragConfig.rerankerEnabled && (
                     <div className="space-y-2">
                       <div>
-                        <label className="text-xs text-muted-foreground block mb-1">Reranker Base URL</label>
+                        <label className="text-xs text-muted-foreground block mb-1">{t.aiSettings.rerankerBaseUrl}</label>
                         <input
                           type="text"
                           value={ragConfig.rerankerBaseUrl || ""}
@@ -848,7 +833,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                       </div>
 
                       <div>
-                        <label className="text-xs text-muted-foreground block mb-1">Reranker API Key</label>
+                        <label className="text-xs text-muted-foreground block mb-1">{t.aiSettings.rerankerApiKey}</label>
                         <input
                           type="password"
                           value={ragConfig.rerankerApiKey || ""}
@@ -859,7 +844,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                       </div>
 
                       <div>
-                        <label className="text-xs text-muted-foreground block mb-1">Reranker 模型</label>
+                        <label className="text-xs text-muted-foreground block mb-1">{t.aiSettings.rerankerModel}</label>
                         <input
                           type="text"
                           value={ragConfig.rerankerModel || ""}
@@ -870,7 +855,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                       </div>
 
                       <div>
-                        <label className="text-xs text-muted-foreground block mb-1">返回数量 (Top N)</label>
+                        <label className="text-xs text-muted-foreground block mb-1">{t.aiSettings.topN}</label>
                         <input
                           type="number"
                           value={ragConfig.rerankerTopN || 5}
@@ -889,16 +874,16 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                 {/* Index Status */}
                 <div className="bg-muted/50 rounded p-2 space-y-2 mt-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">索引状态</span>
+                    <span className="text-muted-foreground">{t.aiSettings.indexStatus}</span>
                     {ragIsIndexing ? (
                       <span className="text-yellow-500 flex items-center gap-1">
                         <Loader2 size={10} className="animate-spin" />
-                        索引中...
+                        {t.aiSettings.indexing}
                       </span>
                     ) : indexStatus?.initialized ? (
-                      <span className="text-green-500 flex items-center gap-1"><Check size={12} /> 已就绪</span>
+                      <span className="text-green-500 flex items-center gap-1"><Check size={12} /> {t.aiSettings.indexReady}</span>
                     ) : (
-                      <span className="text-muted-foreground">未初始化</span>
+                      <span className="text-muted-foreground">{t.aiSettings.notInitialized}</span>
                     )}
                   </div>
 
@@ -917,7 +902,9 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                       </div>
                       <div className="text-xs text-muted-foreground flex justify-between">
                         <span>
-                          {indexStatus.progress.current} / {indexStatus.progress.total} 文件
+                          {t.aiSettings.filesProgress
+                            .replace('{current}', String(indexStatus.progress.current))
+                            .replace('{total}', String(indexStatus.progress.total))}
                         </span>
                         <span>
                           {Math.round(
@@ -931,7 +918,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                           className="text-xs text-muted-foreground truncate"
                           title={indexStatus.progress.currentFile}
                         >
-                          正在处理: {indexStatus.progress.currentFile.split(/[/\\]/).pop()}
+                          {t.aiSettings.processing.replace('{file}', indexStatus.progress.currentFile.split(/[/\\\\]/).pop() || '')}
                         </div>
                       )}
                     </div>
@@ -939,7 +926,9 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
 
                   {!ragIsIndexing && indexStatus && (
                     <div className="text-xs text-muted-foreground">
-                      {indexStatus.totalFiles} 个文件, {indexStatus.totalChunks} 个块
+                      {t.aiSettings.indexSummary
+                        .replace('{files}', String(indexStatus.totalFiles))
+                        .replace('{chunks}', String(indexStatus.totalChunks))}
                     </div>
                   )}
 
@@ -954,7 +943,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                     disabled={ragIsIndexing || (ragConfig.embeddingProvider === 'openai' && !ragConfig.embeddingApiKey)}
                     className="w-full text-xs py-1 px-2 bg-primary/10 hover:bg-primary/20 text-primary rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    {ragIsIndexing ? "索引中..." : "重建索引"}
+                    {ragIsIndexing ? t.aiSettings.indexing : t.aiSettings.rebuildIndex}
                   </button>
                 </div>
               </>
@@ -965,21 +954,21 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
           <div className="bg-muted/30 rounded-lg p-3 space-y-3">
             <div className="flex items-center gap-2 text-sm font-medium">
               <Zap size={14} className="text-yellow-500" />
-              Deep Research 网络搜索
+              {t.deepResearch.webSearchTitle}
             </div>
             <p className="text-xs text-muted-foreground">
-              配置 Tavily API Key 以在深度研究时搜索互联网内容
+              {t.deepResearch.webSearchDesc}
             </p>
             <div>
               <label className="text-xs text-muted-foreground block mb-1">
-                Tavily API Key
+                {t.deepResearch.webSearchKeyLabel}
                 <a
                   href="https://tavily.com"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-primary ml-1 hover:underline"
                 >
-                  (获取 API Key)
+                  ({t.deepResearch.webSearchGetKey})
                 </a>
               </label>
               <input
@@ -990,7 +979,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                 className="w-full text-xs p-2 rounded border border-border bg-background"
               />
               {config.tavilyApiKey && (
-                <p className="text-xs text-green-500 mt-1 flex items-center gap-1"><Check size={12} /> 已配置，Deep Research 将搜索网络内容</p>
+                <p className="text-xs text-green-500 mt-1 flex items-center gap-1"><Check size={12} /> {t.deepResearch.webSearchConfigured}</p>
               )}
             </div>
           </div>

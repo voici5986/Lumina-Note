@@ -18,6 +18,7 @@ import { readFile, saveFile, exists, createDir } from "@/lib/tauri";
 import { parseFrontmatter, updateFrontmatter, getTitleFromPath } from "@/services/markdown/frontmatter";
 import { useFileStore } from "./useFileStore";
 import { useSplitStore } from "./useSplitStore";
+import { getCurrentTranslations } from "@/stores/useLocaleStore";
 
 // ==================== 工具函数 ====================
 
@@ -33,6 +34,32 @@ function slugify(name: string): string {
     .replace(/\s+/g, '-')           // 空格转连字符
     .replace(/-+/g, '-')            // 多个连字符合并
     .replace(/^-|-$/g, '');         // 移除首尾连字符
+}
+
+function localizeTemplate(
+  templateId: CreateDatabaseOptions['template'] | undefined,
+  template: Partial<Database>
+): Partial<Database> {
+  const t = getCurrentTranslations();
+  const content = (t.database as any).templateContent?.[templateId || 'blank'];
+  if (!content) return template;
+
+  const columns = template.columns?.map((col) => {
+    const name = content.columns?.[col.id as keyof typeof content.columns] || col.name;
+    const optionNames = content.options?.[col.id as keyof typeof content.options];
+    const options = col.options?.map((opt) => ({
+      ...opt,
+      name: optionNames?.[opt.id as keyof typeof optionNames] || opt.name,
+    }));
+    return { ...col, name, options };
+  });
+
+  const views = template.views?.map((view) => {
+    const viewName = content.views?.[view.type as keyof typeof content.views] || view.name;
+    return { ...view, name: viewName };
+  });
+
+  return { ...template, columns, views };
 }
 
 // 确保文件名唯一（如果已存在则添加数字后缀）
@@ -360,7 +387,9 @@ export const useDatabaseStore = create<DatabaseState>()(
           dbId = `${baseId}-${counter}`;
           counter++;
         }
-        const template = options.template ? DATABASE_TEMPLATES[options.template] : DATABASE_TEMPLATES.blank;
+        const rawTemplate = options.template ? DATABASE_TEMPLATES[options.template] : DATABASE_TEMPLATES.blank;
+        const template = localizeTemplate(options.template, rawTemplate);
+        const t = getCurrentTranslations();
         const now = new Date().toISOString();
         
         const dbWithRows: DatabaseWithRows = {
@@ -369,11 +398,11 @@ export const useDatabaseStore = create<DatabaseState>()(
           icon: options.icon,
           description: options.description,
           columns: template.columns?.map(col => ({ ...col, id: col.id || generateId() })) || [
-            { id: generateId(), name: '标题', type: 'text' as ColumnType }
+            { id: generateId(), name: t.database.templateContent.blank.columns.title, type: 'text' as ColumnType }
           ],
           rows: [], // 运行时为空，数据从笔记加载
           views: template.views?.map(v => ({ ...v, id: v.id || generateId() })) || [
-            { id: generateId(), name: '表格', type: 'table' as const }
+            { id: generateId(), name: t.database.templateContent.blank.views.table, type: 'table' as const }
           ],
           activeViewId: '',
           createdAt: now,
@@ -426,13 +455,14 @@ export const useDatabaseStore = create<DatabaseState>()(
       
       // ===== 列操作 =====
       addColumn: (dbId: string, column: Partial<DatabaseColumn>) => {
+        const t = getCurrentTranslations();
         set((state) => {
           const db = state.databases[dbId];
           if (!db) return state;
           
           const newColumn: DatabaseColumn = {
             id: generateId(),
-            name: column.name || '新列',
+            name: column.name || t.database.newColumn,
             type: column.type || 'text',
             ...column,
           };
@@ -519,6 +549,7 @@ export const useDatabaseStore = create<DatabaseState>()(
       
       // ===== 行操作 (Dataview: 操作笔记 YAML) =====
       addRow: async (dbId: string, cells?: Record<string, CellValue>) => {
+        const t = getCurrentTranslations();
         const vaultPath = useFileStore.getState().vaultPath;
         if (!vaultPath) throw new Error("No vault path");
         
@@ -527,11 +558,17 @@ export const useDatabaseStore = create<DatabaseState>()(
         
         const now = new Date().toISOString();
         
-        // 查找标题列（支持 "标题", "书名", "title", "name" 等常见列名）
-        const titleColumnNames = ['标题', '书名', '名称', 'title', 'name'];
+        // 查找标题列（支持常见列名 + 当前语言模板名）
+        const titleColumnNames = [
+          t.database.templateContent.blank.columns.title,
+          t.database.templateContent.task.columns.title,
+          t.database.templateContent.project.columns.title,
+          t.database.templateContent.reading.columns.title,
+          'title',
+          'name',
+        ].map((name) => name.toLowerCase());
         const titleColumn = db.columns.find(c => 
-          titleColumnNames.includes(c.name.toLowerCase()) || 
-          titleColumnNames.includes(c.name)
+          titleColumnNames.includes(c.name.toLowerCase())
         );
         
         // 获取标题值：优先从 cells 中获取，否则用默认名
@@ -795,6 +832,7 @@ ${yamlLines.join('\n')}
       
       // ===== 视图操作 =====
       addView: (dbId: string, view: Partial<DatabaseView>) => {
+        const t = getCurrentTranslations();
         const viewId = generateId();
         
         set((state) => {
@@ -803,7 +841,7 @@ ${yamlLines.join('\n')}
           
           const newView: DatabaseView = {
             id: viewId,
-            name: view.name || '新视图',
+            name: view.name || t.database.newView,
             type: view.type || 'table',
             ...view,
           };

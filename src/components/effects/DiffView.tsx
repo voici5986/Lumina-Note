@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Check, X, FileText, Code, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { parseMarkdown } from "@/services/markdown/markdown";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 interface DiffLine {
   type: "unchanged" | "added" | "removed";
@@ -72,6 +73,7 @@ function computeLCS(oldLines: string[], newLines: string[]): { oldIndex: number;
 
 // Preview mode component - shows rendered markdown with inline diff markers
 function PreviewDiffView({ diffLines }: { diffLines: DiffLine[] }) {
+  const { t } = useLocaleStore();
   // Group consecutive lines by type for better rendering
   const groups: { type: "unchanged" | "added" | "removed"; lines: string[] }[] = [];
   
@@ -117,7 +119,9 @@ function PreviewDiffView({ diffLines }: { diffLines: DiffLine[] }) {
               key={idx}
               className="relative bg-[hsl(var(--diff-remove-bg)/0.15)] border-l-4 border-[hsl(var(--diff-remove-text)/0.5)] pl-4 py-2 my-2 rounded-r"
             >
-              <span className="absolute left-0 top-0 text-xs bg-[hsl(var(--diff-remove-text))] text-white px-1.5 py-0.5 rounded-br">删除</span>
+              <span className="absolute left-0 top-0 text-xs bg-[hsl(var(--diff-remove-text))] text-white px-1.5 py-0.5 rounded-br">
+                {t.ai.diffView.removedLabel}
+              </span>
               <div 
                 className="line-through opacity-60 text-[hsl(var(--diff-remove-text))] pt-4"
                 dangerouslySetInnerHTML={{ __html: html }} 
@@ -132,7 +136,9 @@ function PreviewDiffView({ diffLines }: { diffLines: DiffLine[] }) {
               key={idx}
               className="relative bg-[hsl(var(--diff-add-bg)/0.15)] border-l-4 border-[hsl(var(--diff-add-text)/0.5)] pl-4 py-2 my-2 rounded-r"
             >
-              <span className="absolute left-0 top-0 text-xs bg-[hsl(var(--diff-add-text))] text-white px-1.5 py-0.5 rounded-br">新增</span>
+              <span className="absolute left-0 top-0 text-xs bg-[hsl(var(--diff-add-text))] text-white px-1.5 py-0.5 rounded-br">
+                {t.ai.diffView.addedLabel}
+              </span>
               <div 
                 className="text-[hsl(var(--diff-add-text))] pt-4"
                 dangerouslySetInnerHTML={{ __html: html }} 
@@ -199,6 +205,7 @@ export function DiffView({
   onAccept, 
   onReject 
 }: DiffViewProps) {
+  const { t } = useLocaleStore();
   const [viewMode, setViewMode] = useState<"preview" | "source">("preview"); // Default to preview
   
   // Safety check for inputs
@@ -221,17 +228,18 @@ export function DiffView({
         <div className="h-12 border-b border-border flex items-center justify-between px-4 bg-yellow-500/10">
           <div className="flex items-center gap-3">
             <FileText size={16} className="text-yellow-600" />
-            <span className="font-medium text-sm">AI 修改预览</span>
+            <span className="font-medium text-sm">{t.ai.diffView.title}</span>
             <span className="text-xs text-muted-foreground">{fileName}</span>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={onReject} className="px-3 py-1.5 text-sm rounded-md bg-muted hover:bg-red-500/20">
-              <X size={14} className="inline mr-1" />关闭
+              <X size={14} className="inline mr-1" />
+              {t.common.close}
             </button>
           </div>
         </div>
         <div className="flex-1 flex items-center justify-center text-muted-foreground">
-          <p>无法计算差异，内容可能相同或格式有误</p>
+          <p>{t.ai.diffView.noDiff}</p>
         </div>
       </div>
     );
@@ -252,7 +260,7 @@ export function DiffView({
       <div className="h-12 border-b border-border flex items-center justify-between px-4 bg-yellow-500/10">
         <div className="flex items-center gap-3">
           <FileText size={16} className="text-yellow-600" />
-          <span className="font-medium text-sm">AI 修改预览</span>
+          <span className="font-medium text-sm">{t.ai.diffView.title}</span>
           <span className="text-xs text-muted-foreground">{fileName}</span>
           <span className="text-xs px-2 py-0.5 rounded bg-[hsl(var(--diff-add-bg)/0.3)] text-[hsl(var(--diff-add-text))]">+{stats.added}</span>
           <span className="text-xs px-2 py-0.5 rounded bg-[hsl(var(--diff-remove-bg)/0.3)] text-[hsl(var(--diff-remove-text))]">-{stats.removed}</span>
@@ -266,10 +274,10 @@ export function DiffView({
                 "px-2 py-1 text-xs rounded transition-colors flex items-center gap-1",
                 viewMode === "preview" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
               )}
-              title="预览模式"
+              title={t.ai.diffView.previewMode}
             >
               <Eye size={12} />
-              预览
+              {t.ai.diffView.preview}
             </button>
             <button
               onClick={() => setViewMode("source")}
@@ -277,10 +285,10 @@ export function DiffView({
                 "px-2 py-1 text-xs rounded transition-colors flex items-center gap-1",
                 viewMode === "source" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
               )}
-              title="源码模式"
+              title={t.ai.diffView.sourceMode}
             >
               <Code size={12} />
-              源码
+              {t.ai.diffView.source}
             </button>
           </div>
           
@@ -289,14 +297,14 @@ export function DiffView({
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md bg-muted hover:bg-red-500/20 hover:text-red-600 transition-colors"
           >
             <X size={14} />
-            拒绝
+            {t.ai.diffView.reject}
           </button>
           <button
             onClick={onAccept}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             <Check size={14} />
-            接受修改
+            {t.ai.diffView.acceptChanges}
           </button>
         </div>
       </div>

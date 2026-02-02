@@ -6,6 +6,7 @@
  */
 
 import { SM2State, ReviewRating } from '../../types/flashcard';
+import { getCurrentTranslations } from '@/stores/useLocaleStore';
 
 // ==================== 常量 ====================
 
@@ -145,12 +146,20 @@ export function previewNextReview(state: SM2State): Record<ReviewRating, string>
  * 格式化间隔显示
  */
 export function formatInterval(days: number): string {
-  if (days === 0) return '今天';
-  if (days === 1) return '明天';
-  if (days < 7) return `${days}天`;
-  if (days < 30) return `${Math.round(days / 7)}周`;
-  if (days < 365) return `${Math.round(days / 30)}月`;
-  return `${(days / 365).toFixed(1)}年`;
+  const t = getCurrentTranslations();
+  if (days === 0) return t.common.today;
+  if (days === 1) return t.common.tomorrow;
+  if (days < 7) return t.flashcard.intervalDays.replace("{count}", String(days));
+  if (days < 30) {
+    const weeks = Math.round(days / 7);
+    return t.flashcard.intervalWeeks.replace("{count}", String(weeks));
+  }
+  if (days < 365) {
+    const months = Math.round(days / 30);
+    return t.flashcard.intervalMonths.replace("{count}", String(months));
+  }
+  const years = (days / 365).toFixed(1);
+  return t.flashcard.intervalYears.replace("{count}", years);
 }
 
 /**

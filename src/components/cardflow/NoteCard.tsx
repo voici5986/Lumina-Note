@@ -4,6 +4,7 @@ import { FileEntry, readBinaryFileBase64 } from '@/lib/tauri';
 import { Folder, Hash, FileText, Loader2 } from 'lucide-react';
 import { getFileName } from '@/lib/utils';
 import { pdfjs } from 'react-pdf';
+import { useLocaleStore } from '@/stores/useLocaleStore';
 
 // PDF 缩略图缓存（存储渲染后的图片 base64，而不是完整 PDF 数据）
 const pdfThumbnailCache = new Map<string, string>();
@@ -78,13 +79,14 @@ async function generatePdfThumbnail(pdfPath: string): Promise<string> {
 
 // PDF 卡片组件
 function PDFCard({ entry, onClick }: { entry: FileEntry; onClick: () => void }) {
+  const { t } = useLocaleStore();
   const [thumbnail, setThumbnail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   
   const title = getFileName(entry.name).replace('.pdf', '');
   const pathParts = entry.path.replace(/\\/g, '/').split('/');
-  const folder = pathParts.length > 1 ? pathParts[pathParts.length - 2] : 'Root';
+  const folder = pathParts.length > 1 ? pathParts[pathParts.length - 2] : t.file.rootFolder;
 
   useEffect(() => {
     let mounted = true;
@@ -121,7 +123,7 @@ function PDFCard({ entry, onClick }: { entry: FileEntry; onClick: () => void }) 
         ) : error || !thumbnail ? (
           <div className="aspect-[3/4] flex flex-col items-center justify-center bg-muted">
             <FileText className="text-muted-foreground" size={40} />
-            <span className="text-xs text-muted-foreground mt-2">无法预览</span>
+            <span className="text-xs text-muted-foreground mt-2">{t.cardFlow.previewUnavailable}</span>
           </div>
         ) : (
           <img 

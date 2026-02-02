@@ -5,41 +5,36 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { EditorView } from "@codemirror/view";
-import { defaultCommands, hideSlashMenu, SlashCommand, slashMenuField } from "../extensions/slashCommand";
+import { getDefaultCommands, hideSlashMenu, SlashCommand, slashMenuField } from "../extensions/slashCommand";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 interface SlashMenuProps {
   view: EditorView | null;
 }
 
-const categoryLabels: Record<string, string> = {
-  ai: "AI",
-  heading: "标题",
-  list: "列表",
-  block: "块",
-  insert: "插入",
-};
-
 const categoryOrder = ["ai", "heading", "list", "block", "insert"];
 
 export function SlashMenu({ view }: SlashMenuProps) {
+  const { t } = useLocaleStore();
   const [visible, setVisible] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [_slashPos, setSlashPos] = useState(0);
   const [filter, setFilter] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
+  const commands = useMemo(() => getDefaultCommands(t), [t]);
 
   // 过滤命令
   const filteredCommands = useMemo(() => {
-    if (!filter) return defaultCommands;
+    if (!filter) return commands;
     const lower = filter.toLowerCase();
-    return defaultCommands.filter(
+    return commands.filter(
       cmd =>
         cmd.label.toLowerCase().includes(lower) ||
         cmd.description.toLowerCase().includes(lower) ||
         cmd.id.toLowerCase().includes(lower)
     );
-  }, [filter]);
+  }, [filter, commands]);
 
   // 按类别分组
   const groupedCommands = useMemo(() => {
@@ -190,15 +185,15 @@ export function SlashMenu({ view }: SlashMenuProps) {
     >
       <div className="overflow-y-auto max-h-[300px] p-1">
         {categoryOrder.map(cat => {
-          const commands = groupedCommands[cat];
-          if (!commands?.length) return null;
+          const categoryCommands = groupedCommands[cat];
+          if (!categoryCommands?.length) return null;
 
           return (
             <div key={cat}>
               <div className="px-2 py-1 text-xs text-muted-foreground font-medium sticky top-0 bg-background">
-                {categoryLabels[cat]}
+                {t.editor.slashMenu.categories[cat as keyof typeof t.editor.slashMenu.categories] || cat}
               </div>
-              {commands.map(cmd => {
+              {categoryCommands.map(cmd => {
                 const globalIndex = flatCommands.indexOf(cmd);
                 const isSelected = globalIndex === selectedIndex;
 
@@ -228,7 +223,7 @@ export function SlashMenu({ view }: SlashMenuProps) {
 
       {filter && flatCommands.length === 0 && (
         <div className="p-4 text-center text-sm text-muted-foreground">
-          未找到命令
+          {t.editor.slashMenu.noCommands}
         </div>
       )}
     </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useFileStore } from "@/stores/useFileStore";
 import { useBrowserStore } from "@/stores/useBrowserStore";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 import { FileEntry, readFile } from "@/lib/tauri";
 import { cn, getFileName } from "@/lib/utils";
 import { Search, X, FileText, Loader2, Replace, ChevronDown, ChevronRight } from "lucide-react";
@@ -24,6 +25,7 @@ interface GlobalSearchProps {
 }
 
 export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
+  const { t } = useLocaleStore();
   const [query, setQuery] = useState("");
   const [replaceQuery, setReplaceQuery] = useState("");
   const [showReplace, setShowReplace] = useState(false);
@@ -199,7 +201,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
         <div className="p-3 border-b border-border flex items-center justify-between">
           <span className="font-medium text-sm flex items-center gap-2">
             <Search size={16} />
-            全局搜索
+            {t.globalSearch.title}
           </span>
           <button onClick={onClose} className="p-1 hover:bg-accent rounded transition-colors">
             <X size={16} />
@@ -217,7 +219,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="搜索内容..."
+              placeholder={t.globalSearch.searchPlaceholder}
               className="w-full pl-8 pr-3 py-2 bg-muted/50 border border-border rounded-md text-sm outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
@@ -230,7 +232,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
                 type="text"
                 value={replaceQuery}
                 onChange={(e) => setReplaceQuery(e.target.value)}
-                placeholder="替换为..."
+                placeholder={t.globalSearch.replacePlaceholder}
                 className="w-full pl-8 pr-3 py-2 bg-muted/50 border border-border rounded-md text-sm outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
@@ -245,7 +247,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
                 showReplace ? "bg-primary/20 text-primary" : "hover:bg-muted text-muted-foreground"
               )}
             >
-              替换
+              {t.globalSearch.replace}
             </button>
             <button
               onClick={() => setCaseSensitive(!caseSensitive)}
@@ -253,7 +255,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
                 "px-2 py-1 rounded transition-colors font-mono",
                 caseSensitive ? "bg-primary/20 text-primary" : "hover:bg-muted text-muted-foreground"
               )}
-              title="区分大小写"
+              title={t.globalSearch.caseSensitive}
             >
               Aa
             </button>
@@ -263,7 +265,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
                 "px-2 py-1 rounded transition-colors font-mono",
                 useRegex ? "bg-primary/20 text-primary" : "hover:bg-muted text-muted-foreground"
               )}
-              title="使用正则表达式"
+              title={t.globalSearch.useRegex}
             >
               .*
             </button>
@@ -275,11 +277,11 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
           {isSearching ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground">
               <Loader2 size={20} className="animate-spin mr-2" />
-              搜索中...
+              {t.globalSearch.searching}
             </div>
           ) : query && results.length === 0 ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">
-              没有找到匹配项
+              {t.globalSearch.noMatches}
             </div>
           ) : (
             <div className="py-2">
@@ -332,7 +334,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
                       })}
                       {result.matches.length > 10 && (
                         <div className="px-3 py-1.5 text-xs text-muted-foreground italic">
-                          ...还有 {result.matches.length - 10} 个匹配
+                          {t.globalSearch.moreMatches.replace("{count}", String(result.matches.length - 10))}
                         </div>
                       )}
                     </div>
@@ -346,9 +348,9 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
         {/* Footer */}
         <div className="p-2 border-t border-border text-xs text-muted-foreground">
           {results.length > 0 ? (
-            <span>{results.length} 个文件，{totalMatches} 个匹配</span>
+            <span>{t.globalSearch.summary.replace("{files}", String(results.length)).replace("{matches}", String(totalMatches))}</span>
           ) : (
-            <span>Ctrl+Shift+F 打开全局搜索</span>
+            <span>{t.globalSearch.shortcutHint}</span>
           )}
         </div>
       </div>

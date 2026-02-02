@@ -58,9 +58,9 @@ export interface AnnotationPopoverState {
 
 // 颜色配置
 export const ANNOTATION_COLORS: Record<AnnotationColor, { bg: string; border: string; label: string }> = {
-  yellow: { bg: 'rgba(255, 235, 59, 0.35)', border: 'rgba(255, 235, 59, 0.7)', label: '黄色' },
-  green: { bg: 'rgba(76, 175, 80, 0.35)', border: 'rgba(76, 175, 80, 0.7)', label: '绿色' },
-  blue: { bg: 'rgba(33, 150, 243, 0.35)', border: 'rgba(33, 150, 243, 0.7)', label: '蓝色' },
-  pink: { bg: 'rgba(233, 30, 99, 0.35)', border: 'rgba(233, 30, 99, 0.7)', label: '粉色' },
-  purple: { bg: 'rgba(156, 39, 176, 0.35)', border: 'rgba(156, 39, 176, 0.7)', label: '紫色' },
+  yellow: { bg: 'rgba(255, 235, 59, 0.35)', border: 'rgba(255, 235, 59, 0.7)', label: 'Yellow' },
+  green: { bg: 'rgba(76, 175, 80, 0.35)', border: 'rgba(76, 175, 80, 0.7)', label: 'Green' },
+  blue: { bg: 'rgba(33, 150, 243, 0.35)', border: 'rgba(33, 150, 243, 0.7)', label: 'Blue' },
+  pink: { bg: 'rgba(233, 30, 99, 0.35)', border: 'rgba(233, 30, 99, 0.7)', label: 'Pink' },
+  purple: { bg: 'rgba(156, 39, 176, 0.35)', border: 'rgba(156, 39, 176, 0.7)', label: 'Purple' },
 };

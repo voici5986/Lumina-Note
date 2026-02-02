@@ -5,12 +5,14 @@ import { useSplitStore } from "@/stores/useSplitStore";
 import { DatabaseCell } from "./cells/DatabaseCell";
 import { ColumnHeader } from "./ColumnHeader";
 import { Plus, MoreHorizontal, Trash2, Copy, FileText } from "lucide-react";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 interface TableViewProps {
   dbId: string;
 }
 
 export function TableView({ dbId }: TableViewProps) {
+  const { t } = useLocaleStore();
   const {
     databases,
     addRow,
@@ -36,8 +38,8 @@ export function TableView({ dbId }: TableViewProps) {
   const tableRef = useRef<HTMLDivElement>(null);
   
   const handleAddColumn = useCallback(() => {
-    addColumn(dbId, { name: '新列', type: 'text' });
-  }, [dbId, addColumn]);
+    addColumn(dbId, { name: t.database.newColumn, type: 'text' });
+  }, [dbId, addColumn, t.database.newColumn]);
   
   const handleCellClick = useCallback((rowId: string, columnId: string) => {
     setEditingCell({ rowId, columnId });
@@ -120,7 +122,7 @@ export function TableView({ dbId }: TableViewProps) {
                             }}
                             className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent"
                           >
-                            <Copy className="w-4 h-4" /> 复制
+                          <Copy className="w-4 h-4" /> {t.database.copyRow}
                           </button>
                           <button
                             onClick={() => {
@@ -129,7 +131,7 @@ export function TableView({ dbId }: TableViewProps) {
                             }}
                             className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent text-red-500"
                           >
-                            <Trash2 className="w-4 h-4" /> 删除
+                          <Trash2 className="w-4 h-4" /> {t.database.deleteRow}
                           </button>
                         </div>
                       )}
@@ -171,7 +173,7 @@ export function TableView({ dbId }: TableViewProps) {
                           handleOpenInSplit(row.notePath);
                         }}
                         className="p-1 mr-1 rounded hover:bg-accent text-muted-foreground hover:text-primary transition-colors"
-                        title="在分栏中打开笔记"
+                        title={t.database.openInSplit}
                       >
                         <FileText className="w-4 h-4" />
                       </button>
@@ -193,7 +195,7 @@ export function TableView({ dbId }: TableViewProps) {
                 className="w-full h-9 flex items-center gap-2 px-4 text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                新建
+                {t.database.newRow}
               </button>
             </td>
           </tr>

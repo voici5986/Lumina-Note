@@ -252,8 +252,10 @@ export function ThemeEditor({ isOpen, onClose, editingTheme, onSave }: ThemeEdit
                 className="w-full px-2 py-1.5 text-sm bg-muted border border-border rounded"
               >
                 <option value="">{t.themeEditor.selectBaseTheme}</option>
-                {OFFICIAL_THEMES.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
+                {OFFICIAL_THEMES.map((theme) => (
+                  <option key={theme.id} value={theme.id}>
+                    {(t.settingsModal.themes as any)?.[theme.id]?.name || theme.name}
+                  </option>
                 ))}
               </select>
             </div>

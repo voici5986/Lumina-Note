@@ -3,6 +3,7 @@ import { useDatabaseStore } from "@/stores/useDatabaseStore";
 import type { DatabaseColumn, SelectColor } from "@/types/database";
 import { SELECT_COLORS } from "@/types/database";
 import { ChevronDown, Plus, X, Check } from "lucide-react";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 interface MultiSelectCellProps {
   value: string[] | null;
@@ -14,6 +15,7 @@ interface MultiSelectCellProps {
 }
 
 export function MultiSelectCell({ value, onChange, isEditing, onBlur, column, dbId }: MultiSelectCellProps) {
+  const { t } = useLocaleStore();
   const { addSelectOption } = useDatabaseStore();
   const [showDropdown, setShowDropdown] = useState(false);
   const [newOptionName, setNewOptionName] = useState('');
@@ -87,7 +89,7 @@ export function MultiSelectCell({ value, onChange, isEditing, onBlur, column, db
             </span>
           ))
         ) : (
-          <span className="text-sm text-muted-foreground">选择...</span>
+          <span className="text-sm text-muted-foreground">{t.database.selectPlaceholder}</span>
         )}
         <ChevronDown className="w-4 h-4 text-muted-foreground ml-auto flex-shrink-0" />
       </div>
@@ -116,7 +118,7 @@ export function MultiSelectCell({ value, onChange, isEditing, onBlur, column, db
           
           {options.length === 0 && (
             <div className="px-3 py-2 text-sm text-muted-foreground">
-              暂无选项
+              {t.database.noOptions}
             </div>
           )}
           
@@ -129,7 +131,7 @@ export function MultiSelectCell({ value, onChange, isEditing, onBlur, column, db
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleAddOption();
                 }}
-                placeholder="新建选项..."
+                placeholder={t.database.newOption}
                 className="flex-1 px-2 py-1 text-sm bg-transparent border-none outline-none"
               />
               <button

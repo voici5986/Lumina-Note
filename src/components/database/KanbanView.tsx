@@ -3,12 +3,14 @@ import { useDatabaseStore } from "@/stores/useDatabaseStore";
 import type { DatabaseRow } from "@/types/database";
 import { SELECT_COLORS } from "@/types/database";
 import { Plus, MoreHorizontal, GripVertical } from "lucide-react";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 interface KanbanViewProps {
   dbId: string;
 }
 
 export function KanbanView({ dbId }: KanbanViewProps) {
+  const { t } = useLocaleStore();
   const {
     databases,
     addRow,
@@ -34,8 +36,8 @@ export function KanbanView({ dbId }: KanbanViewProps) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground">
         <div className="text-center">
-          <p>请先设置分组列</p>
-          <p className="text-sm mt-1">看板视图需要一个 Select 类型的列作为分组依据</p>
+          <p>{t.database.kanbanMissingGroupTitle}</p>
+          <p className="text-sm mt-1">{t.database.kanbanMissingGroupDesc}</p>
         </div>
       </div>
     );
@@ -143,7 +145,7 @@ export function KanbanView({ dbId }: KanbanViewProps) {
                   onClick={() => handleAddCardToGroup(option.id)}
                   className="w-full p-2 rounded-md border border-dashed border-border text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-1"
                 >
-                  <Plus className="w-4 h-4" /> 新建
+                  <Plus className="w-4 h-4" /> {t.database.newCard}
                 </button>
               </div>
             </div>
@@ -161,7 +163,7 @@ export function KanbanView({ dbId }: KanbanViewProps) {
           >
             <div className="flex items-center gap-2 p-3">
               <span className="px-2 py-0.5 rounded text-sm font-medium bg-muted text-muted-foreground">
-                未分组
+                {t.database.ungrouped}
               </span>
               <span className="text-sm text-muted-foreground">{ungroupedRows.length}</span>
             </div>
@@ -193,7 +195,7 @@ interface KanbanCardProps {
 }
 
 function KanbanCard({ row, titleColumnId, isDragging, onDragStart }: KanbanCardProps) {
-  const title = titleColumnId ? (row.cells[titleColumnId] as string) || '无标题' : '无标题';
+  const title = titleColumnId ? (row.cells[titleColumnId] as string) || t.database.noTitle : t.database.noTitle;
   
   return (
     <div

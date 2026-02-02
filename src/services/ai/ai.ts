@@ -94,6 +94,7 @@ function buildSystemPrompt(files: FileReference[], intent?: IntentType): string 
 
 // Parse AI response for edit suggestions
 export function parseEditSuggestions(response: string): EditSuggestion[] {
+  const t = getCurrentTranslations();
   const suggestions: EditSuggestion[] = [];
   const editRegex = /<edit file="([^"]+)">([\s\S]*?)<\/edit>/g;
   
@@ -111,7 +112,7 @@ export function parseEditSuggestions(response: string): EditSuggestion[] {
         filePath,
         originalContent: origMatch[1].trim(),
         newContent: modMatch[1].trim(),
-        description: descMatch ? descMatch[1].trim() : "内容修改",
+        description: descMatch ? descMatch[1].trim() : t.ai.editSuggestionDefault,
       });
     }
   }
@@ -166,6 +167,7 @@ export async function chat(
 
 // Apply edit suggestion to content
 export function applyEdit(content: string, suggestion: EditSuggestion): string {
+  const t = getCurrentTranslations();
   const originalContent = suggestion.originalContent;
   const newContent = suggestion.newContent;
   
@@ -238,5 +240,5 @@ export function applyEdit(content: string, suggestion: EditSuggestion): string {
   
   // If still no match, insert at a reasonable position or append
   console.warn("[applyEdit] No match found, appending new content");
-  return content + "\n\n<!-- AI 修改 -->\n" + newContent;
+  return content + `\n\n<!-- ${t.ai.editMarker} -->\n` + newContent;
 }

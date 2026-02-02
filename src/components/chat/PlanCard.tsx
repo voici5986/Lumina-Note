@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, Circle, Loader2, ListTodo, ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import type { Plan, PlanStepStatus } from "@/stores/useRustAgentStore";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 interface PlanCardProps {
   plan: Plan;
@@ -22,6 +23,7 @@ const statusConfig: Record<PlanStepStatus, { icon: "completed" | "in_progress" |
 };
 
 export function PlanCard({ plan, className = "" }: PlanCardProps) {
+  const { t } = useLocaleStore();
   const [isExpanded, setIsExpanded] = useState(true);
   
   const completedCount = plan.steps.filter(s => s.status === "completed").length;
@@ -43,7 +45,7 @@ export function PlanCard({ plan, className = "" }: PlanCardProps) {
         <div className="flex items-center gap-2">
           <ListTodo className="w-4 h-4 text-primary" />
           <span className="text-sm font-medium">
-            执行计划
+            {t.ai.planTitle}
           </span>
           <span className="text-xs text-muted-foreground">
             ({completedCount}/{totalCount})

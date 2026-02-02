@@ -1164,7 +1164,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
           imageInfoField,
           // Slash Command 扩展
           ...slashCommandExtensions,
-          placeholderExtension("开始输入，或按 / 唤起命令..."),
+          placeholderExtension(t.editor.slashMenu.placeholder),
           EditorView.updateListener.of((update) => {
             if (update.docChanged && !isExternalChange.current) {
               const newContent = update.state.doc.toString();

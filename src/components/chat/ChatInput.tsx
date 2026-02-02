@@ -563,7 +563,7 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
               ? "text-muted-foreground hover:text-foreground hover:bg-muted"
               : "text-muted-foreground/50 cursor-not-allowed"
           )}
-          title={supportsVision ? (t.ai.attachImage || '添加图片') : (t.ai.modelNoVision || '当前模型不支持图片')}
+          title={supportsVision ? t.ai.attachImage : t.ai.modelNoVision}
           disabled={!supportsVision}
         >
           {supportsVision ? (
@@ -733,14 +733,14 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
                         setShowCommand(false);
                       }}
                       className="opacity-0 group-hover:opacity-100 p-1.5 text-muted-foreground hover:text-foreground hover:bg-background rounded-md transition-all"
-                      title="编辑"
+                      title={t.common.edit}
                     >
                       <Pencil size={12} />
                     </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (confirm("确定要删除这个命令吗？")) {
+                        if (confirm(t.ai.slashCommands.deleteConfirm)) {
                           deleteCommand(cmd.id);
                           setCommandIndex((index) => {
                             if (filteredCommands.length <= 1) return 0;
@@ -752,7 +752,7 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
                         }
                       }}
                       className="opacity-0 group-hover:opacity-100 p-1.5 text-muted-foreground hover:text-red-500 hover:bg-background rounded-md transition-all"
-                      title="删除"
+                      title={t.common.delete}
                     >
                       <Trash2 size={12} />
                     </button>

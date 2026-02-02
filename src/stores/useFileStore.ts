@@ -243,6 +243,7 @@ export const useFileStore = create<FileState>()(
 
       // Open a file
       openFile: async (path: string, addToHistory: boolean = true, forceReload: boolean = false) => {
+        const t = getCurrentTranslations();
         const { tabs, activeTabIndex, navigationHistory, navigationIndex } = get();
 
         // Normalize paths for comparison (handle Windows backslashes)
@@ -310,7 +311,7 @@ export const useFileStore = create<FileState>()(
         set({ isLoadingFile: true });
         try {
           const content = await readFile(path);
-          const fileName = path.split(/[/\\]/).pop()?.replace(/\.(md|docx)$/i, "") || "未命名";
+          const fileName = path.split(/[/\\]/).pop()?.replace(/\.(md|docx)$/i, "") || t.common.untitled;
 
           // 创建新标签页
           const newTab: Tab = {
@@ -594,8 +595,9 @@ export const useFileStore = create<FileState>()(
 
       // Update tab path (for rename)
       updateTabPath: (oldPath: string, newPath: string) => {
+        const t = getCurrentTranslations();
         const { tabs, currentFile } = get();
-        const newFileName = newPath.split(/[/\\/]/).pop()?.replace(/\.(md|docx)$/i, "") || "未命名";
+        const newFileName = newPath.split(/[/\\/]/).pop()?.replace(/\.(md|docx)$/i, "") || t.common.untitled;
 
         // 查找并更新所有匹配的标签页
         const updatedTabs = tabs.map(tab => {
@@ -886,6 +888,7 @@ export const useFileStore = create<FileState>()(
       },
 
       openAIMainTab: () => {
+        const t = getCurrentTranslations();
         const { tabs, activeTabIndex, currentContent, isDirty, undoStack, redoStack } = get();
 
         // 如果已经有 ai-chat 标签页，直接切换
@@ -912,7 +915,7 @@ export const useFileStore = create<FileState>()(
           id: "__ai_chat__",
           type: "ai-chat",
           path: "",
-          name: "AI 聊天",
+          name: t.common.aiChatTab,
           content: "",
           isDirty: false,
           undoStack: [],
@@ -935,6 +938,7 @@ export const useFileStore = create<FileState>()(
 
       // 打开孤立图谱标签页
       openIsolatedGraphTab: (node: IsolatedNodeInfo) => {
+        const t = getCurrentTranslations();
         const { tabs, activeTabIndex, currentContent, isDirty, undoStack, redoStack } = get();
 
         // 每次都创建新标签页（允许多个孤立视图）
@@ -957,7 +961,7 @@ export const useFileStore = create<FileState>()(
           id: tabId,
           type: "isolated-graph",
           path: node.path,
-          name: `孤立: ${node.label}`,
+          name: t.graph.isolatedPrefix.replace("{name}", node.label),
           content: "",
           isDirty: false,
           undoStack: [],
@@ -978,6 +982,7 @@ export const useFileStore = create<FileState>()(
 
       // 打开视频笔记标签页（单例模式：只允许一个视频标签页）
       openVideoNoteTab: (url: string, title?: string) => {
+        const t = getCurrentTranslations();
         const { tabs, activeTabIndex, currentContent, isDirty, undoStack, redoStack } = get();
 
         // 检查是否已有视频标签页
@@ -1003,10 +1008,11 @@ export const useFileStore = create<FileState>()(
           const bvid = bvidMatch ? bvidMatch[0] : "";
 
           // 更新视频标签页
+          const defaultName = `${t.videoNote.title} - ${bvid}`;
           updatedTabs[existingVideoIndex] = {
             ...updatedTabs[existingVideoIndex],
             videoUrl: url,
-            name: title || `视频-${bvid}`,
+            name: title || defaultName,
           };
 
           set({
@@ -1023,6 +1029,7 @@ export const useFileStore = create<FileState>()(
         const bvidMatch = url.match(/BV[A-Za-z0-9]+/);
         const bvid = bvidMatch ? bvidMatch[0] : Date.now().toString();
         const tabId = `__video_${bvid}__`;
+        const defaultName = `${t.videoNote.title} - ${bvid}`;
 
         // 保存当前标签页状态
         let updatedTabs = [...tabs];
@@ -1041,7 +1048,7 @@ export const useFileStore = create<FileState>()(
           id: tabId,
           type: "video-note",
           path: "",
-          name: title || `视频-${bvid}`,
+          name: title || defaultName,
           content: "",
           isDirty: false,
           undoStack: [],
@@ -1062,6 +1069,7 @@ export const useFileStore = create<FileState>()(
 
       // 从已分享的 Markdown 内容打开视频笔记（支持识别并加载时间戳）
       openVideoNoteFromContent: (content: string, title?: string) => {
+        const t = getCurrentTranslations();
         const { tabs, activeTabIndex, currentContent, isDirty, undoStack, redoStack } = get();
 
         try {
@@ -1089,7 +1097,7 @@ export const useFileStore = create<FileState>()(
             updatedTabs[existingVideoIndex] = {
               ...updatedTabs[existingVideoIndex],
               videoUrl: parsed.video.url,
-              name: title || parsed.video.title || `视频-${parsed.video.bvid}`,
+              name: title || parsed.video.title || `${t.videoNote.filePrefix}-${parsed.video.bvid}`,
               videoNoteData: parsed,
             } as Tab;
 
@@ -1123,7 +1131,7 @@ export const useFileStore = create<FileState>()(
             id: tabId,
             type: 'video-note',
             path: '',
-            name: title || parsed.video.title || `视频-${bvid}`,
+            name: title || parsed.video.title || `${t.videoNote.filePrefix}-${bvid}`,
             content: '',
             isDirty: false,
             undoStack: [],
@@ -1292,6 +1300,7 @@ export const useFileStore = create<FileState>()(
 
       // 打开卡片流标签页
       openCardFlowTab: () => {
+        const t = getCurrentTranslations();
         const { tabs, activeTabIndex, currentContent, isDirty, undoStack, redoStack } = get();
 
         // 检查是否已有 cardflow 标签页
@@ -1318,7 +1327,7 @@ export const useFileStore = create<FileState>()(
           id: "__card_flow__",
           type: "cardflow",
           path: "",
-          name: "卡片视图",
+          name: t.views.cardView,
           content: "",
           isDirty: false,
           undoStack: [],
@@ -1341,6 +1350,7 @@ export const useFileStore = create<FileState>()(
 
       // 打开网页标签页
       openWebpageTab: (url: string, title?: string) => {
+        const t = getCurrentTranslations();
         const { tabs, activeTabIndex, currentContent, isDirty, undoStack, redoStack, switchTab } = get();
 
         // 如果已有相同 URL 的网页标签，直接切换过去，避免重复创建
@@ -1382,7 +1392,7 @@ export const useFileStore = create<FileState>()(
         }
 
         // 尝试从 URL 提取域名作为默认标题
-        let defaultTitle = title || '新标签页';
+        let defaultTitle = title || t.views.newTab;
         if (!title && url) {
           try {
             const urlObj = new URL(url);
@@ -1438,6 +1448,7 @@ export const useFileStore = create<FileState>()(
 
       // 打开闪卡标签页
       openFlashcardTab: (deckId?: string) => {
+        const t = getCurrentTranslations();
         const { tabs, activeTabIndex, currentContent, isDirty, undoStack, redoStack, switchTab } = get();
 
         // 如果已有闪卡标签页，直接切换
@@ -1483,7 +1494,7 @@ export const useFileStore = create<FileState>()(
           id: tabId,
           type: "flashcard",
           path: "",
-          name: "闪卡复习",
+          name: t.views.flashcardReview,
           content: "",
           isDirty: false,
           undoStack: [],
@@ -1504,6 +1515,7 @@ export const useFileStore = create<FileState>()(
 
       // 创建新文件
       createNewFile: async (fileName?: string) => {
+        const t = getCurrentTranslations();
         const { vaultPath, refreshFileTree, openFile } = get();
         if (!vaultPath) return;
 
@@ -1513,7 +1525,7 @@ export const useFileStore = create<FileState>()(
         let name = fileName;
         if (!name) {
           // 生成默认文件名：未命名、未命名 1、未命名 2...
-          const baseName = "未命名";
+          const baseName = t.common.untitled;
           let counter = 0;
           let finalName = baseName;
 
@@ -1576,12 +1588,13 @@ export const useFileStore = create<FileState>()(
         if (content === currentContent) return;
 
         if (source === "ai") {
+          const t = getCurrentTranslations();
           // AI 修改：总是创建新的撤销点
           const entry: HistoryEntry = {
             content: currentContent, // 保存修改前的内容
             type: "ai",
             timestamp: now,
-            description: description || "AI 修改",
+            description: description || t.ai.editChangeLabel,
           };
           const newUndoStack = trimUndoStack([...undoStack, entry]);
           set({
@@ -1616,6 +1629,7 @@ export const useFileStore = create<FileState>()(
 
       // 撤销
       undo: () => {
+        const t = getCurrentTranslations();
         const { undoStack, currentContent, redoStack } = get();
         if (undoStack.length === 0) return;
 
@@ -1639,7 +1653,7 @@ export const useFileStore = create<FileState>()(
 
         // 显示撤销提示
         if (lastEntry.type === "ai") {
-          console.log(`[Undo] 撤销 AI 修改: ${lastEntry.description || "未命名"}`);
+          console.log(`[Undo] 撤销 AI 修改: ${lastEntry.description || t.common.untitled}`);
         }
       },
 
@@ -1835,6 +1849,7 @@ export const useFileStore = create<FileState>()(
 
       // Move file to a target folder
       moveFileToFolder: async (sourcePath: string, targetFolder: string) => {
+        const t = getCurrentTranslations();
         const { tabs, currentFile, refreshFileTree } = get();
         
         try {
@@ -1846,7 +1861,7 @@ export const useFileStore = create<FileState>()(
           // Update tab path if the moved file is open
           const tabIndex = tabs.findIndex(t => t.type === 'file' && t.path === sourcePath);
           if (tabIndex !== -1) {
-            const newFileName = newPath.split(/[/\\]/).pop()?.replace(/\.(md|docx)$/i, "") || "未命名";
+            const newFileName = newPath.split(/[/\\]/).pop()?.replace(/\.(md|docx)$/i, "") || t.common.untitled;
             const updatedTabs = tabs.map((tab, i) => {
               if (i === tabIndex) {
                 return {
@@ -1875,6 +1890,7 @@ export const useFileStore = create<FileState>()(
 
       // Move folder to a target folder
       moveFolderToFolder: async (sourcePath: string, targetFolder: string) => {
+        const t = getCurrentTranslations();
         const { tabs, currentFile, refreshFileTree } = get();
         
         try {
@@ -1896,7 +1912,7 @@ export const useFileStore = create<FileState>()(
                 // Replace the old folder path with the new one
                 const relativePath = normalizedTabPath.slice(normalizedSource.length);
                 const newTabPath = normalizedNew + relativePath;
-                const newFileName = newTabPath.split(/[/\\]/).pop()?.replace(/\.(md|docx)$/i, "") || "未命名";
+                const newFileName = newTabPath.split(/[/\\]/).pop()?.replace(/\.(md|docx)$/i, "") || t.common.untitled;
                 return {
                   ...tab,
                   path: newTabPath,

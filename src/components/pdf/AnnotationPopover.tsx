@@ -7,6 +7,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { usePDFAnnotationStore } from '@/stores/usePDFAnnotationStore';
 import { usePDFStore } from '@/stores/usePDFStore';
+import { useLocaleStore } from '@/stores/useLocaleStore';
 import { ANNOTATION_COLORS, type AnnotationColor, type AnnotationType } from '@/types/annotation';
 import { Highlighter, Underline, StickyNote, X } from 'lucide-react';
 
@@ -17,6 +18,7 @@ interface AnnotationPopoverProps {
 export function AnnotationPopover({ className }: AnnotationPopoverProps) {
   const { popover, closePopover, addAnnotation } = usePDFAnnotationStore();
   const { currentPage } = usePDFStore();
+  const { t } = useLocaleStore();
   const [selectedColor, setSelectedColor] = useState<AnnotationColor>('yellow');
   const [selectedType, setSelectedType] = useState<AnnotationType>('highlight');
   const [note, setNote] = useState('');
@@ -110,21 +112,21 @@ export function AnnotationPopover({ className }: AnnotationPopoverProps) {
           <button
             onClick={() => handleQuickAdd('highlight', selectedColor)}
             className="p-2 hover:bg-accent rounded transition-colors"
-            title="高亮"
+            title={t.pdfViewer.annotation.highlight}
           >
             <Highlighter size={18} style={{ color: ANNOTATION_COLORS[selectedColor].border }} />
           </button>
           <button
             onClick={() => handleQuickAdd('underline', selectedColor)}
             className="p-2 hover:bg-accent rounded transition-colors"
-            title="下划线"
+            title={t.pdfViewer.annotation.underline}
           >
             <Underline size={18} style={{ color: ANNOTATION_COLORS[selectedColor].border }} />
           </button>
           <button
             onClick={handleExpandNote}
             className="p-2 hover:bg-accent rounded transition-colors"
-            title="添加笔记"
+            title={t.pdfViewer.annotation.addNote}
           >
             <StickyNote size={18} />
           </button>
@@ -143,7 +145,7 @@ export function AnnotationPopover({ className }: AnnotationPopoverProps) {
                   selectedColor === color && 'ring-2 ring-offset-1 ring-foreground scale-110'
                 )}
                 style={{ backgroundColor: ANNOTATION_COLORS[color].border }}
-                title={ANNOTATION_COLORS[color].label}
+                title={(t.pdfViewer.annotation.colors as Record<string, string>)?.[color] || ANNOTATION_COLORS[color].label}
               />
             ))}
           </div>
@@ -153,7 +155,7 @@ export function AnnotationPopover({ className }: AnnotationPopoverProps) {
         <div className="w-64 space-y-3">
           {/* 头部 */}
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">添加笔记</span>
+            <span className="text-sm font-medium">{t.pdfViewer.annotation.addNote}</span>
             <button
               onClick={closePopover}
               className="p-1 hover:bg-accent rounded"
@@ -209,7 +211,7 @@ export function AnnotationPopover({ className }: AnnotationPopoverProps) {
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="输入笔记..."
+            placeholder={t.pdfViewer.annotation.notePlaceholder}
             className="w-full h-20 px-2 py-1.5 text-sm bg-muted/50 border border-border rounded resize-none focus:outline-none focus:ring-1 focus:ring-ring"
             autoFocus
           />
@@ -220,13 +222,13 @@ export function AnnotationPopover({ className }: AnnotationPopoverProps) {
               onClick={closePopover}
               className="px-3 py-1.5 text-sm hover:bg-accent rounded transition-colors"
             >
-              取消
+              {t.common.cancel}
             </button>
             <button
               onClick={handleAddWithNote}
               className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
             >
-              添加
+              {t.common.add}
             </button>
           </div>
         </div>

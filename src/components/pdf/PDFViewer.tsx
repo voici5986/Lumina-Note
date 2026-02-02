@@ -85,7 +85,8 @@ export function PDFViewer({ filePath, className }: PDFViewerProps) {
       } catch (err) {
         console.error("Failed to read PDF file:", err);
         if (!cancelled) {
-          setError(`读取文件失败: ${err}`);
+          const errorMessage = t.pdfViewer.readFailed.replace("{error}", String(err));
+          setError(errorMessage);
           setLoading(false);
         }
       }
@@ -93,7 +94,7 @@ export function PDFViewer({ filePath, className }: PDFViewerProps) {
 
     loadPdf();
     return () => { cancelled = true; };
-  }, [filePath, parseStructure]);
+  }, [filePath, parseStructure, t]);
 
   const handleDocumentLoad = useCallback((pages: number) => {
     setNumPages(pages);
@@ -133,21 +134,16 @@ export function PDFViewer({ filePath, className }: PDFViewerProps) {
     if (selectedElements.length === 0) return;
     
     // 格式化选中的元素为引用文本
-    const pdfFileName = filePath.split(/[/\\]/).pop() || 'PDF';
+    const pdfFileName = filePath.split(/[/\\]/).pop() || t.pdfViewer.defaultFileName;
     const citations = selectedElements.map((el, index) => {
-      const typeLabels: Record<string, string> = {
-        text: '文本',
-        image: '图片',
-        table: '表格',
-        formula: '公式',
-      };
-      const typeLabel = typeLabels[el.type] || el.type;
+      const typeLabels = t.pdfViewer.elementTypes as Record<string, string> | undefined;
+      const typeLabel = typeLabels?.[el.type] || el.type;
       
       const content = el.content ? `\n${el.content}` : '';
       return `[${index + 1}] ${typeLabel} (P${el.pageIndex})${content}`;
     }).join('\n\n');
     
-    const referenceText = `# PDF 引用 - ${pdfFileName}\n\n${citations}`;
+    const referenceText = `# ${t.pdfViewer.referenceHeader} - ${pdfFileName}\n\n${citations}`;
     
     // 添加到 AI Store 的文本选择
     useAIStore.getState().addTextSelection(
@@ -161,7 +157,7 @@ export function PDFViewer({ filePath, className }: PDFViewerProps) {
     
     // 清空选择
     clearSelection();
-  }, [selectedElements, filePath, clearSelection]);
+  }, [selectedElements, filePath, clearSelection, t]);
 
   // 为不同组件创建独立的数据副本，避免 ArrayBuffer detached 错误
   const pdfDataForSearch = useMemo(() => {
@@ -186,7 +182,7 @@ export function PDFViewer({ filePath, className }: PDFViewerProps) {
         <div className="h-9 flex items-center px-3 gap-2 border-b border-border bg-muted/30 shrink-0">
           <FileText size={14} className="text-red-500" />
           <span className="text-sm font-medium truncate">
-            {filePath.split(/[\/\\]/).pop() || "PDF"}
+            {filePath.split(/[\/\\]/).pop() || t.pdfViewer.defaultFileName}
           </span>
         </div>
         <div className="flex-1 flex items-center justify-center">
@@ -204,7 +200,7 @@ export function PDFViewer({ filePath, className }: PDFViewerProps) {
         <div className="h-9 flex items-center px-3 gap-2 border-b border-border bg-muted/30 shrink-0">
           <FileText size={14} className="text-red-500" />
           <span className="text-sm font-medium truncate">
-            {filePath.split(/[\/\\]/).pop() || "PDF"}
+            {filePath.split(/[\/\\]/).pop() || t.pdfViewer.defaultFileName}
           </span>
         </div>
         <div className="flex-1 flex items-center justify-center">
@@ -289,7 +285,7 @@ export function PDFViewer({ filePath, className }: PDFViewerProps) {
           <button
             onClick={() => setShowOutline(true)}
             className="absolute left-0 top-2 z-10 flex items-center justify-center w-5 h-6 bg-muted/80 border border-border border-l-0 rounded-r shadow-sm hover:bg-background transition-colors"
-            title="展开目录"
+            title={t.pdfViewer.expandCatalog}
           >
             <ChevronRight size={14} className="text-muted-foreground" />
           </button>

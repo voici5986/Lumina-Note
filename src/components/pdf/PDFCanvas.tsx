@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { InteractiveLayer } from "./InteractiveLayer";
 import { AnnotationLayer } from "./AnnotationLayer";
 import { usePDFAnnotationStore } from "@/stores/usePDFAnnotationStore";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 import type { PDFElement } from "@/types/pdf";
 import type { TextPosition } from "@/types/annotation";
 
@@ -50,6 +51,7 @@ export function PDFCanvas({
   enableAnnotations = true,
   className,
 }: PDFCanvasProps) {
+  const { t } = useLocaleStore();
   const [numPages, setNumPages] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState<{ width: number; height: number } | null>(null);
@@ -133,8 +135,8 @@ export function PDFCanvas({
   // 处理加载错误
   const handleDocumentLoadError = useCallback((err: Error) => {
     console.error("PDF load error:", err);
-    setError(`加载失败: ${err.message}`);
-  }, []);
+    setError(t.pdfViewer.readFailed.replace("{error}", err.message));
+  }, [t]);
 
   // 键盘导航
   useEffect(() => {
@@ -219,7 +221,7 @@ export function PDFCanvas({
     return (
       <div className={cn("flex-1 flex items-center justify-center", className)}>
         <div className="text-center text-destructive">
-          <p className="text-lg font-medium">PDF 加载失败</p>
+          <p className="text-lg font-medium">{t.pdfViewer.loadFailed}</p>
           <p className="text-sm text-muted-foreground mt-1">{error}</p>
           <p className="text-xs text-muted-foreground mt-2">{filePath}</p>
         </div>
@@ -232,7 +234,7 @@ export function PDFCanvas({
     return (
       <div className={cn("flex-1 flex items-center justify-center", className)}>
         <Loader2 className="animate-spin mr-2" />
-        <span>读取文件...</span>
+        <span>{t.pdfViewer.readingFile}</span>
       </div>
     );
   }
@@ -252,7 +254,7 @@ export function PDFCanvas({
         loading={
           <div className="flex items-center justify-center py-20">
             <Loader2 className="animate-spin mr-2" />
-            <span>解析 PDF...</span>
+            <span>{t.pdfViewer.parsingPdf}</span>
           </div>
         }
         className="flex flex-col items-center py-4"

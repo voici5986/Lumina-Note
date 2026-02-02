@@ -5,6 +5,7 @@
 
 import { useCallback } from "react";
 import { readFile } from "@/lib/tauri";
+import { getCurrentTranslations } from "@/stores/useLocaleStore";
 
 export interface ReferencedFile {
   path: string;
@@ -30,6 +31,7 @@ export async function processMessageWithFiles(
   message: string,
   referencedFiles: ReferencedFile[]
 ): Promise<ProcessedMessage> {
+  const t = getCurrentTranslations();
   // 构建显示消息（用户输入 + 文件名标签）
   const fileLabels = referencedFiles
     .filter(f => !f.isFolder)
@@ -47,7 +49,8 @@ export async function processMessageWithFiles(
     if (!file.isFolder) {
       try {
         const content = await readFile(file.path);
-        fileContext += `\n\n--- 引用文件: ${file.name} ---\n${content}`;
+        const fileHeader = t.ai.fileContextLabel.replace("{name}", file.name);
+        fileContext += `\n\n--- ${fileHeader} ---\n${content}`;
       } catch (e) {
         console.error(`Failed to read file ${file.path}:`, e);
       }
@@ -56,7 +59,7 @@ export async function processMessageWithFiles(
 
   // 完整消息（包含文件内容，发送给 AI）
   const fullMessage = fileContext
-    ? `${trimmedMessage}\n\n[用户引用的文件内容]${fileContext}`
+    ? `${trimmedMessage}\n\n${t.ai.fileContextTag}${fileContext}`
     : trimmedMessage;
 
   return {

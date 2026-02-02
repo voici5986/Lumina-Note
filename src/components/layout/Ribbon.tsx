@@ -116,7 +116,7 @@ export function Ribbon() {
         <button
           onClick={() => window.dispatchEvent(new CustomEvent("open-global-search"))}
           className="w-8 h-8 ui-icon-btn"
-          title="全局搜索 (Ctrl+Shift+F)"
+          title={t.ribbon.globalSearch}
         >
           <Search size={18} />
         </button>
@@ -133,7 +133,7 @@ export function Ribbon() {
               ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
               : ""
           )}
-          title="AI 聊天（主视图）"
+          title={t.ribbon.aiChatMain}
         >
           <Bot size={18} />
         </button>
@@ -147,7 +147,7 @@ export function Ribbon() {
               ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
               : ""
           )}
-          title="文件编辑器"
+          title={t.ribbon.fileEditor}
         >
           <FileText size={18} />
         </button>
@@ -161,7 +161,7 @@ export function Ribbon() {
               ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
               : ""
           )}
-          title="卡片视图"
+          title={t.ribbon.cardView}
         >
           <LayoutGrid size={18} />
         </button>
@@ -187,7 +187,7 @@ export function Ribbon() {
             if (videoTabIndex >= 0) {
               switchTab(videoTabIndex);
             } else {
-              openVideoNoteTab("", "视频笔记");
+              openVideoNoteTab("", t.videoNote.title);
             }
           }}
           className={cn(
@@ -196,7 +196,7 @@ export function Ribbon() {
               ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
               : ""
           )}
-          title="视频笔记"
+          title={t.ribbon.videoNote}
         >
           <Video size={18} />
         </button>
@@ -210,7 +210,7 @@ export function Ribbon() {
               ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
               : ""
           )}
-          title="数据库"
+          title={t.ribbon.database}
         >
           <Database size={18} />
         </button>
@@ -224,7 +224,7 @@ export function Ribbon() {
               ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
               : ""
           )}
-          title="闪卡复习"
+          title={t.ribbon.flashcardReview}
         >
           <Brain size={18} />
         </button>
@@ -237,7 +237,7 @@ export function Ribbon() {
             if (webpageTabIndex >= 0) {
               switchTab(webpageTabIndex);
             } else {
-              openWebpageTab("", "新标签页");
+              openWebpageTab("", t.views.newTab);
             }
           }}
           className={cn(
@@ -246,7 +246,7 @@ export function Ribbon() {
               ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
               : ""
           )}
-          title="浏览器"
+          title={t.ribbon.browser}
         >
           <Globe size={18} />
         </button>
@@ -261,7 +261,7 @@ export function Ribbon() {
         <button
           onClick={toggleTheme}
           className="w-8 h-8 ui-icon-btn"
-          title={isDarkMode ? "切换到亮色模式" : "切换到暗色模式"}
+          title={isDarkMode ? t.ribbon.switchToLight : t.ribbon.switchToDark}
         >
           {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
         </button>
@@ -270,7 +270,7 @@ export function Ribbon() {
         <button
           onClick={() => setShowSettings(true)}
           className="w-8 h-8 ui-icon-btn"
-          title="设置"
+          title={t.ribbon.settings}
         >
           <Settings size={18} />
         </button>

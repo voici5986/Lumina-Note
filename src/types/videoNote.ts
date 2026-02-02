@@ -2,6 +2,8 @@
  * 视频笔记类型定义
  */
 
+import { getCurrentLocale, getCurrentTranslations } from '@/stores/useLocaleStore';
+
 export interface VideoNoteEntry {
   id: string;
   timestamp: number;      // 秒
@@ -118,13 +120,15 @@ export function filterNoteDanmakus(
  * 获取视频笔记文件路径
  */
 export function getVideoNoteFilePath(vaultPath: string, bvid: string): string {
-  return `${vaultPath}/视频笔记-${bvid}.md`;
+  const prefix = getCurrentTranslations().videoNote.filePrefix;
+  return `${vaultPath}/${prefix}-${bvid}.md`;
 }
 
 /**
  * 将笔记数据转换为 MD 格式（带 frontmatter）
  */
 export function videoNoteToMarkdown(noteFile: VideoNoteFile): string {
+  const t = getCurrentTranslations();
   const lines: string[] = [];
   
   // Frontmatter
@@ -138,17 +142,17 @@ export function videoNoteToMarkdown(noteFile: VideoNoteFile): string {
   lines.push('');
   
   // 标题
-  lines.push(`# 视频笔记 - ${noteFile.video.title}`);
+  lines.push(`# ${t.videoNote.exportTitle} - ${noteFile.video.title}`);
   lines.push('');
-  lines.push(`> B站链接: [${noteFile.video.bvid}](${noteFile.video.url})`);
+  lines.push(`> ${t.videoNote.exportSourceLabel}: [${noteFile.video.bvid}](${noteFile.video.url})`);
   lines.push('');
   
   // 笔记内容
-  lines.push('## 笔记');
+  lines.push(`## ${t.videoNote.exportNoteLabel}`);
   lines.push('');
   
   if (noteFile.notes.length === 0) {
-    lines.push('_暂无笔记_');
+    lines.push(`_${t.videoNote.noNotes}_`);
   } else {
     for (const note of noteFile.notes) {
       lines.push(`- **[${formatTimestamp(note.timestamp)}]** ${note.content}`);
@@ -292,10 +296,12 @@ export function generateNoteId(): string {
 /**
  * 创建新的视频笔记文件
  */
-export function createVideoNoteFile(url: string, title: string = '未命名视频'): VideoNoteFile {
+export function createVideoNoteFile(url: string, title?: string): VideoNoteFile {
+  const t = getCurrentTranslations();
+  const resolvedTitle = title ?? t.videoNote.untitledVideo;
   const bvid = extractBvid(url);
   if (!bvid) {
-    throw new Error('无效的B站链接');
+    throw new Error(t.videoNote.invalidUrl);
   }
   
   const now = new Date().toISOString();
@@ -304,7 +310,7 @@ export function createVideoNoteFile(url: string, title: string = '未命名视�
     video: {
       url,
       bvid,
-      title,
+      title: resolvedTitle,
     },
     createdAt: now,
     updatedAt: now,
@@ -316,13 +322,15 @@ export function createVideoNoteFile(url: string, title: string = '未命名视�
  * 导出为 Markdown 格式
  */
 export function exportToMarkdown(noteFile: VideoNoteFile): string {
+  const t = getCurrentTranslations();
+  const locale = getCurrentLocale();
   const { video, createdAt, notes } = noteFile;
   
-  let md = `# 视频笔记：${video.title}\n\n`;
-  md += `> 🎬 来源: ${video.url}\n`;
-  md += `> 📅 创建时间: ${new Date(createdAt).toLocaleString('zh-CN')}\n`;
+  let md = `# ${t.videoNote.exportTitle}：${video.title}\n\n`;
+  md += `> 🎬 ${t.videoNote.exportSourceLabel}: ${video.url}\n`;
+  md += `> 📅 ${t.videoNote.exportCreatedAtLabel}: ${new Date(createdAt).toLocaleString(locale)}\n`;
   if (video.duration) {
-    md += `> ⏱️ 视频时长: ${formatTimestamp(video.duration)}\n`;
+    md += `> ⏱️ ${t.videoNote.exportDurationLabel}: ${formatTimestamp(video.duration)}\n`;
   }
   md += '\n---\n\n';
   
@@ -334,21 +342,21 @@ export function exportToMarkdown(noteFile: VideoNoteFile): string {
     md += `## [${time}](https://www.bilibili.com/video/${video.bvid}?t=${note.timestamp})\n\n`;
     
     if (note.screenshot) {
-      md += `![截图](${note.screenshot})\n\n`;
+      md += `![${t.videoNote.exportScreenshotLabel}](${note.screenshot})\n\n`;
     }
     
     if (note.content) {
-      md += `**笔记：**\n${note.content}\n\n`;
+      md += `**${t.videoNote.exportNoteLabel}：**\n${note.content}\n\n`;
     }
     
     if (note.aiSummary) {
-      md += `**AI 总结：**\n> ${note.aiSummary.replace(/\n/g, '\n> ')}\n\n`;
+      md += `**${t.videoNote.exportAiSummaryLabel}：**\n> ${note.aiSummary.replace(/\n/g, '\n> ')}\n\n`;
     }
     
     md += '---\n\n';
   }
   
-  md += '*由 Lumina Note 生成*\n';
+  md += `*${t.videoNote.exportFooter}*\n`;
   
   return md;
 }

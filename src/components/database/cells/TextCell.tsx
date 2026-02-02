@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import type { DatabaseColumn } from "@/types/database";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 interface TextCellProps {
   value: string | null;
@@ -10,6 +11,7 @@ interface TextCellProps {
 }
 
 export function TextCell({ value, onChange, isEditing, onBlur }: TextCellProps) {
+  const { t } = useLocaleStore();
   const [editValue, setEditValue] = useState(value || '');
   const inputRef = useRef<HTMLInputElement>(null);
   
@@ -56,7 +58,7 @@ export function TextCell({ value, onChange, isEditing, onBlur }: TextCellProps) 
   
   return (
     <div className="h-9 px-2 flex items-center text-sm truncate">
-      {value || <span className="text-muted-foreground">空</span>}
+      {value || <span className="text-muted-foreground">{t.common.empty}</span>}
     </div>
   );
 }

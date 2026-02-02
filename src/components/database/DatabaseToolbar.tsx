@@ -15,12 +15,14 @@ import {
   ArrowUp,
   ArrowDown,
 } from "lucide-react";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 interface DatabaseToolbarProps {
   dbId: string;
 }
 
 export function DatabaseToolbar({ dbId }: DatabaseToolbarProps) {
+  const { t } = useLocaleStore();
   const { databases, addView, setActiveView, addRow, setSorts } = useDatabaseStore();
   const db = databases[dbId];
   
@@ -60,10 +62,10 @@ export function DatabaseToolbar({ dbId }: DatabaseToolbarProps) {
   
   const handleAddView = (type: ViewType) => {
     const names: Record<ViewType, string> = {
-      table: '表格',
-      kanban: '看板',
-      calendar: '日历',
-      gallery: '画廊',
+      table: t.database.view.table,
+      kanban: t.database.view.kanban,
+      calendar: t.database.view.calendar,
+      gallery: t.database.view.gallery,
     };
     addView(dbId, { type, name: names[type] });
     setShowViewMenu(false);
@@ -122,27 +124,27 @@ export function DatabaseToolbar({ dbId }: DatabaseToolbarProps) {
               onClick={() => handleAddView('table')}
               className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent"
             >
-              <Table className="w-4 h-4" /> 表格视图
+              <Table className="w-4 h-4" /> {t.database.viewMenu.table}
             </button>
             <button
               onClick={() => handleAddView('kanban')}
               className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent"
             >
-              <Kanban className="w-4 h-4" /> 看板视图
+              <Kanban className="w-4 h-4" /> {t.database.viewMenu.kanban}
             </button>
             <button
               onClick={() => handleAddView('calendar')}
               className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent text-muted-foreground"
               disabled
             >
-              <Calendar className="w-4 h-4" /> 日历视图
+              <Calendar className="w-4 h-4" /> {t.database.viewMenu.calendar}
             </button>
             <button
               onClick={() => handleAddView('gallery')}
               className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent text-muted-foreground"
               disabled
             >
-              <LayoutGrid className="w-4 h-4" /> 画廊视图
+              <LayoutGrid className="w-4 h-4" /> {t.database.viewMenu.gallery}
             </button>
           </div>
         )}
@@ -160,7 +162,7 @@ export function DatabaseToolbar({ dbId }: DatabaseToolbarProps) {
         }`}
       >
         <Filter className="w-4 h-4" />
-        筛选
+        {t.database.filter}
         {activeView?.filters?.rules?.length ? (
           <span className="bg-slate-500 text-white text-xs px-1.5 rounded-full">
             {activeView.filters.rules.length}
@@ -179,7 +181,7 @@ export function DatabaseToolbar({ dbId }: DatabaseToolbarProps) {
           }`}
         >
           <ArrowUpDown className="w-4 h-4" />
-          排序
+          {t.database.sort}
           {sorts.length > 0 && (
             <span className="bg-purple-500 text-white text-xs px-1.5 rounded-full">
               {sorts.length}
@@ -195,7 +197,7 @@ export function DatabaseToolbar({ dbId }: DatabaseToolbarProps) {
                   const column = db.columns.find(c => c.id === sort.columnId);
                   return (
                     <div key={index} className="flex items-center gap-2 text-sm">
-                      <span className="flex-1 truncate">{column?.name || '未知列'}</span>
+                      <span className="flex-1 truncate">{column?.name || t.database.unknownColumn}</span>
                       <button
                         onClick={() => handleToggleSortDirection(index)}
                         className="p-1 hover:bg-accent rounded"
@@ -218,7 +220,7 @@ export function DatabaseToolbar({ dbId }: DatabaseToolbarProps) {
               </div>
             )}
             <div className="px-2">
-              <p className="px-1 text-xs text-muted-foreground mb-1">添加排序</p>
+              <p className="px-1 text-xs text-muted-foreground mb-1">{t.database.addSort}</p>
               {db.columns.map((column) => (
                 <button
                   key={column.id}
@@ -238,7 +240,7 @@ export function DatabaseToolbar({ dbId }: DatabaseToolbarProps) {
         <Search className="w-4 h-4 text-muted-foreground" />
         <input
           type="text"
-          placeholder="搜索..."
+          placeholder={t.database.searchPlaceholder}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="bg-transparent border-none outline-none text-sm w-32"
@@ -253,7 +255,7 @@ export function DatabaseToolbar({ dbId }: DatabaseToolbarProps) {
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
       >
         <Plus className="w-4 h-4" />
-        新建
+        {t.database.newRow}
       </button>
       
       {/* 更多操作 */}

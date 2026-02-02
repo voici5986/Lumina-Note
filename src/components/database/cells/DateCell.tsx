@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Calendar } from "lucide-react";
 import type { DatabaseColumn, DateValue } from "@/types/database";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 interface DateCellProps {
   value: DateValue | null;
@@ -11,6 +12,7 @@ interface DateCellProps {
 }
 
 export function DateCell({ value, onChange, isEditing, onBlur, column }: DateCellProps) {
+  const { t, locale } = useLocaleStore();
   const [editValue, setEditValue] = useState(value?.start || '');
   const inputRef = useRef<HTMLInputElement>(null);
   
@@ -50,13 +52,13 @@ export function DateCell({ value, onChange, isEditing, onBlur, column }: DateCel
     
     switch (format) {
       case 'full':
-        return date.toLocaleString('zh-CN');
+        return date.toLocaleString(locale);
       case 'time':
-        return date.toLocaleTimeString('zh-CN');
+        return date.toLocaleTimeString(locale);
       case 'relative':
-        return getRelativeTime(date);
+        return getRelativeTime(date, t, locale);
       default:
-        return date.toLocaleDateString('zh-CN');
+        return date.toLocaleDateString(locale);
     }
   };
   
@@ -78,7 +80,7 @@ export function DateCell({ value, onChange, isEditing, onBlur, column }: DateCel
     return (
       <div className="h-9 px-2 flex items-center text-sm text-muted-foreground">
         <Calendar className="w-4 h-4 mr-1" />
-        空
+        {t.common.empty}
       </div>
     );
   }
@@ -92,16 +94,16 @@ export function DateCell({ value, onChange, isEditing, onBlur, column }: DateCel
   );
 }
 
-function getRelativeTime(date: Date): string {
+function getRelativeTime(date: Date, t: ReturnType<typeof useLocaleStore.getState>['t'], locale: string): string {
   const now = new Date();
   const diff = now.getTime() - date.getTime();
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   
-  if (days === 0) return '今天';
-  if (days === 1) return '昨天';
-  if (days === -1) return '明天';
-  if (days > 0 && days < 7) return `${days}天前`;
-  if (days < 0 && days > -7) return `${-days}天后`;
+  if (days === 0) return t.common.today;
+  if (days === 1) return t.common.yesterday;
+  if (days === -1) return t.common.tomorrow;
+  if (days > 0 && days < 7) return t.common.daysAgo.replace("{count}", String(days));
+  if (days < 0 && days > -7) return t.common.daysLater.replace("{count}", String(-days));
   
-  return date.toLocaleDateString('zh-CN');
+  return date.toLocaleDateString(locale);
 }

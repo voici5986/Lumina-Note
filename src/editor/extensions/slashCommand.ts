@@ -5,6 +5,8 @@
 
 import { EditorView, ViewPlugin, ViewUpdate, WidgetType, Decoration, DecorationSet } from "@codemirror/view";
 import { StateField, StateEffect } from "@codemirror/state";
+import type { Translations } from "@/i18n";
+import { getCurrentTranslations } from "@/stores/useLocaleStore";
 
 // ============ 类型定义 ============
 
@@ -19,13 +21,18 @@ export interface SlashCommand {
 
 // ============ 命令注册 ============
 
-export const defaultCommands: SlashCommand[] = [
+export function getDefaultCommands(translations?: Translations): SlashCommand[] {
+  const t = translations ?? getCurrentTranslations();
+  const labels = t.editor?.slashMenu?.commands;
+  const tableTemplate = labels?.tableTemplate || "| Col 1 | Col 2 | Col 3 |\n| --- | --- | --- |\n|  |  |  |";
+
+  return [
   // AI 命令
   {
     id: "ai-chat",
-    label: "AI 对话",
+    label: labels?.aiChat || "AI Chat",
     icon: "✨",
-    description: "打开 AI 助手对话",
+    description: labels?.aiChatDesc || "Open AI assistant chat",
     category: "ai",
     action: (view, from, to) => {
       view.dispatch({ changes: { from, to, insert: "" } });
@@ -34,9 +41,9 @@ export const defaultCommands: SlashCommand[] = [
   },
   {
     id: "ai-continue",
-    label: "AI 续写",
+    label: labels?.aiContinue || "AI Continue",
     icon: "🪄",
-    description: "让 AI 继续写作",
+    description: labels?.aiContinueDesc || "Continue writing with AI",
     category: "ai",
     action: (view, from, to) => {
       view.dispatch({ changes: { from, to, insert: "" } });
@@ -47,9 +54,9 @@ export const defaultCommands: SlashCommand[] = [
   // 标题
   {
     id: "h1",
-    label: "一级标题",
+    label: labels?.heading1 || "Heading 1",
     icon: "H1",
-    description: "大标题",
+    description: labels?.heading1Desc || "Large heading",
     category: "heading",
     action: (view, from, to) => {
       view.dispatch({ 
@@ -60,9 +67,9 @@ export const defaultCommands: SlashCommand[] = [
   },
   {
     id: "h2",
-    label: "二级标题",
+    label: labels?.heading2 || "Heading 2",
     icon: "H2",
-    description: "章节标题",
+    description: labels?.heading2Desc || "Section heading",
     category: "heading",
     action: (view, from, to) => {
       view.dispatch({ 
@@ -73,9 +80,9 @@ export const defaultCommands: SlashCommand[] = [
   },
   {
     id: "h3",
-    label: "三级标题",
+    label: labels?.heading3 || "Heading 3",
     icon: "H3",
-    description: "子章节",
+    description: labels?.heading3Desc || "Subsection heading",
     category: "heading",
     action: (view, from, to) => {
       view.dispatch({ 
@@ -88,9 +95,9 @@ export const defaultCommands: SlashCommand[] = [
   // 列表
   {
     id: "bullet-list",
-    label: "无序列表",
+    label: labels?.bulletList || "Bullet List",
     icon: "•",
-    description: "项目符号列表",
+    description: labels?.bulletListDesc || "Bulleted list",
     category: "list",
     action: (view, from, to) => {
       view.dispatch({ 
@@ -101,9 +108,9 @@ export const defaultCommands: SlashCommand[] = [
   },
   {
     id: "numbered-list",
-    label: "有序列表",
+    label: labels?.numberedList || "Numbered List",
     icon: "1.",
-    description: "编号列表",
+    description: labels?.numberedListDesc || "Numbered list",
     category: "list",
     action: (view, from, to) => {
       view.dispatch({ 
@@ -114,9 +121,9 @@ export const defaultCommands: SlashCommand[] = [
   },
   {
     id: "task-list",
-    label: "任务列表",
+    label: labels?.taskList || "Task List",
     icon: "☐",
-    description: "待办事项",
+    description: labels?.taskListDesc || "Todo list",
     category: "list",
     action: (view, from, to) => {
       view.dispatch({ 
@@ -129,9 +136,9 @@ export const defaultCommands: SlashCommand[] = [
   // 块
   {
     id: "quote",
-    label: "引用",
+    label: labels?.quote || "Quote",
     icon: "❝",
-    description: "引用块",
+    description: labels?.quoteDesc || "Blockquote",
     category: "block",
     action: (view, from, to) => {
       view.dispatch({ 
@@ -142,9 +149,9 @@ export const defaultCommands: SlashCommand[] = [
   },
   {
     id: "code-block",
-    label: "代码块",
+    label: labels?.codeBlock || "Code Block",
     icon: "</>",
-    description: "代码片段",
+    description: labels?.codeBlockDesc || "Code snippet",
     category: "block",
     action: (view, from, to) => {
       view.dispatch({ 
@@ -155,9 +162,9 @@ export const defaultCommands: SlashCommand[] = [
   },
   {
     id: "callout",
-    label: "Callout",
+    label: labels?.callout || "Callout",
     icon: "💡",
-    description: "提示框",
+    description: labels?.calloutDesc || "Callout block",
     category: "block",
     action: (view, from, to) => {
       view.dispatch({ 
@@ -168,9 +175,9 @@ export const defaultCommands: SlashCommand[] = [
   },
   {
     id: "math-block",
-    label: "数学公式",
+    label: labels?.mathBlock || "Math Block",
     icon: "∑",
-    description: "LaTeX 公式块",
+    description: labels?.mathBlockDesc || "LaTeX block",
     category: "block",
     action: (view, from, to) => {
       view.dispatch({ 
@@ -183,23 +190,22 @@ export const defaultCommands: SlashCommand[] = [
   // 插入
   {
     id: "table",
-    label: "表格",
+    label: labels?.table || "Table",
     icon: "▦",
-    description: "Markdown 表格",
+    description: labels?.tableDesc || "Markdown table",
     category: "insert",
     action: (view, from, to) => {
-      const table = "| 列1 | 列2 | 列3 |\n| --- | --- | --- |\n|  |  |  |";
       view.dispatch({ 
-        changes: { from, to, insert: table },
+        changes: { from, to, insert: tableTemplate },
         selection: { anchor: from + 2 }
       });
     },
   },
   {
     id: "divider",
-    label: "分割线",
+    label: labels?.divider || "Divider",
     icon: "—",
-    description: "水平分割线",
+    description: labels?.dividerDesc || "Horizontal divider",
     category: "insert",
     action: (view, from, to) => {
       view.dispatch({ 
@@ -210,9 +216,9 @@ export const defaultCommands: SlashCommand[] = [
   },
   {
     id: "image",
-    label: "图片",
+    label: labels?.image || "Image",
     icon: "🖼",
-    description: "插入图片",
+    description: labels?.imageDesc || "Insert image",
     category: "insert",
     action: (view, from, to) => {
       view.dispatch({ 
@@ -223,9 +229,9 @@ export const defaultCommands: SlashCommand[] = [
   },
   {
     id: "link",
-    label: "链接",
+    label: labels?.link || "Link",
     icon: "🔗",
-    description: "插入链接",
+    description: labels?.linkDesc || "Insert link",
     category: "insert",
     action: (view, from, to) => {
       view.dispatch({ 
@@ -235,6 +241,7 @@ export const defaultCommands: SlashCommand[] = [
     },
   },
 ];
+}
 
 // ============ State Effects ============
 

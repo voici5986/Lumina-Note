@@ -8,8 +8,10 @@ import { useState, useEffect } from "react";
 import { useRustAgentStore, initRustAgentListeners } from "@/stores/useRustAgentStore";
 import { useFileStore } from "@/stores/useFileStore";
 import { getAIConfig } from "@/services/ai/ai";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 export function RustAgentTest() {
+  const { t } = useLocaleStore();
   const [input, setInput] = useState("");
   const [initialized, setInitialized] = useState(false);
   
@@ -46,10 +48,12 @@ export function RustAgentTest() {
     setInput("");
   };
 
+  const statusLabel = (t.debug.rustAgentTest.status as Record<string, string> | undefined)?.[status] || status;
+
   return (
     <div className="fixed bottom-4 right-4 w-96 bg-white dark:bg-gray-800 rounded-lg shadow-xl border p-4 z-50">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="font-bold text-sm">🦀 Rust Agent 测试</h3>
+        <h3 className="font-bold text-sm">{t.debug.rustAgentTest.title}</h3>
         <div className="flex items-center gap-2">
           <span className={`px-2 py-0.5 rounded text-xs ${
             status === "running" ? "bg-yellow-100 text-yellow-800" :
@@ -57,9 +61,9 @@ export function RustAgentTest() {
             status === "error" ? "bg-red-100 text-red-800" :
             "bg-gray-100 text-gray-800"
           }`}>
-            {status}
+            {statusLabel}
           </span>
-          {!initialized && <span className="text-xs text-red-500">未初始化</span>}
+          {!initialized && <span className="text-xs text-red-500">{t.debug.rustAgentTest.notInitialized}</span>}
         </div>
       </div>
 
@@ -79,21 +83,22 @@ export function RustAgentTest() {
         {/* 流式输出 */}
         {streamingContent && (
           <div className="text-green-600 animate-pulse">
-            <strong>streaming:</strong> {streamingContent.slice(-100)}
+            <strong>{t.debug.rustAgentTest.streamingLabel}:</strong> {streamingContent.slice(-100)}
           </div>
         )}
         
         {/* 当前计划 */}
         {currentPlan && (
           <div className="text-orange-600">
-            <strong>计划:</strong> {currentPlan.steps.length} 步骤
+            <strong>{t.debug.rustAgentTest.planLabel}:</strong>{" "}
+            {t.agentMessage.steps.replace("{count}", String(currentPlan.steps.length))}
           </div>
         )}
         
         {/* 错误 */}
         {error && (
           <div className="text-red-600">
-            <strong>错误:</strong> {error}
+            <strong>{t.common.error}:</strong> {error}
           </div>
         )}
       </div>
@@ -105,7 +110,7 @@ export function RustAgentTest() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-          placeholder="输入测试任务..."
+          placeholder={t.debug.rustAgentTest.inputPlaceholder}
           className="flex-1 px-2 py-1 text-sm border rounded"
           disabled={status === "running"}
         />
@@ -114,7 +119,7 @@ export function RustAgentTest() {
             onClick={abort}
             className="px-3 py-1 text-sm bg-red-500 text-white rounded"
           >
-            停止
+            {t.ai.stop}
           </button>
         ) : (
           <button
@@ -122,26 +127,26 @@ export function RustAgentTest() {
             className="px-3 py-1 text-sm bg-blue-500 text-white rounded"
             disabled={!vaultPath}
           >
-            发送
+            {t.ai.send}
           </button>
         )}
         <button
           onClick={clearChat}
           className="px-2 py-1 text-sm bg-gray-200 rounded"
         >
-          清空
+          {t.common.clear}
         </button>
       </div>
       
       <div className="mt-2 text-xs text-gray-500 space-y-1">
-        <div>工作区: {vaultPath || "未选择"}</div>
+        <div>{t.debug.rustAgentTest.workspaceLabel}: {vaultPath || t.common.notSelected}</div>
         <div>
-          配置: {getAIConfig().provider} / {
+          {t.debug.rustAgentTest.configLabel}: {getAIConfig().provider} / {
             getAIConfig().model === "custom" 
-              ? getAIConfig().customModelId || "未设置自定义模型"
+              ? getAIConfig().customModelId || t.debug.rustAgentTest.customModelNotSet
               : getAIConfig().model
           }
-          {getAIConfig().apiKey ? " ✅" : " ❌无API Key"}
+          {getAIConfig().apiKey ? " ✅" : ` ❌${t.debug.rustAgentTest.noApiKey}`}
         </div>
       </div>
     </div>

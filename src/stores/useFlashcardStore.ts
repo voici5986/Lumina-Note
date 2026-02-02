@@ -16,6 +16,7 @@ import { calculateNextReview, isDue, calculateDeckStats, INITIAL_SM2_STATE } fro
 import { yamlToCard, generateCardMarkdown, generateCardFilename } from '@/services/flashcard/flashcard';
 import { useFileStore } from './useFileStore';
 import { createFile, saveFile, deleteFile } from '../lib/tauri';
+import { getCurrentTranslations } from '@/stores/useLocaleStore';
 
 /**
  * 简单的 YAML 解析器（仅支持基本格式）
@@ -178,9 +179,10 @@ export const useFlashcardStore = create<FlashcardState>((set, get) => ({
       
       set({ cards: newCards, isLoading: false });
     } catch (error) {
+      const t = getCurrentTranslations();
       set({ 
         isLoading: false, 
-        error: error instanceof Error ? error.message : '加载失败' 
+        error: error instanceof Error ? error.message : t.flashcard.loadFailed,
       });
     }
   },
@@ -193,7 +195,7 @@ export const useFlashcardStore = create<FlashcardState>((set, get) => ({
     const vaultPath = fileStore.vaultPath;
     
     if (!vaultPath) {
-      throw new Error('请先打开一个笔记库');
+      throw new Error(getCurrentTranslations().common.openWorkspaceFirst);
     }
     
     // 生成文件名和路径
@@ -284,7 +286,7 @@ export const useFlashcardStore = create<FlashcardState>((set, get) => ({
     const dueCards = get().getDueCards(deckId);
     
     if (dueCards.length === 0) {
-      set({ error: '没有待复习的卡片' });
+      set({ error: getCurrentTranslations().flashcard.noCardsToReview });
       return;
     }
     

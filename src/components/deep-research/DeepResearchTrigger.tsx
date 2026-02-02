@@ -23,6 +23,7 @@ import {
   NoteReference,
 } from "@/stores/useDeepResearchStore";
 import { useFileStore } from "@/stores/useFileStore";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 // ============ 对话框组件 ============
 
@@ -33,6 +34,7 @@ interface DeepResearchDialogProps {
 }
 
 function DeepResearchDialog({ isOpen, onClose, onShowHistory }: DeepResearchDialogProps) {
+  const { t } = useLocaleStore();
   const [topic, setTopic] = useState("");
   const [searchScope, setSearchScope] = useState<string | undefined>();
   const [reportStyle, setReportStyle] = useState<ReportStyle>("detailed");
@@ -116,14 +118,14 @@ function DeepResearchDialog({ isOpen, onClose, onShowHistory }: DeepResearchDial
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-2">
             <Microscope className="w-5 h-5 text-primary" />
-            <span className="font-medium">Deep Research</span>
+            <span className="font-medium">{t.deepResearch.title}</span>
           </div>
           <div className="flex items-center gap-1">
             {sessions.length > 0 && onShowHistory && (
               <button
                 className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded"
                 onClick={onShowHistory}
-                title="研究历史"
+                title={t.deepResearch.history}
               >
                 <History className="w-3.5 h-3.5" />
                 <span>{sessions.length}</span>
@@ -143,13 +145,13 @@ function DeepResearchDialog({ isOpen, onClose, onShowHistory }: DeepResearchDial
           {/* 研究主题 */}
           <div>
             <label className="block text-sm font-medium mb-1.5">
-              研究主题
+              {t.deepResearch.topicLabel}
             </label>
             <input
               type="text"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              placeholder="例如：React 性能优化最佳实践"
+              placeholder={t.deepResearch.topicPlaceholder}
               className="w-full px-3 py-2 rounded-md border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary"
               autoFocus
             />
@@ -158,7 +160,7 @@ function DeepResearchDialog({ isOpen, onClose, onShowHistory }: DeepResearchDial
           {/* 搜索范围 */}
           <div>
             <label className="block text-sm font-medium mb-1.5">
-              搜索范围
+              {t.deepResearch.searchScopeLabel}
             </label>
             <div className="relative">
               <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -167,7 +169,7 @@ function DeepResearchDialog({ isOpen, onClose, onShowHistory }: DeepResearchDial
                 onChange={(e) => setSearchScope(e.target.value || undefined)}
                 className="w-full pl-9 pr-3 py-2 rounded-md border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary appearance-none"
               >
-                <option value="">全部笔记</option>
+                <option value="">{t.deepResearch.searchScopeAll}</option>
                 {folders.map((folder) => (
                   <option key={folder} value={folder}>
                     {folder}
@@ -180,13 +182,13 @@ function DeepResearchDialog({ isOpen, onClose, onShowHistory }: DeepResearchDial
           {/* 报告风格 */}
           <div>
             <label className="block text-sm font-medium mb-1.5">
-              报告风格
+              {t.deepResearch.reportStyleLabel}
             </label>
             <div className="flex gap-2">
               {[
-                { value: "detailed", label: "详细" },
-                { value: "summary", label: "摘要" },
-                { value: "outline", label: "大纲" },
+                { value: "detailed", label: t.deepResearch.reportStyleDetailed },
+                { value: "summary", label: t.deepResearch.reportStyleSummary },
+                { value: "outline", label: t.deepResearch.reportStyleOutline },
               ].map((option) => (
                 <button
                   key={option.value}
@@ -211,7 +213,7 @@ function DeepResearchDialog({ isOpen, onClose, onShowHistory }: DeepResearchDial
             className="px-4 py-2 text-sm rounded-md hover:bg-muted"
             onClick={onClose}
           >
-            取消
+            {t.common.cancel}
           </button>
           <button
             className="flex items-center gap-2 px-4 py-2 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
@@ -219,7 +221,7 @@ function DeepResearchDialog({ isOpen, onClose, onShowHistory }: DeepResearchDial
             disabled={!topic.trim() || isSubmitting}
           >
             {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-            开始研究
+            {t.deepResearch.startResearch}
           </button>
         </div>
       </motion.div>
@@ -240,6 +242,7 @@ export function DeepResearchTrigger({
 }: DeepResearchTriggerProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { isRunning } = useDeepResearchStore();
+  const { t } = useLocaleStore();
 
   if (variant === "icon") {
     return (
@@ -251,7 +254,7 @@ export function DeepResearchTrigger({
             className
           )}
           onClick={() => setIsDialogOpen(true)}
-          title="Deep Research"
+          title={t.deepResearch.title}
         >
           <Microscope className="w-4 h-4" />
         </button>
@@ -279,7 +282,7 @@ export function DeepResearchTrigger({
         onClick={() => setIsDialogOpen(true)}
       >
         <Microscope className="w-4 h-4" />
-        <span>Deep Research</span>
+        <span>{t.deepResearch.title}</span>
       </button>
 
       <AnimatePresence>

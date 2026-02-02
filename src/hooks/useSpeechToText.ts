@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 type SpeechToTextOptions = {
   /** 静音自动停止时间（毫秒），默认 6000 */
@@ -27,6 +28,7 @@ export function useSpeechToText(
   const appendTextRef = useRef(appendText);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const silenceMs = options?.silenceDurationMs ?? 6000;
+  const { t } = useLocaleStore();
 
   // 保持 appendText 最新引用
   useEffect(() => {
@@ -100,11 +102,11 @@ export function useSpeechToText(
     recognition.onerror = (event: any) => {
       const reason = event?.error;
       if (reason === "not-allowed" || reason === "service-not-allowed") {
-        alert("语音输入需要开启麦克风和语音识别权限，请在系统设置中授权。");
+        alert(t.speech.permissionRequired);
       } else if (reason === "audio-capture") {
-        alert("未检测到麦克风设备，请检查麦克风连接或系统设置。");
+        alert(t.speech.noMic);
       } else if (reason === "network") {
-        alert("语音识别需要联网，请检查网络连接。");
+        alert(t.speech.networkRequired);
       }
       console.error("Speech recognition error:", reason || event);
       clearSilenceTimer();
@@ -128,7 +130,7 @@ export function useSpeechToText(
       return true;
     } catch (err) {
       console.error("Microphone permission denied", err);
-      alert("无法获取麦克风权限，请在系统设置中允许麦克风访问。");
+      alert(t.speech.permissionDenied);
       return false;
     }
   }, []);
@@ -136,11 +138,11 @@ export function useSpeechToText(
   const toggleRecording = useCallback(async () => {
     const recognition = recognitionRef.current;
     if (isMacSpeechBlockedInDev()) {
-      alert("macOS 开发模式下语音识别会触发系统崩溃，请使用打包后的 .app 测试语音输入。");
+      alert(t.speech.macDevWarning);
       return;
     }
     if (!recognition) {
-      alert("当前环境不支持语音输入");
+      alert(t.speech.unsupported);
       return;
     }
 

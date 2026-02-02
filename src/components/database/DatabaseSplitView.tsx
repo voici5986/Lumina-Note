@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from "react";
 import { useUIStore } from "@/stores/useUIStore";
 import { useSplitStore } from "@/stores/useSplitStore";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 import { DatabaseView } from "./DatabaseView";
 import { CodeMirrorEditor, ViewMode } from "@/editor/CodeMirrorEditor";
 import { getFileName, cn } from "@/lib/utils";
@@ -11,6 +12,7 @@ interface DatabaseSplitViewProps {
 }
 
 export function DatabaseSplitView({ dbId }: DatabaseSplitViewProps) {
+  const { t } = useLocaleStore();
   const {
     splitDirection,
     setSplitDirection,
@@ -59,20 +61,20 @@ export function DatabaseSplitView({ dbId }: DatabaseSplitViewProps) {
             "p-1.5 rounded transition-colors",
             "hover:bg-accent text-muted-foreground hover:text-foreground"
           )}
-          title={isHorizontal ? "垂直分屏" : "水平分屏"}
+          title={isHorizontal ? t.layout.verticalSplit : t.layout.horizontalSplit}
         >
           {isHorizontal ? <Rows size={14} /> : <Columns size={14} />}
         </button>
         <button
           onClick={toggleSplitView}
           className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-          title="关闭分屏"
+          title={t.layout.closeSplit}
         >
           <X size={14} />
         </button>
         <div className="flex-1" />
         <span className="text-xs text-muted-foreground">
-          数据库 + 笔记
+          {t.database.splitTitle}
         </span>
       </div>
 
@@ -116,7 +118,7 @@ export function DatabaseSplitView({ dbId }: DatabaseSplitViewProps) {
                   <button
                     onClick={saveSecondary}
                     className="p-1 rounded hover:bg-accent text-primary hover:text-primary"
-                    title="保存 (Ctrl+S)"
+                    title={t.database.saveNote}
                   >
                     <Save size={14} />
                   </button>
@@ -124,7 +126,7 @@ export function DatabaseSplitView({ dbId }: DatabaseSplitViewProps) {
                 <button
                   onClick={closeSecondary}
                   className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
-                  title="关闭"
+                  title={t.common.close}
                 >
                   <X size={14} />
                 </button>
@@ -142,8 +144,8 @@ export function DatabaseSplitView({ dbId }: DatabaseSplitViewProps) {
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
               <FileText size={32} className="opacity-30 mb-2" />
-              <p className="text-sm">点击数据库行中的 📄 按钮</p>
-              <p className="text-xs opacity-70">在这里打开对应的笔记</p>
+              <p className="text-sm">{t.database.openNoteHintTitle}</p>
+              <p className="text-xs opacity-70">{t.database.openNoteHintDesc}</p>
             </div>
           )}
         </div>

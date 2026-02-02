@@ -735,7 +735,7 @@ export function RightPanel() {
                       type="text"
                       value={config.customModelId || ""}
                       onChange={(e) => setConfig({ customModelId: e.target.value })}
-                      placeholder="例如：deepseek-ai/DeepSeek-V3 或 Pro/ERNIE-4.0-Turbo-8K"
+                      placeholder={t.aiSettings.customModelHint}
                       className="ui-input h-9 text-xs"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
@@ -910,14 +910,14 @@ export function RightPanel() {
 
                     <div>
                       <label className="text-xs text-muted-foreground block mb-1">
-                        向量维度
+                        {t.aiSettings.vectorDimensions}
                         <span className="text-muted-foreground/60 ml-1">({t.settingsPanel.apiKeyOptional})</span>
                       </label>
                       <input
                         type="number"
                         value={ragConfig.embeddingDimensions || ""}
                         onChange={(e) => setRAGConfig({ embeddingDimensions: e.target.value ? parseInt(e.target.value) : undefined })}
-                        placeholder="如 1024（留空使用默认）"
+                        placeholder={t.aiSettings.dimensionsHint}
                         className="ui-input h-9 text-xs"
                       />
                     </div>
@@ -925,7 +925,7 @@ export function RightPanel() {
                     {/* Reranker Settings */}
                     <div className="border-t border-border pt-3 mt-2">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-medium">重排序 (Reranker)</span>
+                        <span className="text-xs font-medium">{t.aiSettings.reranker}</span>
                         <label className="flex items-center gap-1">
                           <input
                             type="checkbox"
@@ -940,7 +940,7 @@ export function RightPanel() {
                       {ragConfig.rerankerEnabled && (
                         <div className="space-y-2">
                           <div>
-                            <label className="text-xs text-muted-foreground block mb-1">Reranker Base URL</label>
+                            <label className="text-xs text-muted-foreground block mb-1">{t.aiSettings.rerankerBaseUrl}</label>
                             <input
                               type="text"
                               value={ragConfig.rerankerBaseUrl || ""}
@@ -951,7 +951,7 @@ export function RightPanel() {
                           </div>
                           
                           <div>
-                            <label className="text-xs text-muted-foreground block mb-1">Reranker API Key</label>
+                            <label className="text-xs text-muted-foreground block mb-1">{t.aiSettings.rerankerApiKey}</label>
                             <input
                               type="password"
                               value={ragConfig.rerankerApiKey || ""}
@@ -962,7 +962,7 @@ export function RightPanel() {
                           </div>
                           
                           <div>
-                            <label className="text-xs text-muted-foreground block mb-1">Reranker 模型</label>
+                            <label className="text-xs text-muted-foreground block mb-1">{t.aiSettings.rerankerModel}</label>
                             <input
                               type="text"
                               value={ragConfig.rerankerModel || ""}
@@ -973,7 +973,7 @@ export function RightPanel() {
                           </div>
                           
                           <div>
-                            <label className="text-xs text-muted-foreground block mb-1">返回数量 (Top N)</label>
+                            <label className="text-xs text-muted-foreground block mb-1">{t.aiSettings.topN}</label>
                             <input
                               type="number"
                               value={ragConfig.rerankerTopN || 5}
@@ -990,16 +990,16 @@ export function RightPanel() {
                     {/* Index Status */}
                     <div className="bg-muted/50 rounded p-2 space-y-2">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">索引状态</span>
+                        <span className="text-muted-foreground">{t.aiSettings.indexStatus}</span>
                         {ragIsIndexing ? (
                           <span className="text-yellow-500 flex items-center gap-1">
                             <Loader2 size={10} className="animate-spin" />
-                            索引中...
+                            {t.aiSettings.indexing}
                           </span>
                         ) : indexStatus?.initialized ? (
-                          <span className="text-green-500">✓ 已就绪</span>
+                          <span className="text-green-500">✓ {t.aiSettings.indexReady}</span>
                         ) : (
-                          <span className="text-muted-foreground">未初始化</span>
+                          <span className="text-muted-foreground">{t.aiSettings.notInitialized}</span>
                         )}
                       </div>
                       
@@ -1016,7 +1016,9 @@ export function RightPanel() {
                           </div>
                           <div className="text-xs text-muted-foreground flex justify-between">
                             <span>
-                              {indexStatus.progress.current} / {indexStatus.progress.total} 文件
+                              {t.aiSettings.filesProgress
+                                .replace('{current}', String(indexStatus.progress.current))
+                                .replace('{total}', String(indexStatus.progress.total))}
                             </span>
                             <span>
                               {Math.round((indexStatus.progress.current / Math.max(indexStatus.progress.total, 1)) * 100)}%
@@ -1024,7 +1026,7 @@ export function RightPanel() {
                           </div>
                           {indexStatus.progress.currentFile && (
                             <div className="text-xs text-muted-foreground truncate" title={indexStatus.progress.currentFile}>
-                              正在处理: {indexStatus.progress.currentFile.split(/[/\\]/).pop()}
+                              {t.aiSettings.processing.replace('{file}', indexStatus.progress.currentFile.split(/[/\\\\]/).pop() || '')}
                             </div>
                           )}
                         </div>
@@ -1032,7 +1034,9 @@ export function RightPanel() {
                       
                       {!ragIsIndexing && indexStatus && (
                         <div className="text-xs text-muted-foreground">
-                          {indexStatus.totalFiles} 个文件, {indexStatus.totalChunks} 个块
+                          {t.aiSettings.indexSummary
+                            .replace('{files}', String(indexStatus.totalFiles))
+                            .replace('{chunks}', String(indexStatus.totalChunks))}
                         </div>
                       )}
 
@@ -1047,7 +1051,7 @@ export function RightPanel() {
                         disabled={ragIsIndexing || (ragConfig.embeddingProvider === 'openai' && !ragConfig.embeddingApiKey)}
                         className="w-full text-xs py-1 px-2 bg-primary/10 hover:bg-primary/20 text-primary rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
-                        {ragIsIndexing ? "索引中..." : "重建索引"}
+                        {ragIsIndexing ? t.aiSettings.indexing : t.aiSettings.rebuildIndex}
                       </button>
                     </div>
                   </>

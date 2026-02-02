@@ -49,7 +49,7 @@ interface CreatingState {
 }
 
 export function Sidebar() {
-  const { t } = useLocaleStore();
+  const { t, locale } = useLocaleStore();
   const { vaultPath, fileTree, currentFile, openFile, refreshFileTree, isLoadingTree, closeFile, openDatabaseTab, openPDFTab, tabs, activeTabIndex } =
     useFileStore();
   const { config: ragConfig, isIndexing: ragIsIndexing, indexStatus, rebuildIndex, cancelIndex } = useRAGStore();
@@ -98,7 +98,7 @@ export function Sidebar() {
     const hours = String(now.getHours()).padStart(2, "0");
     const minutes = String(now.getMinutes()).padStart(2, "0");
     
-    const fileName = `速记_${year}-${month}-${day}_${hours}-${minutes}`;
+    const fileName = `${t.file.quickNotePrefix}_${year}-${month}-${day}_${hours}-${minutes}`;
     const sep = vaultPath.includes("\\") ? "\\" : "/";
     let filePath = `${vaultPath}${sep}${fileName}.md`;
     
@@ -110,7 +110,7 @@ export function Sidebar() {
     }
     
     // 创建文件内容
-    const dateStr = `${year}年${month}月${day}日 ${hours}:${minutes}`;
+    const dateStr = now.toLocaleString(locale);
     const content = `# ${fileName}\n\n> 📅 ${dateStr}\n\n`;
     
     try {
@@ -171,7 +171,7 @@ export function Sidebar() {
           await moveFileToFolder(sourcePath, vaultPath);
         }
       } catch (error: any) {
-        alert(error?.message || '移动失败');
+        alert(error?.message || t.file.moveFailed);
       }
     };
     
@@ -976,7 +976,7 @@ function CreateInputRow({ type, value, onChange, onSubmit, onCancel, level }: Cr
         }}
         onKeyDown={handleKeyDown}
         autoFocus
-        placeholder={type === "file" ? "文件名" : "文件夹名"}
+        placeholder={type === "file" ? t.file.fileNamePlaceholder : t.file.folderNamePlaceholder}
         className="flex-1 ui-input h-6 px-1.5 border-transparent bg-transparent focus-visible:border-primary/40 focus-visible:ring-1 focus-visible:ring-primary/30"
       />
       {type === "file" && <span className="text-muted-foreground text-sm">.md</span>}
@@ -1102,7 +1102,7 @@ function FileTreeItem({
         }
       } catch (error: any) {
         // 显示错误提示
-        alert(error?.message || '移动失败');
+        alert(error?.message || t.file.moveFailed);
       }
     };
     

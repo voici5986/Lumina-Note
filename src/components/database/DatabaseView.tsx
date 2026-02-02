@@ -5,6 +5,7 @@ import { TableView } from "./TableView";
 import { KanbanView } from "./KanbanView";
 import { DatabaseToolbar } from "./DatabaseToolbar";
 import { Database, RefreshCw } from "lucide-react";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 interface DatabaseViewProps {
   dbId: string;
@@ -12,6 +13,7 @@ interface DatabaseViewProps {
 }
 
 export function DatabaseView({ dbId, className = "" }: DatabaseViewProps) {
+  const { t } = useLocaleStore();
   const { databases, loadDatabase, setCurrentDb, refreshRows } = useDatabaseStore();
   const { refreshFileTree } = useFileStore();
   
@@ -47,7 +49,7 @@ export function DatabaseView({ dbId, className = "" }: DatabaseViewProps) {
     return (
       <div className={`flex items-center justify-center h-full ${className}`}>
         <div className="text-muted-foreground animate-pulse">
-          加载数据库中...
+          {t.database.loading}
         </div>
       </div>
     );
@@ -69,7 +71,7 @@ export function DatabaseView({ dbId, className = "" }: DatabaseViewProps) {
           <button
             onClick={handleRefresh}
             className="p-2 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-            title="刷新数据"
+            title={t.database.refresh}
           >
             <RefreshCw className="w-4 h-4" />
           </button>
@@ -92,12 +94,12 @@ export function DatabaseView({ dbId, className = "" }: DatabaseViewProps) {
         )}
         {activeView?.type === 'calendar' && (
           <div className="flex items-center justify-center h-full text-muted-foreground">
-            日历视图即将推出
+            {t.database.calendarComingSoon}
           </div>
         )}
         {activeView?.type === 'gallery' && (
           <div className="flex items-center justify-center h-full text-muted-foreground">
-            画廊视图即将推出
+            {t.database.galleryComingSoon}
           </div>
         )}
       </div>

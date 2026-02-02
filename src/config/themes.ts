@@ -134,68 +134,68 @@ export const OFFICIAL_THEMES: Theme[] = [
   // =================================================================
   {
     id: "default",
-    name: "默认",
-    description: "温暖的米黄色调",
+    name: "Default",
+    description: "Warm beige tones",
     ...createThemeColors(40, 10, 5, 215, 25),
   },
   {
     id: "ocean",
-    name: "海洋",
-    description: "清新的蓝色调",
+    name: "Ocean",
+    description: "Fresh blue tones",
     ...createThemeColors(210, 15, 12, 210, 65),
   },
   {
     id: "forest",
-    name: "森林",
-    description: "自然的绿色调",
+    name: "Forest",
+    description: "Natural green tones",
     ...createThemeColors(140, 10, 8, 150, 45),
   },
   {
     id: "lavender",
-    name: "薰衣草",
-    description: "优雅的紫色调",
+    name: "Lavender",
+    description: "Elegant purple tones",
     ...createThemeColors(270, 12, 10, 270, 50),
   },
   {
     id: "rose",
-    name: "玫瑰",
-    description: "温柔的粉色调",
+    name: "Rose",
+    description: "Soft pink tones",
     ...createThemeColors(350, 12, 8, 350, 55),
   },
   {
     id: "amber",
-    name: "落日",
-    description: "活力的橙黄色调",
+    name: "Sunset",
+    description: "Vibrant orange-yellow tones",
     ...createThemeColors(35, 15, 10, 30, 80),
   },
   {
     id: "mint",
-    name: "薄荷",
-    description: "清凉的青色调",
+    name: "Mint",
+    description: "Cool cyan tones",
     ...createThemeColors(170, 15, 10, 165, 55),
   },
   {
     id: "indigo",
-    name: "靛青",
-    description: "深邃的蓝紫色调",
+    name: "Indigo",
+    description: "Deep blue-purple tones",
     ...createThemeColors(235, 15, 12, 240, 60),
   },
   {
     id: "coffee",
-    name: "拿铁",
-    description: "复古的咖啡色调",
+    name: "Latte",
+    description: "Vintage coffee tones",
     ...createThemeColors(30, 20, 12, 25, 45),
   },
   {
     id: "nord",
-    name: "极光",
-    description: "冷淡的灰蓝色调",
+    name: "Aurora",
+    description: "Cool gray-blue tones",
     ...createThemeColors(220, 10, 15, 195, 45),
   },
   {
     id: "mono",
-    name: "极简",
-    description: "纯粹的黑白灰",
+    name: "Minimal",
+    description: "Pure black and white",
     ...createThemeColors(0, 0, 0, 0, 0),
   },
 
@@ -204,8 +204,8 @@ export const OFFICIAL_THEMES: Theme[] = [
   // =================================================================
   {
     id: "cyberpunk",
-    name: "赛博朋克",
-    description: "霓虹撞色：紫黑背景 + 荧光粉 + 青色高亮",
+    name: "Cyberpunk",
+    description: "Neon colors: purple-black + hot pink + cyan",
     light: {
        background: "280 20% 96%",
        foreground: "280 80% 10%",
@@ -276,8 +276,8 @@ export const OFFICIAL_THEMES: Theme[] = [
 
   {
     id: "dracula",
-    name: "吸血鬼",
-    description: "经典配色：冷灰背景 + 紫色 + 绿色 + 橙色混搭",
+    name: "Dracula",
+    description: "Classic colors: cool gray + purple + green + orange mix",
     light: {
        background: "220 20% 97%",
        foreground: "230 15% 30%",
@@ -350,8 +350,8 @@ export const OFFICIAL_THEMES: Theme[] = [
 
   {
     id: "solarized",
-    name: "日蚀",
-    description: "护眼高对比：暖米色背景 + 蓝/橙/红/绿 组合",
+    name: "Solarized",
+    description: "Eye-friendly: warm beige + blue/orange/red/green",
     light: {
        background: "44 87% 94%",
        foreground: "192 81% 14%",
@@ -424,8 +424,8 @@ export const OFFICIAL_THEMES: Theme[] = [
 
   {
     id: "gruvbox",
-    name: "复古",
-    description: "暖调怀旧：大地色背景 + 红绿蓝黄撞色",
+    name: "Retro",
+    description: "Nostalgic: earth tones + red/green/blue/yellow accents",
     light: {
        background: "45 25% 94%",  // 暖米色
        foreground: "20 15% 25%",  // 深褐色文字

@@ -507,7 +507,7 @@ export const useRustAgentStore = create<RustAgentState>()(
       // 会话管理初始状态
       sessions: [{
         id: "default-rust-session",
-        title: "新对话",
+        title: getCurrentTranslations().common.newConversation,
         messages: [],
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -535,9 +535,10 @@ export const useRustAgentStore = create<RustAgentState>()(
         const aiConfig = getAIConfig();
 
         if (!aiConfig.apiKey && aiConfig.provider !== "ollama") {
+          const t = getCurrentTranslations();
           set({
             status: "error",
-            error: "请先在设置中配置 API Key",
+            error: t.ai.apiKeyRequired,
           });
           return;
         }
@@ -721,6 +722,7 @@ export const useRustAgentStore = create<RustAgentState>()(
 
       // 创建新会话
       createSession: (title?: string) => {
+        const t = getCurrentTranslations();
         // 先保存当前会话，再基于最新 sessions 追加一个全新会话
         get()._saveCurrentSession();
         const sessions = get().sessions;
@@ -728,7 +730,7 @@ export const useRustAgentStore = create<RustAgentState>()(
         const id = `rust-session-${Date.now()}`;
         const newSession: RustAgentSession = {
           id,
-          title: title || "新对话",
+          title: title || t.common.newConversation,
           messages: [],
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -798,7 +800,7 @@ export const useRustAgentStore = create<RustAgentState>()(
             // 没有会话了，创建一个新的
             const newSession: RustAgentSession = {
               id: `rust-session-${Date.now()}`,
-              title: "新对话",
+              title: getCurrentTranslations().common.newConversation,
               messages: [],
               createdAt: Date.now(),
               updatedAt: Date.now(),
@@ -881,6 +883,7 @@ export const useRustAgentStore = create<RustAgentState>()(
 
       // 保存当前会话
       _saveCurrentSession: () => {
+        const t = getCurrentTranslations();
         set((state) => {
           if (!state.currentSessionId) return state;
 
@@ -892,7 +895,7 @@ export const useRustAgentStore = create<RustAgentState>()(
                     messages: state.messages,
                     totalTokensUsed: state.totalTokensUsed,
                     updatedAt: Date.now(),
-                    title: s.title === "新对话" && state.messages.length > 0
+                    title: s.title === t.common.newConversation && state.messages.length > 0
                       ? state.messages.find(m => m.role === "user")?.content.slice(0, 20) || s.title
                       : s.title,
                   }

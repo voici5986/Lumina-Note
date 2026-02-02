@@ -1,32 +1,34 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useDatabaseStore } from "@/stores/useDatabaseStore";
 import { useFileStore } from "@/stores/useFileStore";
 import { useBrowserStore } from "@/stores/useBrowserStore";
 import { Database, ListTodo, FolderKanban, Book, X } from "lucide-react";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 interface CreateDatabaseDialogProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const templates = [
-  { id: 'blank', name: '空白数据库', icon: Database, description: '从零开始' },
-  { id: 'task', name: '任务管理', icon: ListTodo, description: '跟踪待办事项' },
-  { id: 'project', name: '项目管理', icon: FolderKanban, description: '管理项目进度' },
-  { id: 'reading', name: '阅读清单', icon: Book, description: '记录阅读进度' },
-  { id: 'flashcard', name: '闪卡管理', icon: Book, description: '统一管理与复习所有闪卡' },
-] as const;
-
 export function CreateDatabaseDialog({ isOpen, onClose }: CreateDatabaseDialogProps) {
   const { createDatabase } = useDatabaseStore();
   const { openDatabaseTab, refreshFileTree } = useFileStore();
   const { hideAllWebViews, showAllWebViews } = useBrowserStore();
+  const { t } = useLocaleStore();
   
   const [name, setName] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<
     'blank' | 'task' | 'project' | 'reading' | 'flashcard'
   >('blank');
   const [isCreating, setIsCreating] = useState(false);
+
+  const templates = useMemo(() => ([
+    { id: 'blank', name: t.database.createDialog.templates.blank.name, icon: Database, description: t.database.createDialog.templates.blank.desc },
+    { id: 'task', name: t.database.createDialog.templates.task.name, icon: ListTodo, description: t.database.createDialog.templates.task.desc },
+    { id: 'project', name: t.database.createDialog.templates.project.name, icon: FolderKanban, description: t.database.createDialog.templates.project.desc },
+    { id: 'reading', name: t.database.createDialog.templates.reading.name, icon: Book, description: t.database.createDialog.templates.reading.desc },
+    { id: 'flashcard', name: t.database.createDialog.templates.flashcard.name, icon: Book, description: t.database.createDialog.templates.flashcard.desc },
+  ]), [t]);
   
   // 弹窗打开时隐藏 WebView，关闭时恢复
   useEffect(() => {
@@ -61,7 +63,7 @@ export function CreateDatabaseDialog({ isOpen, onClose }: CreateDatabaseDialogPr
       onClose();
     } catch (error) {
       console.error('Failed to create database:', error);
-      alert('创建数据库失败');
+      alert(t.database.createDialog.failed);
     } finally {
       setIsCreating(false);
     }
@@ -79,7 +81,7 @@ export function CreateDatabaseDialog({ isOpen, onClose }: CreateDatabaseDialogPr
       <div className="relative bg-background rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
         {/* 标题 */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold">新建数据库</h2>
+          <h2 className="text-lg font-semibold">{t.database.createDialog.title}</h2>
           <button
             onClick={onClose}
             className="p-1 rounded hover:bg-accent text-muted-foreground"
@@ -91,13 +93,13 @@ export function CreateDatabaseDialog({ isOpen, onClose }: CreateDatabaseDialogPr
         {/* 名称输入 */}
         <div className="mb-6">
           <label className="block text-sm font-medium mb-2">
-            数据库名称
+            {t.database.createDialog.nameLabel}
           </label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="输入数据库名称..."
+            placeholder={t.database.createDialog.namePlaceholder}
             className="w-full px-3 py-2 rounded-md border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary"
             autoFocus
             onKeyDown={(e) => {
@@ -111,7 +113,7 @@ export function CreateDatabaseDialog({ isOpen, onClose }: CreateDatabaseDialogPr
         {/* 模板选择 */}
         <div className="mb-6">
           <label className="block text-sm font-medium mb-2">
-            选择模板
+            {t.database.createDialog.templateLabel}
           </label>
           <div className="grid grid-cols-2 gap-2">
             {templates.map((template) => {
@@ -143,14 +145,14 @@ export function CreateDatabaseDialog({ isOpen, onClose }: CreateDatabaseDialogPr
             onClick={onClose}
             className="px-4 py-2 rounded-md text-sm hover:bg-accent"
           >
-            取消
+            {t.common.cancel}
           </button>
           <button
             onClick={handleCreate}
             disabled={!name.trim() || isCreating}
             className="px-4 py-2 rounded-md text-sm bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isCreating ? '创建中...' : '创建'}
+            {isCreating ? t.database.createDialog.creating : t.database.createDialog.create}
           </button>
         </div>
       </div>

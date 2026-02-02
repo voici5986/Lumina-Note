@@ -16,6 +16,7 @@ import type {
   StreamChunk
 } from "../types";
 import { llmFetchJson, llmFetchStream, HttpRequest } from "../httpClient";
+import { getCurrentTranslations } from "@/stores/useLocaleStore";
 
 // ============ 消息格式转换 ============
 
@@ -206,7 +207,11 @@ export class OpenAICompatibleProvider implements LLMProvider {
     });
 
     if (!result.ok || !result.data) {
-      throw new Error(`API 错误 (${result.status}): ${result.error}`);
+      const t = getCurrentTranslations();
+      const errorMessage = t.ai.apiErrorWithStatus
+        .replace("{status}", String(result.status ?? ""))
+        .replace("{error}", String(result.error));
+      throw new Error(errorMessage);
     }
 
     return this.parseResponse(result.data);

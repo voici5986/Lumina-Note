@@ -9,7 +9,7 @@
 
 import { useState, useMemo, useCallback, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useLocaleStore } from '@/stores/useLocaleStore';
+import { useLocaleStore, getCurrentTranslations } from '@/stores/useLocaleStore';
 import { parseMarkdown } from "@/services/markdown/markdown";
 import type { MessageContent, TextContent } from "@/services/llm";
 import { useTimeout } from "@/hooks/useTimeout";
@@ -264,6 +264,7 @@ function formatMarkdownContent(content: string): string {
  * 格式化工具参数为可读形式
  */
 function formatToolParams(params: string): string {
+  const t = getCurrentTranslations().agentMessage;
   const trimmed = params.trim();
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
     try {
@@ -271,20 +272,20 @@ function formatToolParams(params: string): string {
       const parts: string[] = [];
       const filePath = parsed.filePath ?? parsed.path;
       if (typeof filePath === "string" && filePath) {
-        parts.push(`文件: ${filePath}`);
+        parts.push(`${t.file}: ${filePath}`);
       }
       const directory = parsed.directory ?? parsed.dir;
       if (typeof directory === "string" && directory) {
-        parts.push(`目录: ${directory}`);
+        parts.push(`${t.directory}: ${directory}`);
       }
       if (typeof parsed.url === "string") {
-        parts.push(`URL: ${parsed.url}`);
+        parts.push(`${t.url}: ${parsed.url}`);
       }
       if (typeof parsed.query === "string") {
-        parts.push(`查询: ${parsed.query}`);
+        parts.push(`${t.query}: ${parsed.query}`);
       }
       if (typeof parsed.pattern === "string") {
-        parts.push(`模式: ${parsed.pattern}`);
+        parts.push(`${t.pattern}: ${parsed.pattern}`);
       }
       if (parts.length > 0) {
         return parts.join(" | ");
@@ -297,16 +298,16 @@ function formatToolParams(params: string): string {
   const parts: string[] = [];
 
   const dirMatch = params.match(/<directory>([^<]*)<\/directory>/);
-  if (dirMatch) parts.push(`目录: ${dirMatch[1] || "/"}`);
+  if (dirMatch) parts.push(`${t.directory}: ${dirMatch[1] || "/"}`);
 
   const recursiveMatch = params.match(/<recursive>([^<]*)<\/recursive>/);
-  if (recursiveMatch) parts.push(`递归: ${recursiveMatch[1]}`);
+  if (recursiveMatch) parts.push(`${t.recursive}: ${recursiveMatch[1]}`);
 
   const pathsMatch = params.match(/<paths>([^<]*)<\/paths>/);
-  if (pathsMatch) parts.push(`路径: ${pathsMatch[1]}`);
+  if (pathsMatch) parts.push(`${t.paths}: ${pathsMatch[1]}`);
 
   const pathMatch = params.match(/<path>([^<]*)<\/path>/);
-  if (pathMatch) parts.push(`文件: ${pathMatch[1]}`);
+  if (pathMatch) parts.push(`${t.file}: ${pathMatch[1]}`);
 
   if (parts.length > 0) {
     return parts.join(" | ");
@@ -319,18 +320,20 @@ function formatToolParams(params: string): string {
  * 生成工具摘要 - 优先显示参数信息
  */
 function getToolSummary(name: string, params: string, result?: string): string {
+  const t = getCurrentTranslations().agentMessage;
+  const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // 优先从参数中提取关键信息
   if (name === "list") {
-    const dirMatch = params.match(/目录:\s*([^\s|]+)/);
-    if (dirMatch) return `目录: ${dirMatch[1] || "/"}`;
+    const dirMatch = params.match(new RegExp(`${escapeRegExp(t.directory)}:\\s*([^\\s|]+)`));
+    if (dirMatch) return `${t.directory}: ${dirMatch[1] || "/"}`;
   }
   if (name === "read") {
-    const fileMatch = params.match(/文件:\s*([^\s|]+)/);
-    if (fileMatch) return `文件: ${fileMatch[1]}`;
+    const fileMatch = params.match(new RegExp(`${escapeRegExp(t.file)}:\\s*([^\\s|]+)`));
+    if (fileMatch) return `${t.file}: ${fileMatch[1]}`;
   }
   if (name === "write" || name === "edit") {
-    const fileMatch = params.match(/文件:\s*([^\s|]+)/);
-    if (fileMatch) return `文件: ${fileMatch[1]}`;
+    const fileMatch = params.match(new RegExp(`${escapeRegExp(t.file)}:\\s*([^\\s|]+)`));
+    if (fileMatch) return `${t.file}: ${fileMatch[1]}`;
   }
   if (name === "grep" || name === "glob" || name === "fetch") {
     // 搜索工具显示搜索关键词
@@ -347,7 +350,7 @@ function getToolSummary(name: string, params: string, result?: string): string {
     return result.length > 50 ? result.slice(0, 50) + "..." : result;
   }
 
-  return "执行中...";
+  return t.executing;
 }
 
 /**
@@ -540,6 +543,7 @@ export const AgentMessageRenderer = memo(function AgentMessageRenderer({
 
   const { pendingDiff, setPendingDiff, clearPendingEdits, diffResolver } = useAIStore();
   const { openFile } = useFileStore();
+  const { t } = useLocaleStore();
 
   const handleAcceptDiff = useCallback(async () => {
     if (!pendingDiff) return;
@@ -554,9 +558,9 @@ export const AgentMessageRenderer = memo(function AgentMessageRenderer({
       }
     } catch (error) {
       console.error("Failed to apply edit:", error);
-      alert(`❌ 应用修改失败: ${error}`);
+      alert(t.ai.applyEditFailed.replace('{error}', String(error)));
     }
-  }, [pendingDiff, clearPendingEdits, openFile, diffResolver]);
+  }, [pendingDiff, clearPendingEdits, openFile, diffResolver, t]);
 
   const handleRejectDiff = useCallback(() => {
     setPendingDiff(null);
@@ -566,8 +570,6 @@ export const AgentMessageRenderer = memo(function AgentMessageRenderer({
       diffResolver(false);
     }
   }, [setPendingDiff, clearPendingEdits, diffResolver]);
-
-  const { t } = useLocaleStore();
 
   // 按轮次分组计算数据（只计算数据，不创建 JSX）
   const rounds = useMemo(() => {
@@ -748,13 +750,13 @@ export const AgentMessageRenderer = memo(function AgentMessageRenderer({
           className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-600 dark:text-amber-400 text-sm mt-2"
         >
           <AlertTriangle size={16} className="shrink-0" />
-          <span>当前 LLM 请求响应时间过长（超过 2 分钟）</span>
+          <span>{t.agentMessage.timeoutWarning}</span>
           <button
             onClick={onRetryTimeout}
             className="ml-auto flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 rounded-md transition-colors font-medium"
           >
             <RefreshCw size={14} />
-            <span>中断并重试</span>
+            <span>{t.agentMessage.interruptRetry}</span>
           </button>
         </motion.div>
       )}
@@ -766,6 +768,7 @@ export const AgentMessageRenderer = memo(function AgentMessageRenderer({
  * 复制按钮组件
  */
 export function CopyButton({ text }: { text: string }) {
+  const { t } = useLocaleStore();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -778,7 +781,7 @@ export function CopyButton({ text }: { text: string }) {
     <button
       onClick={handleCopy}
       className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-      title="复制"
+      title={t.agentMessage.copy}
     >
       {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
     </button>

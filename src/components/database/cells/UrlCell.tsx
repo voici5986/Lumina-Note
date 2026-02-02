@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { ExternalLink } from "lucide-react";
 import type { DatabaseColumn } from "@/types/database";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 interface UrlCellProps {
   value: string | null;
@@ -11,6 +12,7 @@ interface UrlCellProps {
 }
 
 export function UrlCell({ value, onChange, isEditing, onBlur }: UrlCellProps) {
+  const { t } = useLocaleStore();
   const [editValue, setEditValue] = useState(value || '');
   const inputRef = useRef<HTMLInputElement>(null);
   
@@ -66,7 +68,7 @@ export function UrlCell({ value, onChange, isEditing, onBlur }: UrlCellProps) {
   if (!value) {
     return (
       <div className="h-9 px-2 flex items-center text-sm text-muted-foreground">
-        空
+        {t.common.empty}
       </div>
     );
   }

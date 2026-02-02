@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useDatabaseStore } from "@/stores/useDatabaseStore";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 import type { DatabaseColumn, ColumnType } from "@/types/database";
 import {
   Type,
@@ -38,20 +39,10 @@ const typeIcons: Record<ColumnType, React.ReactNode> = {
   'relation': <GitBranch className="w-4 h-4" />,
 };
 
-const typeLabels: Record<ColumnType, string> = {
-  'text': '文本',
-  'number': '数字',
-  'select': '单选',
-  'multi-select': '多选',
-  'date': '日期',
-  'checkbox': '复选框',
-  'url': '链接',
-  'formula': '公式',
-  'relation': '关联',
-};
-
 export function ColumnHeader({ dbId, column, onDragStart, onDragEnd }: ColumnHeaderProps) {
+  const { t } = useLocaleStore();
   const { updateColumn, deleteColumn, addColumn } = useDatabaseStore();
+  const typeLabels = t.database.columnTypes;
   
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(column.name);
@@ -97,7 +88,7 @@ export function ColumnHeader({ dbId, column, onDragStart, onDragEnd }: ColumnHea
   };
   
   const handleDelete = () => {
-    if (confirm(`确定删除列 "${column.name}" 吗？`)) {
+    if (confirm(t.database.confirmDeleteColumn.replace("{name}", column.name))) {
       deleteColumn(dbId, column.id);
     }
     setShowMenu(false);
@@ -105,7 +96,7 @@ export function ColumnHeader({ dbId, column, onDragStart, onDragEnd }: ColumnHea
   
   const handleDuplicate = () => {
     addColumn(dbId, {
-      name: `${column.name} 副本`,
+      name: `${column.name} ${t.database.copySuffix}`,
       type: column.type,
       options: column.options ? [...column.options] : undefined,
     });
@@ -204,10 +195,10 @@ export function ColumnHeader({ dbId, column, onDragStart, onDragEnd }: ColumnHea
               
               {/* 排序 */}
               <button className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent">
-                <ArrowUp className="w-4 h-4" /> 升序排序
+                <ArrowUp className="w-4 h-4" /> {t.database.sortAsc}
               </button>
               <button className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent">
-                <ArrowDown className="w-4 h-4" /> 降序排序
+                <ArrowDown className="w-4 h-4" /> {t.database.sortDesc}
               </button>
               
               <div className="my-1 border-t border-border" />
@@ -217,16 +208,16 @@ export function ColumnHeader({ dbId, column, onDragStart, onDragEnd }: ColumnHea
                 onClick={handleDuplicate}
                 className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent"
               >
-                <Copy className="w-4 h-4" /> 复制列
+                <Copy className="w-4 h-4" /> {t.database.duplicateColumn}
               </button>
               <button className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent">
-                <EyeOff className="w-4 h-4" /> 隐藏列
+                <EyeOff className="w-4 h-4" /> {t.database.hideColumn}
               </button>
               <button
                 onClick={handleDelete}
                 className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent text-red-500"
               >
-                <Trash2 className="w-4 h-4" /> 删除列
+                <Trash2 className="w-4 h-4" /> {t.database.deleteColumn}
               </button>
             </div>
           )}

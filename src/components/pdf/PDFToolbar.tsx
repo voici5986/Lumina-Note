@@ -7,6 +7,7 @@ import {
   Maximize,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 interface PDFToolbarProps {
   currentPage: number;
@@ -33,6 +34,7 @@ export function PDFToolbar({
   searchSlot,
   className,
 }: PDFToolbarProps) {
+  const { t } = useLocaleStore();
   const handlePrevPage = () => {
     if (currentPage > 1) {
       onPageChange(currentPage - 1);
@@ -73,7 +75,7 @@ export function PDFToolbar({
           onClick={handlePrevPage}
           disabled={currentPage <= 1}
           className="p-1.5 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          title="上一页"
+          title={t.pdfViewer.toolbar.prevPage}
         >
           <ChevronLeft size={18} />
         </button>
@@ -93,7 +95,7 @@ export function PDFToolbar({
           onClick={handleNextPage}
           disabled={currentPage >= totalPages}
           className="p-1.5 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          title="下一页"
+          title={t.pdfViewer.toolbar.nextPage}
         >
           <ChevronRight size={18} />
         </button>
@@ -105,7 +107,7 @@ export function PDFToolbar({
           onClick={handleZoomOut}
           disabled={scale <= 0.25}
           className="p-1.5 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          title="缩小"
+          title={t.pdfViewer.toolbar.zoomOut}
         >
           <ZoomOut size={18} />
         </button>
@@ -124,7 +126,7 @@ export function PDFToolbar({
           onClick={handleZoomIn}
           disabled={scale >= 3}
           className="p-1.5 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          title="放大"
+          title={t.pdfViewer.toolbar.zoomIn}
         >
           <ZoomIn size={18} />
         </button>
@@ -133,7 +135,7 @@ export function PDFToolbar({
           <button
             onClick={onFitWidth}
             className="p-1.5 rounded hover:bg-accent transition-colors"
-            title="适应宽度"
+            title={t.pdfViewer.toolbar.fitWidth}
           >
             <Maximize size={18} />
           </button>
@@ -146,7 +148,7 @@ export function PDFToolbar({
         {searchSlot && <div className="w-px h-4 bg-border" />}
         <button
           className="p-1.5 rounded hover:bg-accent transition-colors"
-          title="旋转"
+          title={t.pdfViewer.toolbar.rotate}
         >
           <RotateCw size={18} />
         </button>

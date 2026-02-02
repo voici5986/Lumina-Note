@@ -115,7 +115,7 @@ export function AgentPanel() {
                     ? "text-yellow-500 bg-yellow-500/10" 
                     : "text-muted-foreground hover:text-foreground"
                 }`}
-                title={rustStore.debugEnabled ? "禁用调试模式" : "启用调试模式"}
+                title={rustStore.debugEnabled ? t.ai.debugDisable : t.ai.debugEnable}
               >
                 <Bug className="w-4 h-4" />
               </button>
@@ -129,7 +129,7 @@ export function AgentPanel() {
                     }
                   }}
                   className="p-1.5 rounded hover:bg-muted text-yellow-500"
-                  title={`查看调试日志: ${rustStore.debugLogPath}`}
+                  title={t.ai.debugLog.replace('{path}', rustStore.debugLogPath)}
                 >
                   <FileText className="w-4 h-4" />
                 </button>

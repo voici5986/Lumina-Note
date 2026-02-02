@@ -10,12 +10,14 @@ import { FlashcardReview } from './FlashcardReview';
 import { useFlashcardStore } from '../../stores/useFlashcardStore';
 import { useFileStore } from '../../stores/useFileStore';
 import { Loader2 } from 'lucide-react';
+import { useLocaleStore } from '@/stores/useLocaleStore';
 
 interface FlashcardViewProps {
   deckId?: string;
 }
 
 export const FlashcardView: React.FC<FlashcardViewProps> = ({ deckId }) => {
+  const { t } = useLocaleStore();
   const [reviewingDeckId, setReviewingDeckId] = useState<string | null>(deckId || null);
   const [showCreateCard, setShowCreateCard] = useState(false);
   const [createDeckId, setCreateDeckId] = useState<string>('Default');
@@ -101,6 +103,7 @@ interface CreateCardDialogProps {
 }
 
 const CreateCardDialog: React.FC<CreateCardDialogProps> = ({ deckId, onClose }) => {
+  const { t } = useLocaleStore();
   const { addCard } = useFlashcardStore();
   const [front, setFront] = useState('');
   const [back, setBack] = useState('');
@@ -133,29 +136,29 @@ const CreateCardDialog: React.FC<CreateCardDialogProps> = ({ deckId, onClose }) 
       
       {/* 对话框 */}
       <div className="relative bg-white dark:bg-neutral-900 border rounded-xl p-6 w-full max-w-md shadow-xl">
-        <h3 className="text-lg font-semibold mb-4">创建新卡片</h3>
+        <h3 className="text-lg font-semibold mb-4">{t.flashcard.createCardTitle}</h3>
         
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">正面（问题）</label>
+            <label className="block text-sm font-medium mb-1">{t.flashcard.frontLabel}</label>
             <textarea
               value={front}
               onChange={(e) => setFront(e.target.value)}
               className="w-full p-3 border rounded-lg bg-background resize-none"
               rows={3}
-              placeholder="输入问题..."
+              placeholder={t.flashcard.questionPlaceholder}
               autoFocus
             />
           </div>
           
           <div>
-            <label className="block text-sm font-medium mb-1">背面（答案）</label>
+            <label className="block text-sm font-medium mb-1">{t.flashcard.backLabel}</label>
             <textarea
               value={back}
               onChange={(e) => setBack(e.target.value)}
               className="w-full p-3 border rounded-lg bg-background resize-none"
               rows={3}
-              placeholder="输入答案..."
+              placeholder={t.flashcard.answerPlaceholder}
             />
           </div>
         </div>
@@ -165,14 +168,14 @@ const CreateCardDialog: React.FC<CreateCardDialogProps> = ({ deckId, onClose }) 
             onClick={onClose}
             className="px-4 py-2 text-muted-foreground hover:text-foreground"
           >
-            取消
+            {t.common.cancel}
           </button>
           <button
             onClick={handleSubmit}
             disabled={!front.trim() || !back.trim() || isSubmitting}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-lg disabled:opacity-50"
           >
-            {isSubmitting ? '创建中...' : '创建'}
+            {isSubmitting ? t.flashcard.creating : t.flashcard.createCard}
           </button>
         </div>
       </div>

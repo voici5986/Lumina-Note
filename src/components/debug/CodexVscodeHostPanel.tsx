@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { CodexEmbeddedWebview } from "./CodexEmbeddedWebview";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 type HostInfo = {
   origin: string;
@@ -28,6 +29,7 @@ function Badge({ ok, children }: { ok: boolean; children: React.ReactNode }) {
 }
 
 export function CodexVscodeHostPanel({ onClose }: Props) {
+  const { t } = useLocaleStore();
   const [extensionPath, setExtensionPath] = useState("");
   const [workspacePath, setWorkspacePath] = useState("");
   const [viewType, setViewType] = useState("chatgpt.sidebarView");
@@ -129,7 +131,7 @@ export function CodexVscodeHostPanel({ onClose }: Props) {
               onClick={onClose}
               className="h-9 px-3 rounded-lg border border-slate-200/10 bg-slate-900/40 hover:bg-slate-900/70 transition-colors text-sm"
             >
-              关闭 (Esc)
+              {t.common.close} (Esc)
             </button>
           )}
         </div>

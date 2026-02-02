@@ -3,16 +3,20 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import { getCurrentLocale, getCurrentTranslations } from "@/stores/useLocaleStore";
 
 /**
  * 导出当前笔记为 PDF
  * 使用 jspdf + html2canvas 生成 PDF 文件
  */
 export async function exportToPdf(content: string, title: string) {
+  const t = getCurrentTranslations();
+  const locale = getCurrentLocale();
+
   // 弹出保存对话框
   const filePath = await save({
     defaultPath: `${title}.pdf`,
-    filters: [{ name: 'PDF 文件', extensions: ['pdf'] }],
+    filters: [{ name: t.pdf.fileFilterName, extensions: ['pdf'] }],
   });
   
   if (!filePath) return; // 用户取消
@@ -37,10 +41,10 @@ export async function exportToPdf(content: string, title: string) {
   `;
   
   container.innerHTML = `
-    <div style="text-align:center;margin-bottom:30px;padding-bottom:20px;border-bottom:2px solid #eee;">
+      <div style="text-align:center;margin-bottom:30px;padding-bottom:20px;border-bottom:2px solid #eee;">
       <div style="color:#3b82f6;font-size:14px;font-weight:600;letter-spacing:1px;margin-bottom:8px;">Lumina Note</div>
       <h1 style="font-size:24px;margin:0;color:#333;">${title}</h1>
-      <div style="color:#888;font-size:12px;margin-top:8px;">导出时间：${new Date().toLocaleString('zh-CN')}</div>
+      <div style="color:#888;font-size:12px;margin-top:8px;">${t.pdf.exportedAt}：${new Date().toLocaleString(locale)}</div>
     </div>
     <div class="content">${html}</div>
   `;
@@ -105,10 +109,10 @@ export async function exportToPdf(content: string, title: string) {
     const pdfData = pdf.output('arraybuffer');
     await writeFile(filePath, new Uint8Array(pdfData));
     
-    alert('PDF 导出成功！');
+    alert(t.pdf.exportSuccess);
   } catch (err) {
     console.error('PDF 导出失败:', err);
-    alert('PDF 导出失败: ' + (err as Error).message);
+    alert(`${t.pdf.exportFailed}: ${(err as Error).message}`);
   } finally {
     // 清理
     container.remove();
@@ -120,7 +124,7 @@ export async function exportToPdf(content: string, title: string) {
  * 获取文件名（不含扩展名）
  */
 export function getExportFileName(filePath: string | null): string {
-  if (!filePath) return '未命名笔记';
+  if (!filePath) return getCurrentTranslations().common.untitled;
   const parts = filePath.split(/[/\\]/);
   const fileName = parts[parts.length - 1];
   return fileName.replace(/\.md$/i, '');

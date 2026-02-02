@@ -4,6 +4,7 @@ import { useProfileStore } from "@/stores/useProfileStore";
 import { buildProfileData } from "@/services/profile/profileData";
 import type { ProfilePageData } from "@/types/profile";
 import { cn } from "@/lib/utils";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 const emptyData: ProfilePageData = {
   profile: {
@@ -22,11 +23,12 @@ const emptyData: ProfilePageData = {
 export function ProfilePreview() {
   const fileTree = useFileStore((state) => state.fileTree);
   const profileConfig = useProfileStore((state) => state.config);
+  const { t } = useLocaleStore();
   const [data, setData] = useState<ProfilePageData>(emptyData);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const displayName = profileConfig.displayName || "未命名用户";
+  const displayName = profileConfig.displayName || t.profilePreview.unnamedUser;
   const profileId = profileConfig.id;
   const isRemoteCover = (cover?: string) =>
     Boolean(cover && (cover.startsWith("http://") || cover.startsWith("https://") || cover.startsWith("data:")));
@@ -70,7 +72,7 @@ export function ProfilePreview() {
                   <img src={profileConfig.avatarUrl} alt={displayName} className="h-full w-full object-cover" />
                 ) : (
                   <span className="text-2xl font-semibold text-muted-foreground">
-                    {displayName.slice(0, 1) || "U"}
+                    {displayName.slice(0, 1) || t.profilePreview.initialFallback}
                   </span>
                 )}
               </div>
@@ -82,7 +84,7 @@ export function ProfilePreview() {
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground max-w-xl">
-                  {profileConfig.bio || "写点关于你的简介吧…"}
+                  {profileConfig.bio || t.profilePreview.bioPlaceholder}
                 </p>
                 {links.length > 0 && (
                   <div className="flex flex-wrap gap-2 text-sm">
@@ -103,22 +105,22 @@ export function ProfilePreview() {
             <div className="grid grid-cols-3 gap-3 text-center text-xs text-muted-foreground md:text-right">
               <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2">
                 <p className="text-base font-semibold text-foreground">{data.pinned.length}</p>
-                <p>置顶</p>
+                <p>{t.profilePreview.pinned}</p>
               </div>
               <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2">
                 <p className="text-base font-semibold text-foreground">{data.recent.length}</p>
-                <p>最近</p>
+                <p>{t.profilePreview.recent}</p>
               </div>
               <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2">
                 <p className="text-base font-semibold text-foreground">{data.tags.length}</p>
-                <p>标签</p>
+                <p>{t.profilePreview.tags}</p>
               </div>
             </div>
           </div>
         </div>
 
         {isLoading && (
-          <div className="mt-10 text-sm text-muted-foreground">正在生成公开主页预览…</div>
+          <div className="mt-10 text-sm text-muted-foreground">{t.profilePreview.loadingPreview}</div>
         )}
         {error && (
           <div className="mt-10 rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-600">
@@ -128,12 +130,12 @@ export function ProfilePreview() {
 
         <section className="mt-12 space-y-4">
           <header className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">置顶</h2>
+            <h2 className="text-lg font-semibold">{t.profilePreview.pinned}</h2>
             <span className="text-xs text-muted-foreground">{data.pinned.length}/3</span>
           </header>
           {data.pinned.length === 0 ? (
             <div className="rounded-md border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
-              还没有置顶内容。你可以在设置中选择置顶笔记。
+              {t.profilePreview.pinnedEmpty}
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
@@ -163,12 +165,12 @@ export function ProfilePreview() {
 
         <section className="mt-12 space-y-4">
           <header className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">最近更新</h2>
+            <h2 className="text-lg font-semibold">{t.profilePreview.recent}</h2>
             <span className="text-xs text-muted-foreground">{data.recent.length}/10</span>
           </header>
           {data.recent.length === 0 ? (
             <div className="rounded-md border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
-              暂无公开笔记。请在笔记 frontmatter 中设置 visibility: public。
+              {t.profilePreview.recentEmpty}
             </div>
           ) : (
             <div className="space-y-3">
@@ -207,12 +209,12 @@ export function ProfilePreview() {
 
         <section className="mt-12 space-y-4">
           <header className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">标签</h2>
+            <h2 className="text-lg font-semibold">{t.profilePreview.tags}</h2>
             <span className="text-xs text-muted-foreground">{data.tags.length}</span>
           </header>
           {data.tags.length === 0 ? (
             <div className="rounded-md border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
-              没有可展示的标签。
+              {t.profilePreview.tagsEmpty}
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">

@@ -9,6 +9,7 @@ import {
   FilePlus,
   FolderPlus,
 } from "lucide-react";
+import { getCurrentTranslations } from "@/stores/useLocaleStore";
 
 export interface MenuItem {
   label: string;
@@ -105,34 +106,34 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
 // Pre-built menu item creators
 export const menuItems = {
   rename: (onClick: () => void): MenuItem => ({
-    label: "重命名",
+    label: getCurrentTranslations().fileMenu.rename,
     icon: <Pencil size={14} />,
     onClick,
   }),
   delete: (onClick: () => void): MenuItem => ({
-    label: "删除",
+    label: getCurrentTranslations().fileMenu.delete,
     icon: <Trash2 size={14} />,
     onClick,
     danger: true,
     divider: true,
   }),
   copyPath: (onClick: () => void): MenuItem => ({
-    label: "复制路径",
+    label: getCurrentTranslations().fileMenu.copyPath,
     icon: <Copy size={14} />,
     onClick,
   }),
   showInExplorer: (onClick: () => void): MenuItem => ({
-    label: "在资源管理器中显示",
+    label: getCurrentTranslations().fileMenu.revealInExplorer,
     icon: <FolderOpen size={14} />,
     onClick,
   }),
   newFile: (onClick: () => void): MenuItem => ({
-    label: "新建文件",
+    label: getCurrentTranslations().fileMenu.newFile,
     icon: <FilePlus size={14} />,
     onClick,
   }),
   newFolder: (onClick: () => void): MenuItem => ({
-    label: "新建文件夹",
+    label: getCurrentTranslations().fileMenu.newFolder,
     icon: <FolderPlus size={14} />,
     onClick,
   }),

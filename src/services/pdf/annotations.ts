@@ -18,6 +18,7 @@
  */
 
 import type { Annotation, AnnotationFile, TextPosition, AnnotationColor, AnnotationType } from '@/types/annotation';
+import { getCurrentTranslations } from '@/stores/useLocaleStore';
 
 /**
  * 生成唯一的批注 ID
@@ -169,10 +170,11 @@ function parseAnnotationBlock(blockContent: string, pageIndex: number, _pdfPath:
  * 将批注数据序列化为 Markdown
  */
 export function stringifyAnnotationsMarkdown(file: AnnotationFile): string {
+  const t = getCurrentTranslations();
   const lines: string[] = [];
   
   // 标题
-  lines.push(`# 📝 批注 - ${file.pdfName}`);
+  lines.push(`# 📝 ${t.pdfViewer.annotation.exportTitle} - ${file.pdfName}`);
   lines.push('');
   
   // 按页码分组
@@ -191,7 +193,7 @@ export function stringifyAnnotationsMarkdown(file: AnnotationFile): string {
   for (const pageIndex of sortedPages) {
     const pageAnnotations = byPage.get(pageIndex)!;
     
-    lines.push(`## 第 ${pageIndex} 页`);
+    lines.push(`## ${t.pdfViewer.annotation.exportPage.replace("{page}", String(pageIndex))}`);
     lines.push('');
     
     for (const ann of pageAnnotations) {
@@ -210,7 +212,7 @@ export function stringifyAnnotationsMarkdown(file: AnnotationFile): string {
       
       // 跳转链接
       const encodedPath = encodeURIComponent(file.pdfPath);
-      lines.push(`[📍 跳转](lumina://pdf?file=${encodedPath}&page=${pageIndex}&id=${ann.id})`);
+      lines.push(`[📍 ${t.pdfViewer.annotation.exportJump}](lumina://pdf?file=${encodedPath}&page=${pageIndex}&id=${ann.id})`);
       lines.push('');
       
       // 位置数据（隐藏）

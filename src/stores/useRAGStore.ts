@@ -113,7 +113,8 @@ export const useRAGStore = create<RAGState>()(
             set({ indexStatus: newStatus, isIndexing: false });
           }
         } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : "初始化失败";
+          const t = getCurrentTranslations();
+          const errorMsg = error instanceof Error ? error.message : t.rag.errors.initFailed;
           set({ lastError: errorMsg, isInitialized: false });
           console.error("[RAG] Initialize error:", error);
         }
@@ -137,7 +138,8 @@ export const useRAGStore = create<RAGState>()(
           ragManager = get().ragManager;
           
           if (!ragManager) {
-            set({ lastError: "RAG 系统初始化失败" });
+            const t = getCurrentTranslations();
+            set({ lastError: t.rag.errors.systemInitFailed });
             return;
           }
         }
@@ -159,7 +161,8 @@ export const useRAGStore = create<RAGState>()(
           const newStatus = await ragManager.getStatus();
           set({ indexStatus: newStatus, isIndexing: false });
         } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : "索引失败";
+          const t = getCurrentTranslations();
+          const errorMsg = error instanceof Error ? error.message : t.rag.errors.indexFailed;
           set({ lastError: errorMsg, isIndexing: false });
           console.error("[RAG] Rebuild error:", error);
         }
@@ -184,7 +187,8 @@ export const useRAGStore = create<RAGState>()(
         const { ragManager } = get();
         
         if (!ragManager || !ragManager.isInitialized()) {
-          throw new Error("RAG 系统未初始化");
+          const t = getCurrentTranslations();
+          throw new Error(t.rag.errors.notInitialized);
         }
 
         return await ragManager.search(query, options);

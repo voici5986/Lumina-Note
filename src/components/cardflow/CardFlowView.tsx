@@ -3,6 +3,7 @@ import { useFileStore } from '@/stores/useFileStore';
 import { NoteCard } from './NoteCard';
 import { useNoteCards, NoteCardData } from './useNoteCards';
 import { Search, Filter, Loader2 } from 'lucide-react';
+import { useLocaleStore } from '@/stores/useLocaleStore';
 
 // 保存滚动位置（组件外部，跨挂载保持）
 let savedScrollTop = 0;
@@ -32,6 +33,7 @@ function useColumnCount() {
 
 export function CardFlowView() {
   const { openFile, openPDFTab } = useFileStore();
+  const { t } = useLocaleStore();
   const { 
     cards, 
     loading, 
@@ -126,17 +128,22 @@ export function CardFlowView() {
     return () => container.removeEventListener('scroll', handleScroll);
   }, [hasMore, loading, isPending, loadMore]);
 
+  const loadedSummary = t.cardFlow.loadedSummary
+    .replace("{loaded}", String(loadedCount))
+    .replace("{total}", String(totalFiles))
+    .replace("{shown}", String(cards.length));
+
   return (
     <div className="h-full flex flex-col bg-background">
       {/* 顶部工具栏 */}
       <div className="p-4 border-b border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-muted/20">
         <div className="flex flex-col gap-1">
             <h2 className="text-lg font-semibold flex items-center gap-2">
-                卡片视图
+                {t.cardFlow.title}
                 {(loading || isPending) && <Loader2 size={16} className="animate-spin text-primary" />}
             </h2>
             <p className="text-xs text-muted-foreground">
-                已加载 {loadedCount} / {totalFiles}，显示 {cards.length} 个
+                {loadedSummary}
             </p>
         </div>
 
@@ -145,7 +152,7 @@ export function CardFlowView() {
             <Search size={16} className="text-muted-foreground" />
             <input 
                 type="text" 
-                placeholder="搜索笔记..."
+                placeholder={t.cardFlow.searchPlaceholder}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-muted-foreground min-w-0"
@@ -159,7 +166,7 @@ export function CardFlowView() {
                 onChange={(e) => setSelectedFolder(e.target.value)}
                 className="bg-background border border-input rounded-md text-sm px-2 py-1.5 outline-none focus:ring-2 focus:ring-ring max-w-[150px]"
                 >
-                <option value="all">所有文件夹</option>
+                <option value="all">{t.cardFlow.allFolders}</option>
                 {allFolders.map(f => (
                     <option key={f} value={f}>{f}</option>
                 ))}
@@ -176,12 +183,12 @@ export function CardFlowView() {
         {cards.length === 0 && loading ? (
           <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            <p>正在加载笔记...</p>
+            <p>{t.cardFlow.loadingNotes}</p>
           </div>
         ) : filteredCards.length === 0 ? (
           <div className="h-64 flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed border-border rounded-2xl">
             <Filter size={48} className="mb-4 opacity-50" />
-            <p>没有找到匹配的笔记</p>
+            <p>{t.cardFlow.noResults}</p>
           </div>
         ) : (
           <>
@@ -213,10 +220,12 @@ export function CardFlowView() {
               {(loading || isPending) && hasMore ? (
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Loader2 size={16} className="animate-spin" />
-                  <span className="text-sm">加载更多...</span>
+                  <span className="text-sm">{t.cardFlow.loadMore}</span>
                 </div>
               ) : !hasMore && loadedCount > 0 ? (
-                <span className="text-xs text-muted-foreground/50">— 已加载全部 {totalFiles} 个笔记 —</span>
+                <span className="text-xs text-muted-foreground/50">
+                  {t.cardFlow.allLoaded.replace("{total}", String(totalFiles))}
+                </span>
               ) : null}
             </div>
           </>

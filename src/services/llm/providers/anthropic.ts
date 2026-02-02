@@ -6,6 +6,7 @@
 
 import type { Message, MessageContent, LLMConfig, LLMOptions, LLMResponse, LLMProvider } from "../types";
 import { llmFetchJson } from "../httpClient";
+import { getCurrentTranslations } from "@/stores/useLocaleStore";
 
 // 转换消息内容为 Anthropic 格式
 function convertContent(
@@ -79,7 +80,8 @@ export class AnthropicProvider implements LLMProvider {
     });
 
     if (!result.ok || !result.data) {
-      throw new Error(`Anthropic API 错误: ${result.error}`);
+      const t = getCurrentTranslations();
+      throw new Error(t.ai.providerError.replace("{provider}", "Anthropic").replace("{error}", String(result.error)));
     }
 
     const data = result.data;

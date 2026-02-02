@@ -187,7 +187,8 @@ describe('themePlugin', () => {
       const template = createThemeTemplate();
       
       expect(template.id).toContain('custom-');
-      expect(template.name).toBe('我的主题');
+      expect(template.name).toBeTruthy();
+      expect(template.description).toBeTruthy();
       expect(template.light).toBeDefined();
       expect(template.dark).toBeDefined();
     });

@@ -76,10 +76,10 @@ const WELCOME_EMOJIS = [
 // 快捷操作卡片数据 - 动态获取翻译
 function getQuickActions(t: ReturnType<typeof useLocaleStore.getState>['t']) {
   return [
-    { icon: Sparkles, label: t.ai.polishText, desc: t.ai.polishTextDesc, mode: "chat" as const, prompt: "帮我润色这段文字：" },
-    { icon: FileText, label: t.ai.summarizeNote, desc: t.ai.summarizeNoteDesc, mode: "chat" as const, prompt: "帮我总结当前笔记的要点" },
-    { icon: Zap, label: t.ai.writeArticle, desc: t.ai.writeArticleDesc, mode: "agent" as const, prompt: "帮我写一篇关于" },
-    { icon: Bot, label: t.ai.studyNotes, desc: t.ai.studyNotesDesc, mode: "agent" as const, prompt: "帮我创建一份关于 __ 的学习笔记" },
+    { icon: Sparkles, label: t.ai.polishText, desc: t.ai.polishTextDesc, mode: "chat" as const, prompt: t.ai.quickPrompts.polishText },
+    { icon: FileText, label: t.ai.summarizeNote, desc: t.ai.summarizeNoteDesc, mode: "chat" as const, prompt: t.ai.quickPrompts.summarizeNote },
+    { icon: Zap, label: t.ai.writeArticle, desc: t.ai.writeArticleDesc, mode: "agent" as const, prompt: t.ai.quickPrompts.writeArticle },
+    { icon: Bot, label: t.ai.studyNotes, desc: t.ai.studyNotesDesc, mode: "agent" as const, prompt: t.ai.quickPrompts.studyNotes },
   ];
 }
 
@@ -762,12 +762,12 @@ export function MainAIChatShell() {
     } else {
       createSession();
     }
-    autoSendMessageRef.current = "性能调试：首次发送卡顿";
-    setInput("性能调试：首次发送卡顿");
+    autoSendMessageRef.current = t.ai.performanceDebugMessage;
+    setInput(t.ai.performanceDebugMessage);
     setTimeout(() => {
-      handleSendRef.current("性能调试：首次发送卡顿");
+      handleSendRef.current(t.ai.performanceDebugMessage);
     }, 200);
-  }, [chatMode, resetResearch, rustClearChat, createSession]);
+  }, [chatMode, resetResearch, rustClearChat, createSession, t]);
 
   // 键盘事件
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -813,18 +813,19 @@ export function MainAIChatShell() {
   // 动态 Research placeholder
   const researchPlaceholder = useMemo(() => {
     if (allTags.length === 0) {
-      return "输入研究主题，例如：React 性能优化...";
+      return t.deepResearch.placeholderFallback;
     }
     // 随机选择一个标签作为示例
     const randomTag = allTags[Math.floor(Math.random() * Math.min(allTags.length, 10))];
+    const tag = randomTag?.tag || t.deepResearch.exampleTagFallback;
     const examples = [
-      `${randomTag?.tag || "React"} 最佳实践`,
-      `${randomTag?.tag || "设计模式"} 入门指南`,
-      `${randomTag?.tag || "性能优化"} 技巧总结`,
+      t.deepResearch.exampleTemplates.bestPractices.replace('{tag}', tag),
+      t.deepResearch.exampleTemplates.introGuide.replace('{tag}', tag),
+      t.deepResearch.exampleTemplates.tipsSummary.replace('{tag}', tag),
     ];
     const example = examples[Math.floor(Math.random() * examples.length)];
-    return `输入研究主题，例如：${example}...`;
-  }, [allTags]);
+    return t.deepResearch.placeholderExample.replace('{example}', example);
+  }, [allTags, t]);
 
   // 快捷操作点击
   const handleQuickAction = (action: typeof quickActions[0]) => {
@@ -902,7 +903,7 @@ export function MainAIChatShell() {
       >
         <span className="flex items-center gap-1">
           <Sparkles size={12} />
-          Chat
+          {t.ai.modeChat}
         </span>
       </button>
       <button
@@ -915,12 +916,12 @@ export function MainAIChatShell() {
       >
         <span className="flex items-center gap-1">
           <Bot size={12} />
-          Agent
+          {t.ai.modeAgent}
         </span>
       </button>
       <button
         onClick={() => setChatMode("research")}
-        title="Deep Research - 深度研究笔记库"
+        title={t.deepResearch.modeTitle}
         className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${chatMode === "research"
             ? "bg-background text-foreground shadow-sm"
             : "text-muted-foreground hover:text-foreground"
@@ -928,7 +929,7 @@ export function MainAIChatShell() {
       >
         <span className="flex items-center gap-1">
           <Microscope size={12} />
-          Research
+          {t.deepResearch.modeLabel}
         </span>
       </button>
       <button
@@ -941,7 +942,7 @@ export function MainAIChatShell() {
       >
         <span className="flex items-center gap-1">
           <Code2 size={12} />
-          Codex
+          {t.ai.modeCodex}
         </span>
       </button>
     </div>
@@ -954,7 +955,7 @@ export function MainAIChatShell() {
         <div className="h-10 flex items-center justify-between px-4 border-b border-border shrink-0">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Code2 size={14} />
-            <span>Codex</span>
+            <span>{t.ai.modeCodex}</span>
           </div>
           {renderModeToggle()}
         </div>
@@ -1010,7 +1011,7 @@ export function MainAIChatShell() {
               >
                 <div className="p-3 border-b border-border flex items-center justify-between">
                   <h3 className="text-xs font-medium text-muted-foreground">
-                    会话历史
+                    {t.ai.historyChats}
                   </h3>
                   <button
                     onClick={() => setShowHistory(false)}
@@ -1464,7 +1465,7 @@ export function MainAIChatShell() {
                     {/* 网络搜索按钮（独立于模式切换） */}
                     <button
                       onClick={() => setEnableWebSearch(!enableWebSearch)}
-                      title={enableWebSearch ? "关闭网络搜索" : "启用网络搜索（需配置 Tavily API Key）"}
+                      title={enableWebSearch ? t.ai.webSearchDisable : t.ai.webSearchEnable}
                       className={`ml-2 flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-all duration-200 ${
                         enableWebSearch
                           ? "bg-primary/10 text-primary border border-primary/30"
@@ -1508,7 +1509,7 @@ export function MainAIChatShell() {
                             ? "text-yellow-500 bg-yellow-500/10" 
                             : "text-muted-foreground hover:bg-muted hover:text-foreground"
                         }`}
-                        title={debugEnabled ? `调试模式已启用: ${debugLogPath}` : "启用调试模式"}
+                        title={debugEnabled ? t.ai.debugEnabled.replace('{path}', debugLogPath || '') : t.ai.debugEnable}
                       >
                         <Bug size={14} />
                       </button>
@@ -1668,7 +1669,7 @@ export function MainAIChatShell() {
                             </span>
                             {displayIntent && (
                               <span className="px-1.5 py-0.5 rounded text-[10px] bg-green-500/20 text-green-600">
-                                ✓ 已识别
+                                ✓ {t.ai.intentRecognized}
                               </span>
                             )}
                           </div>
@@ -1677,13 +1678,13 @@ export function MainAIChatShell() {
                         {displayIntent ? (
                           <div className="space-y-2">
                             <div className="flex gap-2">
-                              <span className="text-muted-foreground w-16 shrink-0">Type:</span>
+                              <span className="text-muted-foreground w-16 shrink-0">{t.ai.intentTypeLabel}</span>
                               <span className="font-bold text-foreground bg-background px-1 rounded border border-border/50">
                                 {displayIntent.type}
                               </span>
                             </div>
                             <div className="flex gap-2">
-                              <span className="text-muted-foreground w-16 shrink-0">Route:</span>
+                              <span className="text-muted-foreground w-16 shrink-0">{t.ai.intentRouteLabel}</span>
                               <span className="text-foreground/80">
                                 {'route' in displayIntent ? displayIntent.route : '-'}
                               </span>
@@ -1691,7 +1692,7 @@ export function MainAIChatShell() {
                           </div>
                         ) : (
                           <div className="text-muted-foreground italic opacity-70">
-                            尚未发送消息，暂无意图数据。
+                            {t.ai.intentEmpty}
                           </div>
                         )}
                       </>

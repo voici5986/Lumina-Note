@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { pdfjs } from "react-pdf";
 import { Search, X, ChevronUp, ChevronDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 interface SearchResult {
   pageIndex: number;
@@ -21,6 +22,7 @@ export function PDFSearch({
   onNavigate,
   className,
 }: PDFSearchProps) {
+  const { t } = useLocaleStore();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -167,7 +169,7 @@ export function PDFSearch({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="搜索..."
+          placeholder={t.pdfViewer.search.placeholder}
           className="w-40 pl-7 pr-7 py-1 text-sm bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary"
         />
         {query && (
@@ -185,7 +187,7 @@ export function PDFSearch({
         onClick={doSearch}
         disabled={searching || !query.trim()}
         className="p-1.5 rounded hover:bg-accent disabled:opacity-50 transition-colors"
-        title="搜索"
+        title={t.pdfViewer.search.search}
       >
         {searching ? (
           <Loader2 size={14} className="animate-spin" />
@@ -203,14 +205,14 @@ export function PDFSearch({
           <button
             onClick={navigatePrev}
             className="p-1 rounded hover:bg-accent transition-colors"
-            title="上一个 (Shift+Enter)"
+            title={t.pdfViewer.search.prev}
           >
             <ChevronUp size={14} />
           </button>
           <button
             onClick={navigateNext}
             className="p-1 rounded hover:bg-accent transition-colors"
-            title="下一个 (Enter)"
+            title={t.pdfViewer.search.next}
           >
             <ChevronDown size={14} />
           </button>
@@ -219,7 +221,7 @@ export function PDFSearch({
 
       {/* 无结果提示 */}
       {!searching && query && results.length === 0 && (
-        <span className="text-xs text-muted-foreground">无结果</span>
+        <span className="text-xs text-muted-foreground">{t.pdfViewer.search.noResults}</span>
       )}
     </div>
   );

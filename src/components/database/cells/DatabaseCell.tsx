@@ -1,4 +1,5 @@
 import { useDatabaseStore } from "@/stores/useDatabaseStore";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 import type { DatabaseColumn, CellValue } from "@/types/database";
 import { TextCell } from "./TextCell";
 import { NumberCell } from "./NumberCell";
@@ -26,6 +27,7 @@ export function DatabaseCell({
   onBlur,
 }: DatabaseCellProps) {
   const { updateCell } = useDatabaseStore();
+  const { t } = useLocaleStore();
   
   const handleChange = (newValue: CellValue) => {
     updateCell(dbId, rowId, column.id, newValue);
@@ -64,21 +66,21 @@ export function DatabaseCell({
     case 'formula':
       return (
         <div className="h-9 px-2 flex items-center text-sm text-muted-foreground">
-          公式
+          {t.database.columnTypes.formula}
         </div>
       );
     
     case 'relation':
       return (
         <div className="h-9 px-2 flex items-center text-sm text-muted-foreground">
-          关联
+          {t.database.columnTypes.relation}
         </div>
       );
     
     default:
       return (
         <div className="h-9 px-2 flex items-center text-sm text-muted-foreground">
-          不支持的类型
+          {t.database.unsupportedType}
         </div>
       );
   }

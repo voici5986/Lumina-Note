@@ -19,6 +19,7 @@ import {
   createEmptyAnnotationFile,
   generateAnnotationId,
 } from '@/services/pdf/annotations';
+import { getCurrentTranslations } from '@/stores/useLocaleStore';
 
 interface PDFAnnotationState {
   // 当前加载的批注文件
@@ -108,8 +109,9 @@ export const usePDFAnnotationStore = create<PDFAnnotationState>((set, get) => ({
         set({ currentFile: emptyFile, loading: false });
       } else {
         console.error('Failed to load annotations:', err);
+        const t = getCurrentTranslations();
         set({ 
-          error: `加载批注失败: ${err}`, 
+          error: t.pdfViewer.annotation.loadFailed.replace("{error}", String(err)),
           loading: false,
           currentFile: createEmptyAnnotationFile(pdfPath),
         });
@@ -147,7 +149,8 @@ export const usePDFAnnotationStore = create<PDFAnnotationState>((set, get) => ({
       }
     } catch (err) {
       console.error('Failed to save annotations:', err);
-      set({ error: `保存批注失败: ${err}` });
+      const t = getCurrentTranslations();
+      set({ error: t.pdfViewer.annotation.saveFailed.replace("{error}", String(err)) });
     }
   },
   

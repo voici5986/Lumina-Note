@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { usePDFAnnotationStore } from '@/stores/usePDFAnnotationStore';
 import { ANNOTATION_COLORS } from '@/types/annotation';
 import type { Annotation } from '@/types/annotation';
+import { useLocaleStore } from '@/stores/useLocaleStore';
 
 interface AnnotationLayerProps {
   pageIndex: number;        // 当前页码 (1-based)
@@ -24,6 +25,7 @@ export function AnnotationLayer({
   scale,
   className,
 }: AnnotationLayerProps) {
+  const { t } = useLocaleStore();
   const { 
     currentFile, 
     highlightedAnnotationId,
@@ -49,10 +51,12 @@ export function AnnotationLayer({
     e.stopPropagation();
     
     // 简单的确认删除
-    if (confirm(`删除此批注？\n"${ann.selectedText.slice(0, 50)}..."`)) {
+    const previewText = ann.selectedText.slice(0, 50);
+    const confirmText = t.pdfViewer.annotation.deleteConfirm.replace("{text}", previewText);
+    if (confirm(confirmText)) {
       deleteAnnotation(ann.id);
     }
-  }, [deleteAnnotation]);
+  }, [deleteAnnotation, t]);
   
   if (pageAnnotations.length === 0) {
     return null;

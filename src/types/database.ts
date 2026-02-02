@@ -209,109 +209,109 @@ export interface CreateDatabaseOptions {
 export const DATABASE_TEMPLATES: Record<string, Partial<Database>> = {
   blank: {
     columns: [
-      { id: 'title', name: '标题', type: 'text' },
+      { id: 'title', name: 'Title', type: 'text' },
     ],
     views: [
-      { id: 'default', name: '表格', type: 'table' }
+      { id: 'default', name: 'Table', type: 'table' }
     ],
   },
   flashcard: {
     columns: [
-      { id: 'deck', name: '牌组', type: 'text' },
-      { id: 'type', name: '类型', type: 'select',
+      { id: 'deck', name: 'Deck', type: 'text' },
+      { id: 'type', name: 'Type', type: 'select',
         options: [
-          { id: 'basic', name: '问答', color: 'blue' },
-          { id: 'basic-reversed', name: '双向', color: 'purple' },
-          { id: 'cloze', name: '填空', color: 'green' },
-          { id: 'mcq', name: '选择', color: 'orange' },
-          { id: 'list', name: '列表', color: 'yellow' },
+          { id: 'basic', name: 'Basic', color: 'blue' },
+          { id: 'basic-reversed', name: 'Reversed', color: 'purple' },
+          { id: 'cloze', name: 'Cloze', color: 'green' },
+          { id: 'mcq', name: 'Multiple choice', color: 'orange' },
+          { id: 'list', name: 'List', color: 'yellow' },
         ]
       },
-      { id: 'front', name: '正面', type: 'text' },
-      { id: 'due', name: '到期', type: 'date' },
-      { id: 'ease', name: '难度', type: 'number' },
-      { id: 'interval', name: '间隔', type: 'number' },
-      { id: 'repetitions', name: '重复', type: 'number' },
-      { id: 'source', name: '来源', type: 'text' },
+      { id: 'front', name: 'Front', type: 'text' },
+      { id: 'due', name: 'Due', type: 'date' },
+      { id: 'ease', name: 'Ease', type: 'number' },
+      { id: 'interval', name: 'Interval', type: 'number' },
+      { id: 'repetitions', name: 'Repetitions', type: 'number' },
+      { id: 'source', name: 'Source', type: 'text' },
     ],
     views: [
-      { id: 'table', name: '表格', type: 'table' },
-      { id: 'kanban', name: '牌组', type: 'kanban', groupBy: 'deck' }
+      { id: 'table', name: 'Table', type: 'table' },
+      { id: 'kanban', name: 'Decks', type: 'kanban', groupBy: 'deck' }
     ],
   },
   task: {
     columns: [
-      { id: 'title', name: '任务', type: 'text' },
+      { id: 'title', name: 'Task', type: 'text' },
       { 
         id: 'status', 
-        name: '状态', 
+        name: 'Status', 
         type: 'select',
         options: [
-          { id: 'todo', name: '待办', color: 'gray' },
-          { id: 'doing', name: '进行中', color: 'blue' },
-          { id: 'done', name: '已完成', color: 'green' },
+          { id: 'todo', name: 'Todo', color: 'gray' },
+          { id: 'doing', name: 'In progress', color: 'blue' },
+          { id: 'done', name: 'Done', color: 'green' },
         ]
       },
-      { id: 'priority', name: '优先级', type: 'select',
+      { id: 'priority', name: 'Priority', type: 'select',
         options: [
-          { id: 'high', name: '高', color: 'red' },
-          { id: 'medium', name: '中', color: 'yellow' },
-          { id: 'low', name: '低', color: 'gray' },
+          { id: 'high', name: 'High', color: 'red' },
+          { id: 'medium', name: 'Medium', color: 'yellow' },
+          { id: 'low', name: 'Low', color: 'gray' },
         ]
       },
-      { id: 'dueDate', name: '截止日期', type: 'date' },
-      { id: 'done', name: '完成', type: 'checkbox' },
+      { id: 'dueDate', name: 'Due date', type: 'date' },
+      { id: 'done', name: 'Done', type: 'checkbox' },
     ],
     views: [
-      { id: 'table', name: '表格', type: 'table' },
-      { id: 'kanban', name: '看板', type: 'kanban', groupBy: 'status' }
+      { id: 'table', name: 'Table', type: 'table' },
+      { id: 'kanban', name: 'Kanban', type: 'kanban', groupBy: 'status' }
     ],
   },
   project: {
     columns: [
-      { id: 'title', name: '项目名称', type: 'text' },
-      { id: 'status', name: '状态', type: 'select',
+      { id: 'title', name: 'Project name', type: 'text' },
+      { id: 'status', name: 'Status', type: 'select',
         options: [
-          { id: 'planning', name: '规划中', color: 'gray' },
-          { id: 'active', name: '进行中', color: 'blue' },
-          { id: 'paused', name: '暂停', color: 'yellow' },
-          { id: 'completed', name: '已完成', color: 'green' },
+          { id: 'planning', name: 'Planning', color: 'gray' },
+          { id: 'active', name: 'Active', color: 'blue' },
+          { id: 'paused', name: 'Paused', color: 'yellow' },
+          { id: 'completed', name: 'Completed', color: 'green' },
         ]
       },
-      { id: 'startDate', name: '开始日期', type: 'date' },
-      { id: 'endDate', name: '结束日期', type: 'date' },
-      { id: 'progress', name: '进度', type: 'number', numberFormat: 'percent' },
-      { id: 'url', name: '链接', type: 'url' },
+      { id: 'startDate', name: 'Start date', type: 'date' },
+      { id: 'endDate', name: 'End date', type: 'date' },
+      { id: 'progress', name: 'Progress', type: 'number', numberFormat: 'percent' },
+      { id: 'url', name: 'Link', type: 'url' },
     ],
     views: [
-      { id: 'table', name: '表格', type: 'table' },
+      { id: 'table', name: 'Table', type: 'table' },
     ],
   },
   reading: {
     columns: [
-      { id: 'title', name: '书名', type: 'text' },
-      { id: 'author', name: '作者', type: 'text' },
-      { id: 'status', name: '状态', type: 'select',
+      { id: 'title', name: 'Book title', type: 'text' },
+      { id: 'author', name: 'Author', type: 'text' },
+      { id: 'status', name: 'Status', type: 'select',
         options: [
-          { id: 'want', name: '想读', color: 'gray' },
-          { id: 'reading', name: '在读', color: 'blue' },
-          { id: 'finished', name: '已读', color: 'green' },
+          { id: 'want', name: 'Want to read', color: 'gray' },
+          { id: 'reading', name: 'Reading', color: 'blue' },
+          { id: 'finished', name: 'Finished', color: 'green' },
         ]
       },
-      { id: 'rating', name: '评分', type: 'number' },
-      { id: 'tags', name: '标签', type: 'multi-select',
+      { id: 'rating', name: 'Rating', type: 'number' },
+      { id: 'tags', name: 'Tags', type: 'multi-select',
         options: [
-          { id: 'fiction', name: '小说', color: 'purple' },
-          { id: 'tech', name: '技术', color: 'blue' },
-          { id: 'self-help', name: '自我提升', color: 'green' },
+          { id: 'fiction', name: 'Fiction', color: 'purple' },
+          { id: 'tech', name: 'Tech', color: 'blue' },
+          { id: 'self-help', name: 'Self-improvement', color: 'green' },
         ]
       },
-      { id: 'startDate', name: '开始阅读', type: 'date' },
-      { id: 'finishDate', name: '完成阅读', type: 'date' },
+      { id: 'startDate', name: 'Start reading', type: 'date' },
+      { id: 'finishDate', name: 'Finish reading', type: 'date' },
     ],
     views: [
-      { id: 'table', name: '表格', type: 'table' },
-      { id: 'kanban', name: '看板', type: 'kanban', groupBy: 'status' }
+      { id: 'table', name: 'Table', type: 'table' },
+      { id: 'kanban', name: 'Kanban', type: 'kanban', groupBy: 'status' }
     ],
   }
 };

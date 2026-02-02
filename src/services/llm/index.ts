@@ -46,6 +46,7 @@ export {
 import type { Message, LLMOptions, LLMResponse, LLMStream, LLMConfig } from "./types";
 import { getLLMConfig } from "./config";
 import { createProvider } from "./factory";
+import { getCurrentTranslations } from "@/stores/useLocaleStore";
 
 // 导出 Router
 export { IntentRouter, intentRouter } from "./router";
@@ -102,7 +103,8 @@ export async function callLLM(
     }
   }
 
-  throw lastError || new Error("未知错误");
+  const t = getCurrentTranslations();
+  throw lastError || new Error(t.common.unknownError);
 }
 
 /**

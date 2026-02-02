@@ -13,6 +13,7 @@ import {
   Lock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLocaleStore } from '@/stores/useLocaleStore';
 
 interface AddressBarProps {
   url: string;
@@ -48,6 +49,7 @@ export function AddressBar({
   className,
   searchEngine = 'bing',
 }: AddressBarProps) {
+  const { t } = useLocaleStore();
   const [inputValue, setInputValue] = useState(url);
   const [isFocused, setIsFocused] = useState(false);
   const [originalUrl, setOriginalUrl] = useState(url);
@@ -151,7 +153,7 @@ export function AddressBar({
               ? "hover:bg-accent text-foreground" 
               : "text-muted-foreground cursor-not-allowed"
           )}
-          title="后退"
+          title={t.browser.back}
         >
           <ArrowLeft size={14} />
         </button>
@@ -165,7 +167,7 @@ export function AddressBar({
               ? "hover:bg-accent text-foreground" 
               : "text-muted-foreground cursor-not-allowed"
           )}
-          title="前进"
+          title={t.browser.forward}
         >
           <ArrowRight size={14} />
         </button>
@@ -176,7 +178,7 @@ export function AddressBar({
             "p-1 rounded-md hover:bg-accent transition-colors",
             isLoading && "animate-spin"
           )}
-          title="刷新"
+          title={t.browser.refresh}
         >
           <RotateCw size={14} />
         </button>
@@ -185,7 +187,7 @@ export function AddressBar({
           <button
             onClick={onHome}
             className="p-1 rounded-md hover:bg-accent transition-colors"
-            title="主页"
+            title={t.browser.home}
           >
             <Home size={14} />
           </button>
@@ -220,7 +222,7 @@ export function AddressBar({
             setTimeout(() => inputRef.current?.select(), 0);
           }}
           onBlur={() => setIsFocused(false)}
-          placeholder="搜索或输入网址"
+          placeholder={t.browser.addressPlaceholder}
           className="flex-1 bg-transparent outline-none text-xs"
         />
         
@@ -228,7 +230,7 @@ export function AddressBar({
         <button
           onClick={handleNavigate}
           className="p-0.5 rounded hover:bg-accent transition-colors"
-          title="前往"
+          title={t.browser.go}
         >
           <Search size={12} className="text-muted-foreground" />
         </button>

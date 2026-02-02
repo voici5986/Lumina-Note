@@ -63,17 +63,21 @@ function getTextFromContent(content: MessageContent): string {
     .join('\n');
 }
 
-function generateSessionTitleFromMessages(messages: Message[], fallback: string = "新对话"): string {
+function generateSessionTitleFromMessages(messages: Message[], fallback?: string): string {
+  const t = getCurrentTranslations();
+  const finalFallback = fallback ?? t.common.newConversation;
   const firstUser = messages.find((m) => m.role === "user");
-  if (!firstUser || !firstUser.content) return fallback;
+  if (!firstUser || !firstUser.content) return finalFallback;
   const raw = getTextFromContent(firstUser.content).replace(/\s+/g, " ").trim();
-  if (!raw) return fallback;
+  if (!raw) return finalFallback;
   const maxLen = 20;
   return raw.length > maxLen ? `${raw.slice(0, maxLen)}...` : raw;
 }
 
-function generateTitleFromAssistantContent(content: string, fallback: string = "新对话"): string {
-  if (!content) return fallback;
+function generateTitleFromAssistantContent(content: string, fallback?: string): string {
+  const t = getCurrentTranslations();
+  const finalFallback = fallback ?? t.common.newConversation;
+  if (!content) return finalFallback;
   // 去掉思维标签等包裹内容
   const cleaned = content
     .replace(/```[\s\S]*?```/g, "")
@@ -81,12 +85,12 @@ function generateTitleFromAssistantContent(content: string, fallback: string = "
     .replace(/[#>*\-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  if (!cleaned) return fallback;
+  if (!cleaned) return finalFallback;
   const firstSentenceEnd = cleaned.search(/[。.!？?]/);
   const base = firstSentenceEnd > 0 ? cleaned.slice(0, firstSentenceEnd) : cleaned;
   const maxLen = 20;
   const result = base.length > maxLen ? `${base.slice(0, maxLen)}...` : base;
-  return result || fallback;
+  return result || finalFallback;
 }
 
 interface AIState {
@@ -179,11 +183,12 @@ export const useAIStore = create<AIState>()(
   currentSessionId: null,
             // Session management
             createSession: (title) => {
+              const t = getCurrentTranslations();
               const createdAt = Date.now();
               const id = `chat-${createdAt}`;
               const session: ChatSession = {
                 id,
-                title: title || "新对话",
+                title: title || t.common.newConversation,
                 createdAt,
                 updatedAt: createdAt,
                 messages: [],
@@ -300,11 +305,12 @@ export const useAIStore = create<AIState>()(
       // Send message
       sendMessage: async (content, currentFile, displayContent) => {
         const { referencedFiles, currentSessionId } = get();
+        const t = getCurrentTranslations();
         // 使用内存中的配置（已解密），而不是 store 中可能未同步的配置
         const config = getAIConfig();
 
         if (!config.apiKey && config.provider !== "ollama") {
-          set({ error: "请先在设置中配置 API Key" });
+          set({ error: t.ai.apiKeyRequired });
           return;
         }
 
@@ -323,7 +329,7 @@ export const useAIStore = create<AIState>()(
         set((state) => {
           // 使用 state.messages 而不是闭包中的 messages，确保获取最新状态
           const newMessages = [...state.messages, userMessage];
-          const newTitle = generateSessionTitleFromMessages(newMessages, "新对话");
+          const newTitle = generateSessionTitleFromMessages(newMessages, t.common.newConversation);
           return {
             messages: newMessages,
             error: null,
@@ -331,7 +337,7 @@ export const useAIStore = create<AIState>()(
               s.id === state.currentSessionId
                 ? {
                     ...s,
-                    title: s.title === "新对话" ? newTitle : s.title,
+                    title: s.title === t.common.newConversation ? newTitle : s.title,
                     messages: newMessages,
                     updatedAt: Date.now(),
                   }
@@ -406,7 +412,7 @@ export const useAIStore = create<AIState>()(
           set((state) => {
             const assistantMessage: Message = { role: "assistant", content: response.content };
             const newMessages = [...state.messages, assistantMessage];
-            const newTitle = generateTitleFromAssistantContent(response.content, "新对话");
+            const newTitle = generateTitleFromAssistantContent(response.content, t.common.newConversation);
             
             return {
               messages: newMessages,
@@ -418,7 +424,7 @@ export const useAIStore = create<AIState>()(
                 s.id === state.currentSessionId
                   ? {
                       ...s,
-                      title: s.title === "新对话" ? newTitle : s.title,
+                      title: s.title === t.common.newConversation ? newTitle : s.title,
                       messages: newMessages,
                       updatedAt: Date.now(),
                     }
@@ -466,7 +472,7 @@ export const useAIStore = create<AIState>()(
             },
           });
           set({
-            error: error instanceof Error ? error.message : "发送消息失败",
+            error: error instanceof Error ? error.message : t.ai.sendFailed,
             isLoading: false,
           });
         }
@@ -476,6 +482,7 @@ export const useAIStore = create<AIState>()(
       sendMessageStream: async (content, currentFile, displayContent, images) => {
         const { referencedFiles, currentSessionId } = get();
         const runtimeConfig = getAIConfig();
+        const t = getCurrentTranslations();
 
         // 构建用户消息内容（支持多模态）
         let userMessageContent: MessageContent;
@@ -511,7 +518,7 @@ export const useAIStore = create<AIState>()(
         set((state) => {
           // 使用 state.messages 而不是闭包中的 messages，确保获取最新状态
           const newMessages = [...state.messages, userMessage];
-          const newTitle = generateSessionTitleFromMessages(newMessages, "新对话");
+          const newTitle = generateSessionTitleFromMessages(newMessages, t.common.newConversation);
           return {
             messages: newMessages,
             streamingContent: "",
@@ -521,7 +528,7 @@ export const useAIStore = create<AIState>()(
               s.id === state.currentSessionId
                 ? {
                     ...s,
-                    title: s.title === "新对话" ? newTitle : s.title,
+                    title: s.title === t.common.newConversation ? newTitle : s.title,
                     messages: newMessages,
                     updatedAt: Date.now(),
                   }
@@ -534,7 +541,7 @@ export const useAIStore = create<AIState>()(
         set({ isStreaming: true, streamingContent: "", streamingReasoning: "" });
 
         if (!runtimeConfig.apiKey && runtimeConfig.provider !== "ollama") {
-          set({ error: "请先在设置中配置 API Key" });
+          set({ error: t.ai.apiKeyRequired });
           return;
         }
 
@@ -546,7 +553,6 @@ export const useAIStore = create<AIState>()(
           }
 
           // Build messages with context - 使用国际化提示词
-          const t = getCurrentTranslations();
           const chatPrompt = t.prompts.chat;
           const basePrompt = chatPrompt.system;
           
@@ -635,7 +641,7 @@ export const useAIStore = create<AIState>()(
           set((state) => {
             const assistantMessage: Message = { role: "assistant", content: finalContent };
             const newMessages = [...state.messages, assistantMessage];
-            const newTitle = generateTitleFromAssistantContent(finalContent, "新对话");
+            const newTitle = generateTitleFromAssistantContent(finalContent, t.common.newConversation);
             return {
               messages: newMessages,
               pendingEdits: edits.length > 0 ? edits : state.pendingEdits,
@@ -646,7 +652,7 @@ export const useAIStore = create<AIState>()(
                 s.id === state.currentSessionId
                   ? {
                       ...s,
-                      title: s.title === "新对话" ? newTitle : s.title,
+                      title: s.title === t.common.newConversation ? newTitle : s.title,
                       messages: newMessages,
                       updatedAt: Date.now(),
                     }
@@ -682,7 +688,7 @@ export const useAIStore = create<AIState>()(
           }
         } catch (error) {
           set({
-            error: error instanceof Error ? error.message : "发送消息失败",
+            error: error instanceof Error ? error.message : t.ai.sendFailed,
             isStreaming: false,
           });
         }

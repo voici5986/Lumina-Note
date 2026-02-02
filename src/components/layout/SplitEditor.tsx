@@ -4,6 +4,7 @@ import { useUIStore } from "@/stores/useUIStore";
 import { useSplitStore } from "@/stores/useSplitStore";
 import { usePDFAnnotationStore } from "@/stores/usePDFAnnotationStore";
 import { usePDFStore } from "@/stores/usePDFStore";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 import { CodeMirrorEditor, ViewMode } from "@/editor/CodeMirrorEditor";
 import { PDFViewer } from "@/components/pdf/PDFViewer";
 import { getFileName, cn } from "@/lib/utils";
@@ -34,6 +35,7 @@ function EditorPane({
   onClose,
 }: EditorPaneProps) {
   const { editorMode } = useUIStore();
+  const { t } = useLocaleStore();
 
   if (isLoading) {
     return (
@@ -47,8 +49,8 @@ function EditorPane({
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
         <FileText size={32} className="opacity-30 mb-2" />
-        <p className="text-sm">选择一个文件</p>
-        <p className="text-xs opacity-70">从侧边栏拖放或双击打开</p>
+        <p className="text-sm">{t.layout.emptyFileTitle}</p>
+        <p className="text-xs opacity-70">{t.layout.emptyFileHint}</p>
       </div>
     );
   }
@@ -63,14 +65,14 @@ function EditorPane({
             {getFileName(file)}
           </span>
           {isDirty && (
-            <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0" title="未保存" />
+            <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0" title={t.layout.unsaved} />
           )}
         </div>
         {onClose && (
           <button
             onClick={onClose}
             className="p-1 hover:bg-accent rounded transition-colors text-muted-foreground hover:text-foreground"
-            title="关闭此面板"
+            title={t.layout.closePanel}
           >
             <X size={14} />
           </button>
@@ -92,6 +94,7 @@ function EditorPane({
 }
 
 export function SplitEditor() {
+  const { t } = useLocaleStore();
   const {
     currentFile,
     currentContent,
@@ -209,14 +212,14 @@ export function SplitEditor() {
             "p-1.5 rounded transition-colors",
             "hover:bg-accent text-muted-foreground hover:text-foreground"
           )}
-          title={isHorizontal ? "垂直分屏" : "水平分屏"}
+          title={isHorizontal ? t.layout.verticalSplit : t.layout.horizontalSplit}
         >
           {isHorizontal ? <Rows size={14} /> : <Columns size={14} />}
         </button>
         <button
           onClick={toggleSplitView}
           className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-          title="关闭分屏"
+          title={t.layout.closeSplit}
         >
           <X size={14} />
         </button>
@@ -297,7 +300,7 @@ export function SplitEditor() {
               <button
                 onClick={closeSecondary}
                 className="absolute top-2 right-2 z-10 p-1 bg-background/80 hover:bg-accent rounded transition-colors text-muted-foreground hover:text-foreground"
-                title="关闭此面板"
+                title={t.layout.closePanel}
               >
                 <X size={14} />
               </button>

@@ -8,6 +8,7 @@
  */
 
 import { Theme, ThemeColors, applyTheme, OFFICIAL_THEMES } from './themes';
+import { getCurrentTranslations } from '@/stores/useLocaleStore';
 import { invoke } from '@tauri-apps/api/core';
 
 // 用户主题存储目录（相对于 vault）
@@ -229,11 +230,12 @@ export function importTheme(jsonString: string): Theme | null {
  */
 export function createThemeTemplate(basedOn?: Theme): Theme {
   const base = basedOn || OFFICIAL_THEMES[0];
+  const t = getCurrentTranslations();
   
   return {
     id: `custom-${Date.now()}`,
-    name: '我的主题',
-    description: '自定义主题',
+    name: t.themeEditor.defaultThemeName,
+    description: t.themeEditor.defaultThemeDescription,
     light: { ...base.light },
     dark: { ...base.dark }
   };

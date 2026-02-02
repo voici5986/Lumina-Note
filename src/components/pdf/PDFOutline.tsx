@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { pdfjs } from "react-pdf";
 import { ChevronRight, ChevronDown, BookOpen, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 interface OutlineItem {
   title: string;
@@ -82,6 +83,7 @@ export function PDFOutline({
   onPageClick,
   className,
 }: PDFOutlineProps) {
+  const { t } = useLocaleStore();
   const [outline, setOutline] = useState<OutlineItem[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [pdfDoc, setPdfDoc] = useState<pdfjs.PDFDocumentProxy | null>(null);
@@ -165,7 +167,7 @@ export function PDFOutline({
     return (
       <div className={cn("flex flex-col items-center justify-center py-8 text-muted-foreground", className)}>
         <BookOpen size={24} className="mb-2 opacity-50" />
-        <span className="text-sm">暂无目录</span>
+        <span className="text-sm">{t.pdfViewer.outlineEmpty}</span>
       </div>
     );
   }

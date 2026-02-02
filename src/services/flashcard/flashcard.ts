@@ -10,6 +10,7 @@ import {
   FLASHCARD_DATABASE_COLUMNS 
 } from '@/types/flashcard';
 import { INITIAL_SM2_STATE } from './sm2';
+import { getCurrentTranslations } from '@/stores/useLocaleStore';
 
 // ==================== 填空语法解析 ====================
 
@@ -216,6 +217,7 @@ export function yamlToCard(yaml: Record<string, any>, notePath: string): Flashca
  * 生成卡片笔记的 Markdown 内容
  */
 export function generateCardMarkdown(card: Partial<Flashcard>): string {
+  const t = getCurrentTranslations();
   const yaml = cardToYaml(card);
   
   // 构建 YAML frontmatter
@@ -236,11 +238,11 @@ export function generateCardMarkdown(card: Partial<Flashcard>): string {
   
   // 添加卡片内容作为笔记正文（方便阅读）
   if (card.type === 'basic' || card.type === 'basic-reversed') {
-    yamlLines.push(`## Q: ${card.front}`);
+    yamlLines.push(`## ${t.flashcard.markdownQuestionPrefix} ${card.front}`);
     yamlLines.push('');
     yamlLines.push(card.back || '');
   } else if (card.type === 'cloze') {
-    yamlLines.push('## 填空');
+    yamlLines.push(`## ${t.flashcard.markdownClozeTitle}`);
     yamlLines.push('');
     yamlLines.push(card.text || '');
   } else if (card.type === 'mcq') {
@@ -262,7 +264,7 @@ export function generateCardMarkdown(card: Partial<Flashcard>): string {
   if (card.source) {
     yamlLines.push('');
     yamlLines.push(`---`);
-    yamlLines.push(`来源: ${card.source}`);
+    yamlLines.push(`${t.flashcard.markdownSourceLabel}: ${card.source}`);
   }
   
   return yamlLines.join('\n');
@@ -300,15 +302,32 @@ export function generateCardFilename(card: Partial<Flashcard>): string {
  * 获取 Flashcard 数据库定义
  */
 export function getFlashcardDatabaseTemplate() {
+  const t = getCurrentTranslations();
+  const templateContent = t.database.templateContent?.flashcard;
+  const templateMeta = t.database.createDialog?.templates?.flashcard;
+  const columns = FLASHCARD_DATABASE_COLUMNS.map((col) => {
+    const localizedName = templateContent?.columns?.[col.id as keyof typeof templateContent.columns];
+    const optionNames = templateContent?.options?.[col.id as keyof typeof templateContent.options];
+    const options = col.options?.map((opt) => ({
+      ...opt,
+      name: optionNames?.[opt.id as keyof typeof optionNames] || opt.name,
+    }));
+    return {
+      ...col,
+      name: localizedName || col.name,
+      options,
+    };
+  });
+
   return {
     id: 'flashcards',
-    name: '闪卡',
+    name: t.flashcard.decks,
     icon: '🎴',
-    description: 'AI 制卡与间隔重复学习',
-    columns: FLASHCARD_DATABASE_COLUMNS,
+    description: templateMeta?.desc || '',
+    columns,
     views: [
-      { id: 'table', name: '表格', type: 'table' as const },
-      { id: 'kanban', name: '牌组', type: 'kanban' as const, groupBy: 'deck' },
+      { id: 'table', name: templateContent?.views?.table || 'Table', type: 'table' as const },
+      { id: 'kanban', name: templateContent?.views?.kanban || 'Kanban', type: 'kanban' as const, groupBy: 'deck' },
     ],
     activeViewId: 'table',
     createdAt: new Date().toISOString(),

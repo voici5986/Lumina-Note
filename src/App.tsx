@@ -29,6 +29,7 @@ import { TypesettingDocumentPane } from "@/components/typesetting/TypesettingDoc
 import { TypesettingExportHarness } from "@/components/typesetting/TypesettingExportHarness";
 import { useAIStore } from "@/stores/useAIStore";
 import { initRustAgentListeners } from "@/stores/useRustAgentStore";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 import { saveFile } from "@/lib/tauri";
 import { TitleBar } from "@/components/layout/TitleBar";
 import { VoiceInputBall } from "@/components/ai/VoiceInputBall";
@@ -110,9 +111,9 @@ function DiffViewWrapper() {
       }
     } catch (error) {
       console.error("Failed to apply edit:", error);
-      alert(`❌ 应用修改失败: ${error}`);
+      alert(`❌ ${t.ai.applyEditFailed}: ${error}`);
     }
-  }, [pendingDiff, clearPendingEdits, openFile, diffResolver]);
+  }, [pendingDiff, clearPendingEdits, openFile, diffResolver, t]);
 
   const handleReject = useCallback(() => {
     setPendingDiff(null);
@@ -155,6 +156,7 @@ function App() {
   const { pendingDiff } = useAIStore();
   const { buildIndex } = useNoteIndexStore();
   const { initialize: initializeRAG, config: ragConfig } = useRAGStore();
+  const { t } = useLocaleStore();
 
   // Get active tab
   const activeTab = activeTabIndex >= 0 ? tabs[activeTabIndex] : null;
@@ -488,7 +490,7 @@ function App() {
     const selected = await open({
       directory: true,
       multiple: false,
-      title: "选择笔记文件夹",
+      title: t.welcome.openFolder,
     });
 
     if (selected && typeof selected === "string") {
@@ -729,7 +731,7 @@ function App() {
             <button
               onClick={toggleRightSidebar}
               className="absolute top-1/2 -translate-y-1/2 z-10 right-1 w-7 h-7 bg-background/55 backdrop-blur-md border border-border/60 shadow-ui-card ui-icon-btn"
-              title="展开右侧栏"
+              title={t.layout.expandRightPanel}
             >
               <PanelRight className="w-4 h-4 text-muted-foreground" />
             </button>
@@ -789,7 +791,7 @@ function App() {
               onClick={() => setEvalPanelOpen(false)}
               className="px-4 py-2 bg-muted rounded hover:bg-muted/80"
             >
-              ✕ 关闭 (Esc)
+              ✕ {t.common.close} (Esc)
             </button>
           </div>
           <AgentEvalPanel />
@@ -804,7 +806,7 @@ function App() {
               onClick={() => setCodexPanelOpen(false)}
               className="px-4 py-2 bg-muted rounded hover:bg-muted/80"
             >
-              âœ?å…³é—­ (Esc)
+              ✕ {t.common.close} (Esc)
             </button>
           </div>
           <CodexVscodeHostPanel onClose={() => setCodexPanelOpen(false)} />

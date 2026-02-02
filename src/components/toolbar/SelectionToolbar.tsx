@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { MessageSquarePlus, Video, Sparkles } from "lucide-react";
+import { MessageSquarePlus, Video, Sparkles, Languages } from "lucide-react";
 import { useAIStore } from "@/stores/useAIStore";
 import { useFileStore } from "@/stores/useFileStore";
 import { callLLM, type Message } from '@/services/llm';
@@ -131,8 +131,8 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
     
     // 获取当前文件名
     const fileName = currentFile 
-      ? currentFile.split(/[/\\]/).pop()?.replace(".md", "") || "未知"
-      : "未知";
+      ? currentFile.split(/[/\\]/).pop()?.replace(".md", "") || t.selectionToolbar.unknown
+      : t.selectionToolbar.unknown;
     
     addTextSelection(selectedText, fileName, currentFile || undefined);
     
@@ -151,15 +151,11 @@ export function SelectionToolbar({ containerRef }: SelectionToolbarProps) {
       const messages: Message[] = [
         {
           role: "system",
-          content:
-            "你是一个翻译助手。",
+          content: t.selectionToolbar.prompts.translateSystem,
         },
         {
           role: "user",
-          content: `原文：
-${text}
-
-要求：根据原文主要语言，在中英文之间互译。如果原文主要是中文则翻译成自然流畅的英文；如果主要是英文则翻译成自然流畅的中文。只返回译文本身，使用合适的分行，不要解释。`,
+          content: t.selectionToolbar.prompts.translateUser.replace('{text}', text),
         },
       ];
 
@@ -175,14 +171,14 @@ ${text}
         })
         .join("\n");
 
-      const calloutBlock = `\n\n> [!info] 翻译\n${calloutBody}\n\n`;
+      const calloutBlock = `\n\n> [!info] ${t.selectionToolbar.translateTitle}\n${calloutBody}\n\n`;
 
       window.dispatchEvent(
         new CustomEvent("selection-ai-edit", {
           detail: {
             mode: "append_callout",
             text: calloutBlock,
-            description: "选区翻译",
+            description: t.selectionToolbar.selectionTranslate,
           },
         })
       );
@@ -192,7 +188,7 @@ ${text}
       setSelectedText("");
     } catch (error) {
       console.error("Failed to translate selection:", error);
-      alert("翻译失败，请检查 AI 设置或稍后再试。");
+      alert(t.selectionToolbar.translateFailed);
     } finally {
       setIsTranslating(false);
     }
@@ -207,15 +203,11 @@ ${text}
       const messages: Message[] = [
         {
           role: "system",
-          content:
-            "你是一个写作润色助手。",
+          content: t.selectionToolbar.prompts.polishSystem,
         },
         {
           role: "user",
-          content: `原文：
-${text}
-
-要求：在保持原意不变的前提下，优化文本。提高表达清晰度和流畅度，修正语法和用词问题，语言保持与原文一致（中文就用中文，英文就用英文）。只返回润色后的文本，不要解释。`,
+          content: t.selectionToolbar.prompts.polishUser.replace('{text}', text),
         },
       ];
 
@@ -228,7 +220,7 @@ ${text}
           detail: {
             mode: "replace_selection",
             text: polished,
-            description: "选区润色",
+            description: t.selectionToolbar.selectionPolish,
           },
         })
       );
@@ -238,7 +230,7 @@ ${text}
       setSelectedText("");
     } catch (error) {
       console.error("Failed to polish selection:", error);
-      alert("润色失败，请检查 AI 设置或稍后再试。");
+      alert(t.selectionToolbar.polishFailed);
     } finally {
       setIsPolishing(false);
     }
@@ -253,15 +245,11 @@ ${text}
       const messages: Message[] = [
         {
           role: "system",
-          content:
-            "你是一个任务提取助手。",
+          content: t.selectionToolbar.prompts.todoSystem,
         },
         {
           role: "user",
-          content: `文本内容：
-${text}
-
-要求：从上述文本中提取清晰、可执行的待办事项，输出 Markdown 任务列表，每一项使用 \`- [ ]\` 开头；如果没有合理的待办事项，请输出一条 \`- [ ] 暂无明确待办\`。只返回任务列表，不要解释。`,
+          content: t.selectionToolbar.prompts.todoUser.replace('{text}', text),
         },
       ];
 
@@ -277,14 +265,14 @@ ${text}
         })
         .join("\n");
 
-      const calloutBlock = `\n\n> [!tip] 待办清单\n${calloutBody}\n\n`;
+      const calloutBlock = `\n\n> [!tip] ${t.selectionToolbar.todoTitle}\n${calloutBody}\n\n`;
 
       window.dispatchEvent(
         new CustomEvent("selection-ai-edit", {
           detail: {
             mode: "append_callout",
             text: calloutBlock,
-            description: "生成待办清单",
+            description: t.selectionToolbar.generateTodo,
           },
         })
       );
@@ -294,7 +282,7 @@ ${text}
       setSelectedText("");
     } catch (error) {
       console.error("Failed to generate todos from selection:", error);
-      alert("生成待办清单失败，请检查 AI 设置或稍后再试。");
+      alert(t.selectionToolbar.todoFailed);
     } finally {
       setIsTodoing(false);
     }
@@ -309,15 +297,11 @@ ${text}
       const messages: Message[] = [
         {
           role: "system",
-          content:
-            "你是一个笔记助手。",
+          content: t.selectionToolbar.prompts.summarySystem,
         },
         {
           role: "user",
-          content: `文本内容：
-${text}
-
-要求：对上述文本生成简洁的要点式总结，使用中文，输出为 Markdown 列表，不要额外解释。`,
+          content: t.selectionToolbar.prompts.summaryUser.replace('{text}', text),
         },
       ];
 
@@ -337,7 +321,7 @@ ${text}
         })
         .join("\n");
 
-      const calloutBlock = `\n\n> [!summary] 总结\n${calloutBody}\n\n`;
+      const calloutBlock = `\n\n> [!summary] ${t.selectionToolbar.summaryTitle}\n${calloutBody}\n\n`;
 
       // 通过事件交给编辑器，由编辑器构造 diff
       window.dispatchEvent(
@@ -345,7 +329,7 @@ ${text}
           detail: {
             mode: "append_callout",
             text: calloutBlock,
-            description: "选区总结",
+            description: t.selectionToolbar.selectionSummary,
           },
         })
       );
@@ -356,7 +340,7 @@ ${text}
       setSelectedText("");
     } catch (error) {
       console.error("Failed to summarize selection:", error);
-      alert("生成总结失败，请检查 AI 设置或稍后再试。");
+      alert(t.selectionToolbar.summaryFailed);
     } finally {
       setIsSummarizing(false);
     }
@@ -367,7 +351,7 @@ ${text}
 
     // 直接利用现有解析逻辑：允许用户选中完整的视频笔记 Markdown 段落
     // 若解析失败，底层会降级为普通空视频标签
-    openVideoNoteFromContent(selectedText, "视频笔记");
+    openVideoNoteFromContent(selectedText, t.selectionToolbar.videoNote);
 
     window.getSelection()?.removeAllRanges();
     setPosition(null);
@@ -393,7 +377,7 @@ ${text}
           title={t.selectionToolbar.addToChat}
         >
           <MessageSquarePlus size={13} />
-          <span>Add to Chat</span>
+          <span>{t.selectionToolbar.addToChat}</span>
         </button>
         <button
           onClick={handleSummarize}
@@ -402,7 +386,7 @@ ${text}
           title={t.selectionToolbar.selectionSummary}
         >
           <Sparkles size={13} className={isSummarizing ? "animate-spin" : ""} />
-          <span>Summary</span>
+          <span>{t.selectionToolbar.summary}</span>
         </button>
         <button
           onClick={handleTranslate}
@@ -410,8 +394,8 @@ ${text}
           className="flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-medium text-foreground hover:bg-accent rounded transition-colors whitespace-nowrap disabled:opacity-60 disabled:cursor-wait"
           title={t.selectionToolbar.selectionTranslate}
         >
-          <span className={isTranslating ? "animate-spin" : ""}>译</span>
-          <span>Translate</span>
+          <Languages size={13} className={isTranslating ? "animate-spin" : ""} />
+          <span>{t.selectionToolbar.translate}</span>
         </button>
         <button
           onClick={handlePolish}
@@ -420,7 +404,7 @@ ${text}
           title={t.selectionToolbar.selectionPolish}
         >
           <span className={isPolishing ? "animate-spin" : ""}>✎</span>
-          <span>Polish</span>
+          <span>{t.selectionToolbar.polish}</span>
         </button>
         <button
           onClick={handleTodo}
@@ -429,7 +413,7 @@ ${text}
           title={t.selectionToolbar.generateTodo}
         >
           <span className={isTodoing ? "animate-spin" : ""}>☑</span>
-          <span>Todos</span>
+          <span>{t.selectionToolbar.todos}</span>
         </button>
         <button
           onClick={handleOpenAsVideoNote}
@@ -437,7 +421,7 @@ ${text}
           title={t.selectionToolbar.videoNote}
         >
           <Video size={13} />
-          <span>Video Note</span>
+          <span>{t.selectionToolbar.videoNote}</span>
         </button>
       </div>
       {/* 左侧小三角指向选中文字 */}

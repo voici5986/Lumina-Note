@@ -2,8 +2,11 @@ import { motion } from "framer-motion";
 import { Keyboard, Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Kbd } from "@/components/ui/kbd";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 export function OverviewDashboard() {
+  const { t } = useLocaleStore();
+
   return (
     <div className="flex-1 ui-app-bg overflow-auto">
       <div className="mx-auto w-full max-w-6xl px-6 py-10 min-h-full flex items-center justify-center">
@@ -17,17 +20,17 @@ export function OverviewDashboard() {
             <Card className="md:col-span-7 ui-card-hover">
               <CardHeader className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-primary" />
-                <CardTitle>概览</CardTitle>
+                <CardTitle>{t.overview.title}</CardTitle>
               </CardHeader>
               <CardContent className="pt-3">
                 <div className="space-y-2">
                   <p className="text-[15px] font-medium text-foreground">
-                    从侧边栏选择一个笔记开始编辑
+                    {t.overview.getStarted}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    或按 <Kbd>Ctrl</Kbd>
+                    {t.overview.createHintPrefix} <Kbd>Ctrl</Kbd>
                     <span className="px-1 opacity-70">+</span>
-                    <Kbd>N</Kbd> 创建新笔记
+                    <Kbd>N</Kbd> {t.overview.createHintSuffix}
                   </p>
                 </div>
               </CardContent>
@@ -36,24 +39,24 @@ export function OverviewDashboard() {
             <Card className="md:col-span-5 ui-card-hover">
               <CardHeader className="flex items-center gap-2">
                 <Keyboard className="w-4 h-4 text-primary" />
-                <CardTitle>快捷键</CardTitle>
+                <CardTitle>{t.overview.shortcutsTitle}</CardTitle>
               </CardHeader>
               <CardContent className="pt-3">
                 <div className="grid grid-cols-1 gap-2 text-sm">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">命令面板</span>
+                    <span className="text-muted-foreground">{t.overview.commandPalette}</span>
                     <Kbd>Ctrl+P</Kbd>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">快速打开</span>
+                    <span className="text-muted-foreground">{t.overview.quickOpen}</span>
                     <Kbd>Ctrl+O</Kbd>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">全局搜索</span>
+                    <span className="text-muted-foreground">{t.overview.globalSearch}</span>
                     <Kbd>Ctrl+Shift+F</Kbd>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">保存</span>
+                    <span className="text-muted-foreground">{t.overview.save}</span>
                     <Kbd>Ctrl+S</Kbd>
                   </div>
                 </div>

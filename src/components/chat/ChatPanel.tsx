@@ -9,6 +9,7 @@ import { useAIStore } from "@/stores/useAIStore";
 import { parseMarkdown } from "@/services/markdown/markdown";
 import { useFileStore } from "@/stores/useFileStore";
 import { EditSuggestion, applyEdit } from "@/services/ai/ai";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 import {
   Send,
   X,
@@ -69,6 +70,7 @@ function EditCard({
   onApply: () => void; 
   onReject: () => void;
 }) {
+  const { t } = useLocaleStore();
   const diff = useMemo(() => {
     return diffLines(edit.originalContent, edit.newContent);
   }, [edit.originalContent, edit.newContent]);
@@ -84,14 +86,14 @@ function EditCard({
           <button
             onClick={onApply}
             className="px-2 py-1 rounded bg-primary/20 text-primary hover:bg-primary/30 transition-colors text-xs font-medium"
-            title="预览修改"
+            title={t.ai.editPreview}
           >
-            预览
+            {t.ai.preview}
           </button>
           <button
             onClick={onReject}
             className="p-1 rounded bg-red-500/20 text-red-600 hover:bg-red-500/30 transition-colors"
-            title="忽略"
+            title={t.ai.ignore}
           >
             <X size={14} />
           </button>
@@ -148,6 +150,7 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
     setPendingDiff,
   } = useAIStore();
   const { currentFile, currentContent } = useFileStore();
+  const { t } = useLocaleStore();
   
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -219,7 +222,7 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
         });
       }
     } else {
-      alert("❌ 找不到要修改的文件");
+      alert(t.ai.editFileNotFound);
     }
   }, [referencedFiles, currentFileInfo, setPendingDiff]);
 
@@ -228,7 +231,7 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
       {/* Context indicator - shows which file(s) will be sent to AI */}
       {!compact && (
         <div className="p-2 border-b border-border">
-          <div className="text-xs text-muted-foreground mb-1">上下文:</div>
+          <div className="text-xs text-muted-foreground mb-1">{t.ai.contextLabel}</div>
           <div className="flex flex-wrap gap-1">
             {referencedFiles.length > 0 ? (
               referencedFiles.map((file) => (
@@ -247,10 +250,10 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
               <span className="inline-flex items-center gap-1 text-xs bg-muted text-muted-foreground px-2 py-1 rounded">
                 <FileText size={10} />
                 {currentFileInfo.name}
-                <span className="text-[10px] opacity-60">(自动)</span>
+                <span className="text-[10px] opacity-60">({t.common.auto})</span>
               </span>
             ) : (
-              <span className="text-xs text-muted-foreground/60">无文件</span>
+              <span className="text-xs text-muted-foreground/60">{t.ai.noContextFiles}</span>
             )}
           </div>
         </div>
@@ -261,8 +264,8 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
         {/* Welcome message */}
         {messages.length === 0 && (
           <div className="text-sm text-muted-foreground leading-relaxed">
-            <p>你好！我可以帮你编辑笔记。</p>
-            {!compact && <p className="mt-2 text-xs opacity-70">当前笔记会自动作为上下文</p>}
+            <p>{t.ai.welcomeEdit}</p>
+            {!compact && <p className="mt-2 text-xs opacity-70">{t.ai.currentNoteContextHint}</p>}
           </div>
         )}
 
@@ -287,7 +290,7 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
         {pendingEdits.length > 0 && (
           <div className="space-y-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
             <p className="text-xs font-semibold text-yellow-600 dark:text-yellow-400">
-              📝 待确认的修改 ({pendingEdits.length})
+              📝 {t.ai.pendingEdits.replace('{count}', String(pendingEdits.length))}
             </p>
             {pendingEdits.map((edit, idx) => (
               <EditCard
@@ -343,10 +346,10 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
                 } : undefined);
               }}
               className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors"
-              title="重新生成"
+              title={t.ai.regenerate}
             >
               <RefreshCw size={12} />
-              重新生成
+              {t.ai.regenerate}
             </button>
           </div>
         )}
@@ -363,13 +366,13 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
             onChange={setInputValue}
             onSend={handleSendWithFiles}
             isLoading={isLoading || isStreaming}
-            placeholder="输入消息... (@ 引用文件)"
+            placeholder={t.ai.inputPlaceholder}
             rows={compact ? 2 : 2}
             hideSendButton={true}
           />
           <div className="flex items-center mt-2 gap-2">
             <div className="flex gap-2 items-center text-xs text-muted-foreground shrink-0">
-              <span>@ 添加文件</span>
+              <span>{t.ai.addFile}</span>
             </div>
             {/* 流式显示中间识别结果 */}
             <div className="flex-1 truncate text-sm text-foreground/70 italic">
@@ -384,7 +387,7 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
                     ? "bg-red-500/20 border-red-500 text-red-500"
                     : "bg-background border-border text-muted-foreground hover:bg-accent"
                 }`}
-                title={isRecording ? "停止语音输入" : "开始语音输入"}
+                title={isRecording ? t.ai.stopVoice : t.ai.startVoice}
               >
                 {isRecording && (
                   <span className="absolute inset-0 rounded-md animate-ping bg-red-500/30" />
@@ -399,7 +402,7 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
                     ? "bg-red-500 hover:bg-red-600 text-white" 
                     : "bg-primary hover:bg-primary/90 text-primary-foreground"
                 } disabled:opacity-50 rounded p-1.5 transition-colors flex items-center justify-center`}
-                title={(isLoading || isStreaming) ? "停止" : "发送"}
+                title={(isLoading || isStreaming) ? t.ai.stop : t.ai.send}
               >
                 {(isLoading || isStreaming) ? (
                   <Square size={14} fill="currentColor" />

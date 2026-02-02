@@ -5,6 +5,7 @@
 
 import type { EmbeddingResult, BatchEmbeddingResult, RAGConfig } from "./types";
 import { tauriFetch } from "@/lib/tauriFetch";
+import { getCurrentTranslations } from "@/stores/useLocaleStore";
 
 export class Embedder {
   private config: RAGConfig;
@@ -31,7 +32,10 @@ export class Embedder {
     } else if (this.config.embeddingProvider === "ollama") {
       return this.embedOllama(text);
     }
-    throw new Error(`不支持的 embedding 提供商: ${this.config.embeddingProvider}`);
+    const t = getCurrentTranslations();
+    throw new Error(
+      t.rag.errors.unsupportedProvider.replace('{provider}', String(this.config.embeddingProvider))
+    );
   }
 
   /**
@@ -47,7 +51,10 @@ export class Embedder {
     } else if (this.config.embeddingProvider === "ollama") {
       return this.embedBatchOllama(texts);
     }
-    throw new Error(`不支持的 embedding 提供商: ${this.config.embeddingProvider}`);
+    const t = getCurrentTranslations();
+    throw new Error(
+      t.rag.errors.unsupportedProvider.replace('{provider}', String(this.config.embeddingProvider))
+    );
   }
 
   /**
@@ -56,7 +63,8 @@ export class Embedder {
   private async embedOpenAI(text: string): Promise<EmbeddingResult> {
     const apiKey = this.config.embeddingApiKey;
     if (!apiKey) {
-      throw new Error("请配置 OpenAI API Key 用于 embedding");
+      const t = getCurrentTranslations();
+      throw new Error(t.rag.errors.missingOpenAIKey);
     }
 
     const baseUrl = this.config.embeddingBaseUrl || "https://api.openai.com/v1";
@@ -76,7 +84,8 @@ export class Embedder {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`OpenAI Embedding API 错误: ${error}`);
+      const t = getCurrentTranslations();
+      throw new Error(t.rag.errors.openaiError.replace('{error}', error));
     }
 
     const data = await response.json();
@@ -95,7 +104,8 @@ export class Embedder {
   private async embedBatchOpenAI(texts: string[]): Promise<BatchEmbeddingResult> {
     const apiKey = this.config.embeddingApiKey;
     if (!apiKey) {
-      throw new Error("请配置 OpenAI API Key 用于 embedding");
+      const t = getCurrentTranslations();
+      throw new Error(t.rag.errors.missingOpenAIKey);
     }
 
     const baseUrl = this.config.embeddingBaseUrl || "https://api.openai.com/v1";
@@ -125,7 +135,8 @@ export class Embedder {
 
       if (!response.ok) {
         const error = await response.text();
-        throw new Error(`OpenAI Embedding API 错误: ${error}`);
+        const t = getCurrentTranslations();
+        throw new Error(t.rag.errors.openaiError.replace('{error}', error));
       }
 
       const data = await response.json();
@@ -155,6 +166,8 @@ export class Embedder {
    * 旧版: /api/embeddings + prompt 字段 + embedding 单个返回
    */
   private async embedOllama(text: string): Promise<EmbeddingResult> {
+    const t = getCurrentTranslations();
+    const provider = "Ollama";
     const baseUrl = this.config.embeddingBaseUrl || "http://localhost:11434";
     
     // 如果已知 API 版本，直接使用
@@ -176,7 +189,11 @@ export class Embedder {
       });
 
       if (response.error) {
-        throw new Error(`Ollama Embedding API 错误: ${response.error}`);
+        throw new Error(
+          t.rag.errors.providerError
+            .replace("{provider}", provider)
+            .replace("{error}", String(response.error))
+        );
       }
 
       if (response.status === 404) {
@@ -191,7 +208,12 @@ export class Embedder {
         return { embedding: data.embeddings[0] };
       }
 
-      throw new Error(`Ollama Embedding API 错误 (${response.status}): ${response.body}`);
+      throw new Error(
+        t.rag.errors.providerErrorWithStatus
+          .replace("{provider}", provider)
+          .replace("{status}", String(response.status))
+          .replace("{error}", String(response.body))
+      );
     } catch (e) {
       // 网络错误或其他错误，尝试旧版
       if (this.ollamaApiVersion === null) {
@@ -207,6 +229,8 @@ export class Embedder {
    * Ollama 旧版 API (/api/embeddings)
    */
   private async embedOllamaLegacy(text: string, baseUrl: string): Promise<EmbeddingResult> {
+    const t = getCurrentTranslations();
+    const provider = "Ollama";
     const response = await tauriFetch({
       url: `${baseUrl}/api/embeddings`,
       method: "POST",
@@ -219,11 +243,20 @@ export class Embedder {
     });
 
     if (response.error) {
-      throw new Error(`Ollama Embedding API 错误: ${response.error}`);
+      throw new Error(
+        t.rag.errors.providerError
+          .replace("{provider}", provider)
+          .replace("{error}", String(response.error))
+      );
     }
 
     if (response.status < 200 || response.status >= 300) {
-      throw new Error(`Ollama Embedding API 错误 (${response.status}): ${response.body}`);
+      throw new Error(
+        t.rag.errors.providerErrorWithStatus
+          .replace("{provider}", provider)
+          .replace("{status}", String(response.status))
+          .replace("{error}", String(response.body))
+      );
     }
 
     const data = JSON.parse(response.body);
@@ -234,6 +267,8 @@ export class Embedder {
    * Ollama 批量 embedding (自动兼容新旧版本)
    */
   private async embedBatchOllama(texts: string[]): Promise<BatchEmbeddingResult> {
+    const t = getCurrentTranslations();
+    const provider = "Ollama";
     const baseUrl = this.config.embeddingBaseUrl || "http://localhost:11434";
     
     // 如果已知是旧版，逐个调用
@@ -255,7 +290,11 @@ export class Embedder {
       });
 
       if (response.error) {
-        throw new Error(`Ollama Embedding API 错误: ${response.error}`);
+        throw new Error(
+          t.rag.errors.providerError
+            .replace("{provider}", provider)
+            .replace("{error}", String(response.error))
+        );
       }
 
       if (response.status === 404) {
@@ -270,7 +309,12 @@ export class Embedder {
         return { embeddings: data.embeddings };
       }
 
-      throw new Error(`Ollama Embedding API 错误 (${response.status}): ${response.body}`);
+      throw new Error(
+        t.rag.errors.providerErrorWithStatus
+          .replace("{provider}", provider)
+          .replace("{status}", String(response.status))
+          .replace("{error}", String(response.body))
+      );
     } catch (e) {
       if (this.ollamaApiVersion === null) {
         this.ollamaApiVersion = 'legacy';

@@ -19,6 +19,7 @@ import {
   Range,
 } from "@codemirror/state";
 import { Change } from "diff";
+import { getCurrentTranslations } from "@/stores/useLocaleStore";
 
 // ==================== Effects ====================
 
@@ -58,16 +59,21 @@ class TypingCursorWidget extends WidgetType {
 
 // ==================== Decorations ====================
 
+const getAgentEditTitles = () => {
+  const t = getCurrentTranslations();
+  return t.editor.agentEdit;
+};
+
 // 添加内容的高亮样式
 const addedHighlight = Decoration.mark({
   class: "cm-agent-added",
-  attributes: { title: "Agent 添加" },
+  attributes: { title: getAgentEditTitles().added },
 });
 
 // 修改内容的高亮样式
 const modifiedHighlight = Decoration.mark({
   class: "cm-agent-modified",
-  attributes: { title: "Agent 修改" },
+  attributes: { title: getAgentEditTitles().modified },
 });
 
 // 正在输入的光标

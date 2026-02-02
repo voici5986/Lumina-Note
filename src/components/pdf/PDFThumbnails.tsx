@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Document, Page } from "react-pdf";
 import { Loader2, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 interface PDFThumbnailsProps {
   pdfData: Uint8Array | null;
@@ -23,6 +24,7 @@ export function PDFThumbnails({
   onToggle,
   className,
 }: PDFThumbnailsProps) {
+  const { t } = useLocaleStore();
   const [visibleRange, setVisibleRange] = useState({ start: 1, end: 10 });
 
   // 当前页变化时，确保当前页在可见范围内
@@ -58,7 +60,7 @@ export function PDFThumbnails({
         <button
           onClick={onToggle}
           className="p-1 hover:bg-accent rounded transition-colors"
-          title="展开缩略图"
+          title={t.pdfViewer.thumbnails.expand}
         >
           <ChevronRight size={16} />
         </button>

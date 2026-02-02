@@ -1,6 +1,7 @@
 import { X, Copy, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PDFElement } from "@/types/pdf";
+import { useLocaleStore } from "@/stores/useLocaleStore";
 
 interface ElementPanelProps {
   elements: PDFElement[];
@@ -19,6 +20,7 @@ export function ElementPanel({
   onChatWithAI,
   className,
 }: ElementPanelProps) {
+  const { t } = useLocaleStore();
   if (elements.length === 0) {
     return null;
   }
@@ -28,13 +30,13 @@ export function ElementPanel({
       {/* 头部 */}
       <div className="h-10 flex items-center justify-between px-3 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">已选元素</span>
+          <span className="text-sm font-medium">{t.pdfViewer.elementPanel.selectedElements}</span>
           <span className="text-xs text-muted-foreground">({elements.length})</span>
         </div>
         <button
           onClick={onClear}
           className="p-1 hover:bg-accent rounded transition-colors"
-          title="清除全部"
+          title={t.pdfViewer.elementPanel.clearAll}
         >
           <X size={14} />
         </button>
@@ -57,7 +59,7 @@ export function ElementPanel({
                     element.type === "table" && "bg-purple-500/20 text-purple-600",
                     element.type === "equation" && "bg-orange-500/20 text-orange-600"
                   )}>
-                    {element.type}
+                    {(t.pdfViewer.elementTypes as Record<string, string>)?.[element.type] || element.type}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     P.{element.pageIndex}
@@ -77,7 +79,7 @@ export function ElementPanel({
               <button
                 onClick={() => onRemove(element.id)}
                 className="p-1 hover:bg-accent rounded transition-colors shrink-0"
-                title="移除"
+                title={t.pdfViewer.elementPanel.remove}
               >
                 <X size={12} />
               </button>
@@ -93,14 +95,14 @@ export function ElementPanel({
           className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm bg-accent hover:bg-accent/80 rounded transition-colors"
         >
           <Copy size={14} />
-          <span>复制为引用</span>
+          <span>{t.pdfViewer.elementPanel.copyAsReference}</span>
         </button>
         <button
           onClick={onChatWithAI}
           className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium bg-primary text-white hover:bg-primary/90 rounded transition-colors"
         >
           <MessageSquare size={14} />
-          <span>与 AI 对话</span>
+          <span>{t.pdfViewer.elementPanel.chatWithAi}</span>
         </button>
       </div>
     </div>

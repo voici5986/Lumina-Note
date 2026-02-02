@@ -599,21 +599,21 @@ export function VideoNoteView({
                 <button
                   onClick={() => setCurrentTime(prev => Math.max(0, prev - 30))}
                   className="px-2 py-1 text-xs hover:bg-accent rounded"
-                  title="-30秒"
+                  title={t.videoNote.seekBackward.replace('{seconds}', '30')}
                 >
                   -30s
                 </button>
                 <button
                   onClick={() => setCurrentTime(prev => Math.max(0, prev - 10))}
                   className="px-2 py-1 text-xs hover:bg-accent rounded"
-                  title="-10秒"
+                  title={t.videoNote.seekBackward.replace('{seconds}', '10')}
                 >
                   -10s
                 </button>
                 <button
                   onClick={() => setCurrentTime(prev => Math.max(0, prev - 1))}
                   className="px-2 py-1 text-xs hover:bg-accent rounded"
-                  title="-1秒"
+                  title={t.videoNote.seekBackward.replace('{seconds}', '1')}
                 >
                   -1s
                 </button>
@@ -631,13 +631,13 @@ export function VideoNoteView({
                     }}
                     autoFocus
                     className="w-24 px-2 py-1 text-center font-mono text-lg bg-primary/10 border border-primary rounded"
-                    placeholder="5:32"
+                    placeholder={t.videoNote.timeInputPlaceholder}
                   />
                 ) : (
                   <button
                     onClick={handleStartEditTime}
                     className="flex items-center gap-2 px-3 py-1 hover:bg-accent rounded min-w-[100px] justify-center"
-                    title="点击输入时间（如 5:32）"
+                    title={t.videoNote.timeInputHint}
                   >
                     <Clock className="w-4 h-4" />
                     <span className="font-mono text-lg font-semibold">{formatTimestamp(currentTime)}</span>
@@ -648,21 +648,21 @@ export function VideoNoteView({
                 <button
                   onClick={() => setCurrentTime(prev => prev + 1)}
                   className="px-2 py-1 text-xs hover:bg-accent rounded"
-                  title="+1秒"
+                  title={t.videoNote.seekForward.replace('{seconds}', '1')}
                 >
                   +1s
                 </button>
                 <button
                   onClick={() => setCurrentTime(prev => prev + 10)}
                   className="px-2 py-1 text-xs hover:bg-accent rounded"
-                  title="+10秒"
+                  title={t.videoNote.seekForward.replace('{seconds}', '10')}
                 >
                   +10s
                 </button>
                 <button
                   onClick={() => setCurrentTime(prev => prev + 30)}
                   className="px-2 py-1 text-xs hover:bg-accent rounded"
-                  title="+30秒"
+                  title={t.videoNote.seekForward.replace('{seconds}', '30')}
                 >
                   +30s
                 </button>
@@ -715,7 +715,7 @@ export function VideoNoteView({
                 onClick={handleSyncDanmaku}
                 disabled={isSyncingDanmaku}
                 className="px-2 py-1 text-xs bg-orange-500/20 text-orange-600 hover:bg-orange-500/30 rounded transition-colors disabled:opacity-50"
-                title={`从B站同步以 "${danmakuPrefix}" 开头的弹幕`}
+                title={t.videoNote.syncDanmakuHint.replace('{prefix}', danmakuPrefix)}
               >
                 {isSyncingDanmaku ? t.videoNote.syncing : `🎯 ${t.videoNote.syncDanmaku}`}
               </button>
@@ -733,7 +733,7 @@ export function VideoNoteView({
               <button
                 onClick={() => invoke('fill_danmaku_prefix', { prefix: danmakuPrefix })}
                 className="px-2 py-1 bg-slate-500/20 text-slate-600 hover:bg-slate-500/30 rounded transition-colors"
-                title="自动填充前缀到弹幕输入框"
+                title={t.videoNote.fillPrefixHint}
               >
                 📝 {t.videoNote.fillPrefix}
               </button>
@@ -827,14 +827,14 @@ export function VideoNoteView({
                         <button
                           onClick={() => handleStartEdit(note)}
                           className="p-1 hover:bg-accent rounded"
-                          title="编辑"
+                          title={t.common.edit}
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleDeleteNote(note.id)}
                           className="p-1 hover:bg-accent rounded text-red-500"
-                          title="删除"
+                          title={t.common.delete}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>

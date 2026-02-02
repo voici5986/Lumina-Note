@@ -10,12 +10,14 @@ import {
   OpenRouterProvider,
   OllamaProvider,
 } from "./providers";
+import { getCurrentTranslations } from "@/stores/useLocaleStore";
 
 /**
  * 根据配置创建 Provider 实例
  * @param configOverride 可选的配置覆盖
  */
 export function createProvider(configOverride?: Partial<LLMConfig>): LLMProvider {
+  const t = getCurrentTranslations();
   const globalConfig = getLLMConfig();
   
   // 合并配置：优先使用 override，其次是 global
@@ -34,7 +36,7 @@ export function createProvider(configOverride?: Partial<LLMConfig>): LLMProvider
   // Ollama 不需要 API Key
   if (!config.apiKey && config.provider !== "ollama") {
     console.error('[AI Debug] No API key found for', config.provider);
-    throw new Error(`请先配置 ${config.provider} 的 API Key`);
+    throw new Error(t.ai.apiKeyRequiredWithProvider.replace("{provider}", config.provider));
   }
 
   // 处理自定义模型
@@ -63,6 +65,6 @@ export function createProvider(configOverride?: Partial<LLMConfig>): LLMProvider
     case "ollama":
       return new OllamaProvider(finalConfig);
     default:
-      throw new Error(`不支持的 AI 提供商: ${finalConfig.provider}`);
+      throw new Error(t.ai.unsupportedProvider.replace("{provider}", finalConfig.provider));
   }
 }

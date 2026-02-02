@@ -155,20 +155,20 @@ export interface GenerateCardsResponse {
 
 /** Flashcard 数据库列定义 */
 export const FLASHCARD_DATABASE_COLUMNS = [
-  { id: 'deck', name: '牌组', type: 'text' as const },
-  { id: 'type', name: '类型', type: 'select' as const, 
+  { id: 'deck', name: 'Deck', type: 'text' as const },
+  { id: 'type', name: 'Type', type: 'select' as const, 
     options: [
-      { id: 'basic', name: '问答', color: 'blue' as const },
-      { id: 'basic-reversed', name: '双向', color: 'purple' as const },
-      { id: 'cloze', name: '填空', color: 'green' as const },
-      { id: 'mcq', name: '选择', color: 'orange' as const },
-      { id: 'list', name: '列表', color: 'yellow' as const },
+      { id: 'basic', name: 'Basic', color: 'blue' as const },
+      { id: 'basic-reversed', name: 'Reversed', color: 'purple' as const },
+      { id: 'cloze', name: 'Cloze', color: 'green' as const },
+      { id: 'mcq', name: 'Multiple choice', color: 'orange' as const },
+      { id: 'list', name: 'List', color: 'yellow' as const },
     ]
   },
-  { id: 'front', name: '正面', type: 'text' as const },
-  { id: 'due', name: '到期', type: 'date' as const },
-  { id: 'ease', name: '难度', type: 'number' as const },
-  { id: 'interval', name: '间隔', type: 'number' as const },
-  { id: 'repetitions', name: '重复', type: 'number' as const },
-  { id: 'source', name: '来源', type: 'text' as const },
+  { id: 'front', name: 'Front', type: 'text' as const },
+  { id: 'due', name: 'Due', type: 'date' as const },
+  { id: 'ease', name: 'Ease', type: 'number' as const },
+  { id: 'interval', name: 'Interval', type: 'number' as const },
+  { id: 'repetitions', name: 'Repetitions', type: 'number' as const },
+  { id: 'source', name: 'Source', type: 'text' as const },
 ];

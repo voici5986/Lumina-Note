@@ -28,7 +28,7 @@ export function useVoiceNote() {
   
   const { vaultPath, refreshFileTree, openFile } = useFileStore();
   const { config } = useAIStore();
-  const { t } = useLocaleStore();
+  const { t, locale } = useLocaleStore();
 
   // 清除静音计时器
   const clearSilenceTimer = useCallback(() => {
@@ -36,7 +36,7 @@ export function useVoiceNote() {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
     }
-  }, []);
+  }, [t.speech.permissionDenied]);
 
   // 重置静音计时器（30秒无声音自动停止，比普通输入长）
   const resetSilenceTimer = useCallback(() => {
@@ -115,11 +115,11 @@ export function useVoiceNote() {
         return;
       }
       if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-        alert("语音输入需要开启麦克风和语音识别权限，请在系统设置中授权。");
+        alert(t.speech.permissionRequired);
       } else if (event.error === "audio-capture") {
-        alert("未检测到麦克风设备，请检查麦克风连接或系统设置。");
+        alert(t.speech.noMic);
       } else if (event.error === "network") {
-        alert("语音识别需要联网，请检查网络连接。");
+        alert(t.speech.networkRequired);
       }
       setIsRecording(false);
       setStatus("idle");
@@ -141,8 +141,8 @@ export function useVoiceNote() {
     const day = String(now.getDate()).padStart(2, "0");
     const hours = String(now.getHours()).padStart(2, "0");
     const minutes = String(now.getMinutes()).padStart(2, "0");
-    return `语音笔记_${year}-${month}-${day}_${hours}-${minutes}`;
-  }, []);
+    return `${t.file.voiceNotePrefix}_${year}-${month}-${day}_${hours}-${minutes}`;
+  }, [t.file.voiceNotePrefix]);
 
   // 生成唯一文件路径
   const getUniqueFilePath = useCallback(async (baseName: string) => {
@@ -170,11 +170,11 @@ export function useVoiceNote() {
       const messages: Message[] = [
         {
           role: "system",
-          content: "你是一个专业的笔记助手。请为以下语音转录的文字生成一个简洁的总结，提取关键要点。总结应该简明扼要，使用 markdown 格式，包含要点列表。"
+          content: t.speech.voiceNoteSummarySystem,
         },
         {
           role: "user",
-          content: `请为以下语音笔记生成总结：\n\n${transcript}`
+          content: t.speech.voiceNoteSummaryUser.replace('{text}', transcript),
         }
       ];
       
@@ -184,7 +184,7 @@ export function useVoiceNote() {
       console.error("Failed to generate summary:", error);
       return "";
     }
-  }, [config]);
+  }, [config, t]);
 
   // 开始录音
   const ensureMicPermission = useCallback(async () => {
@@ -195,7 +195,7 @@ export function useVoiceNote() {
       return true;
     } catch (err) {
       console.error("Microphone permission denied", err);
-      alert("无法获取麦克风权限，请在系统设置中允许麦克风访问。");
+      alert(t.speech.permissionDenied);
       return false;
     }
   }, []);
@@ -203,11 +203,11 @@ export function useVoiceNote() {
   const startRecording = useCallback(async () => {
     const recognition = recognitionRef.current;
     if (isMacSpeechBlockedInDev()) {
-      alert("macOS 开发模式下语音识别会触发系统崩溃，请使用打包后的 .app 测试语音输入。");
+      alert(t.speech.macDevWarning);
       return;
     }
     if (!recognition) {
-      alert("当前环境不支持语音输入");
+      alert(t.speech.unsupported);
       return;
     }
 
@@ -267,15 +267,15 @@ export function useVoiceNote() {
       const filePath = await getUniqueFilePath(fileName);
       
       if (!filePath) {
-        throw new Error("无法生成文件路径");
+        throw new Error(t.file.voiceNotePathFailed);
       }
 
       // 构建初始内容
       const now = new Date();
-      const dateStr = now.toLocaleString("zh-CN");
+      const dateStr = now.toLocaleString(locale);
       let content = `# ${fileName}\n\n`;
-      content += `> 📅 创建时间：${dateStr}\n\n`;
-      content += `## 原始文稿\n\n${fullTranscript}\n`;
+      content += `> 📅 ${t.file.voiceNoteCreatedAtLabel}：${dateStr}\n\n`;
+      content += `## ${t.file.voiceNoteTranscriptTitle}\n\n${fullTranscript}\n`;
 
       // 先保存原始文稿
       await saveFile(filePath, content);
@@ -287,7 +287,7 @@ export function useVoiceNote() {
       
       if (summary) {
         // 追加总结到文件
-        content += `\n---\n\n## AI 总结\n\n${summary}\n`;
+        content += `\n---\n\n## ${t.file.voiceNoteSummaryTitle}\n\n${summary}\n`;
         await saveFile(filePath, content);
       }
 
@@ -303,12 +303,12 @@ export function useVoiceNote() {
       return filePath;
     } catch (error) {
       console.error("Failed to save voice note:", error);
-      alert("保存语音笔记失败");
+      alert(t.file.voiceNoteSaveFailed);
       setStatus("idle");
       setTranscriptChunks([]);
       return null;
     }
-  }, [transcriptChunks, generateFileName, getUniqueFilePath, generateSummary, refreshFileTree, openFile, clearSilenceTimer]);
+  }, [transcriptChunks, generateFileName, getUniqueFilePath, generateSummary, refreshFileTree, openFile, clearSilenceTimer, t, locale]);
 
   // 取消录音
   const cancelRecording = useCallback(() => {
