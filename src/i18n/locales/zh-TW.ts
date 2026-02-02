@@ -178,6 +178,7 @@ export default {
       promptHint: '此內容將自動添加到您的訊息前面',
       save: '保存',
       cancel: '取消',
+      deleteConfirm: '確定刪除該快捷指令嗎？',
       explain: '總結內容',
       explainPrompt: '請總結以下內容的要點：\n\n要求：\n1. 提取核心觀點和關鍵信息\n2. 用簡潔明了的語言表達\n3. 保持邏輯結構清晰\n4. 如果內容較長，請分層次總結\n\n內容：\n',
       fix: '潤色文本',
@@ -303,6 +304,7 @@ export default {
     intentTypeLabel: '類型',
     intentRouteLabel: '路由',
     unsupportedProvider: '不支援的 AI 提供商: {provider}',
+    providerError: '{provider} 請求失敗：{error}',
     apiErrorWithStatus: 'API 錯誤 ({status}): {error}',
     quickPrompts: {
       polishText: '潤色文字',
@@ -523,6 +525,7 @@ export default {
       formula: '公式',
       relation: '關聯',
     },
+    unsupportedType: '不支援的欄位類型：{type}',
     createDialog: {
       title: '建立資料庫',
       nameLabel: '資料庫名稱',
@@ -1156,6 +1159,9 @@ export default {
     recursive: '遞迴',
     paths: '路徑',
     file: '檔案',
+    url: 'URL',
+    query: '查詢',
+    pattern: '模式',
     timeoutWarning: '目前 LLM 請求響應時間過長（超過 2 分鐘）',
     interruptRetry: '中斷並重試',
     copy: '複製',

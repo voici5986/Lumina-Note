@@ -17,7 +17,6 @@ interface FlashcardViewProps {
 }
 
 export const FlashcardView: React.FC<FlashcardViewProps> = ({ deckId }) => {
-  const { t } = useLocaleStore();
   const [reviewingDeckId, setReviewingDeckId] = useState<string | null>(deckId || null);
   const [showCreateCard, setShowCreateCard] = useState(false);
   const [createDeckId, setCreateDeckId] = useState<string>('Default');

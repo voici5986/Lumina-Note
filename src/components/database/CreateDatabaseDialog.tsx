@@ -16,13 +16,14 @@ export function CreateDatabaseDialog({ isOpen, onClose }: CreateDatabaseDialogPr
   const { hideAllWebViews, showAllWebViews } = useBrowserStore();
   const { t } = useLocaleStore();
   
+  type TemplateId = 'blank' | 'task' | 'project' | 'reading' | 'flashcard';
+  type TemplateItem = { id: TemplateId; name: string; icon: typeof Database; description: string };
+
   const [name, setName] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState<
-    'blank' | 'task' | 'project' | 'reading' | 'flashcard'
-  >('blank');
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateId>('blank');
   const [isCreating, setIsCreating] = useState(false);
 
-  const templates = useMemo(() => ([
+  const templates = useMemo<TemplateItem[]>(() => ([
     { id: 'blank', name: t.database.createDialog.templates.blank.name, icon: Database, description: t.database.createDialog.templates.blank.desc },
     { id: 'task', name: t.database.createDialog.templates.task.name, icon: ListTodo, description: t.database.createDialog.templates.task.desc },
     { id: 'project', name: t.database.createDialog.templates.project.name, icon: FolderKanban, description: t.database.createDialog.templates.project.desc },

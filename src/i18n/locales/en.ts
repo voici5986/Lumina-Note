@@ -178,6 +178,7 @@ export default {
       promptHint: 'This content will be automatically prepended to your message',
       save: 'Save',
       cancel: 'Cancel',
+      deleteConfirm: 'Delete this shortcut?',
       explain: 'Summarize content',
       explainPrompt: 'Please summarize the key points of the following content:\n\nRequirements:\n1. Extract core viewpoints and key information\n2. Express in concise and clear language\n3. Maintain clear logical structure\n4. If the content is lengthy, summarize in layers\n\nContent:\n',
       fix: 'Polish text',
@@ -303,6 +304,7 @@ export default {
     intentTypeLabel: 'Type',
     intentRouteLabel: 'Route',
     unsupportedProvider: 'Unsupported AI provider: {provider}',
+    providerError: '{provider} request failed: {error}',
     apiErrorWithStatus: 'API error ({status}): {error}',
     quickPrompts: {
       polishText: 'Polish text',
@@ -523,6 +525,7 @@ export default {
       formula: 'Formula',
       relation: 'Relation',
     },
+    unsupportedType: 'Unsupported column type: {type}',
     createDialog: {
       title: 'Create database',
       nameLabel: 'Database name',
@@ -1155,6 +1158,9 @@ export default {
     recursive: 'Recursive',
     paths: 'Paths',
     file: 'File',
+    url: 'URL',
+    query: 'Query',
+    pattern: 'Pattern',
     timeoutWarning: 'Current LLM request is taking too long (over 2 minutes)',
     interruptRetry: 'Interrupt & Retry',
     copy: 'Copy',

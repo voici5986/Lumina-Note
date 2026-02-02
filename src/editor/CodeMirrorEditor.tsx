@@ -1098,6 +1098,7 @@ const voicePreviewField = StateField.define<DecorationSet>({
 
 export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditorProps>(
   function CodeMirrorEditor({ content, onChange, className = "", viewMode, livePreview }, ref) {
+    const { t } = useLocaleStore();
 
     const effectiveMode: ViewMode = viewMode ?? (livePreview === false ? 'source' : 'live');
     const isReadOnly = effectiveMode === 'reading';

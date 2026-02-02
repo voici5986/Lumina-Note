@@ -178,6 +178,7 @@ export default {
       promptHint: 'この内容はメッセージの前に自動的に追加されます',
       save: '保存',
       cancel: 'キャンセル',
+      deleteConfirm: 'このショートカットを削除しますか？',
       explain: '内容を要約',
       explainPrompt: '以下の内容の要点を要約してください：\n\n要求：\n1. 核心的な観点と重要な情報を抽出\n2. 簡潔で明確な言語で表現\n3. 論理構造を明確に保持\n4. 内容が長い場合は、階層的に要約\n\n内容：\n',
       fix: 'テキストを校正',
@@ -303,6 +304,7 @@ export default {
     intentTypeLabel: 'タイプ',
     intentRouteLabel: 'ルート',
     unsupportedProvider: 'サポートされていない AI プロバイダー: {provider}',
+    providerError: '{provider} リクエストに失敗しました: {error}',
     apiErrorWithStatus: 'API エラー ({status}): {error}',
     quickPrompts: {
       polishText: '文章を磨く',
@@ -523,6 +525,7 @@ export default {
       formula: '数式',
       relation: '関連',
     },
+    unsupportedType: 'サポートされていない列タイプ：{type}',
     createDialog: {
       title: 'データベースを作成',
       nameLabel: 'データベース名',
@@ -1156,6 +1159,9 @@ export default {
     recursive: '再帰',
     paths: 'パス',
     file: 'ファイル',
+    url: 'URL',
+    query: 'クエリ',
+    pattern: 'パターン',
     timeoutWarning: 'LLM リクエストの応答時間が長すぎます（2分以上）',
     interruptRetry: '中断してリトライ',
     copy: 'コピー',

@@ -195,6 +195,7 @@ interface KanbanCardProps {
 }
 
 function KanbanCard({ row, titleColumnId, isDragging, onDragStart }: KanbanCardProps) {
+  const { t } = useLocaleStore();
   const title = titleColumnId ? (row.cells[titleColumnId] as string) || t.database.noTitle : t.database.noTitle;
   
   return (

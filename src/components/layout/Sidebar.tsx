@@ -939,6 +939,7 @@ interface CreateInputRowProps {
 }
 
 function CreateInputRow({ type, value, onChange, onSubmit, onCancel, level }: CreateInputRowProps) {
+  const { t } = useLocaleStore();
   const paddingLeft = 12 + level * 16 + 20;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -1027,6 +1028,7 @@ function FileTreeItem({
   onCreateCancel,
   vaultPath,
 }: FileTreeItemProps) {
+  const { t } = useLocaleStore();
   const [isDragOver, setIsDragOver] = useState(false);
   const { moveFileToFolder, moveFolderToFolder } = useFileStore();
   

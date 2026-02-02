@@ -36,7 +36,7 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
   } = useRAGStore();
   const { hideAllWebViews, showAllWebViews } = useBrowserStore();
   const { t } = useLocaleStore();
-  const errorMessages = t.aiSettings.errors;
+  const errorMessages = t.aiSettings.errors as Record<string, string>;
 
   // 测试连接状态
   const [testResult, setTestResult] = useState<TestResult>({ status: "idle" });

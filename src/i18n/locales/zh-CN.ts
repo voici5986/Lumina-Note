@@ -178,6 +178,7 @@ export default {
       promptHint: '此内容将自动添加到您的消息前面',
       save: '保存',
       cancel: '取消',
+      deleteConfirm: '确定删除该快捷指令吗？',
       explain: '总结内容',
       explainPrompt: '请总结以下内容的要点：\n\n要求：\n1. 提取核心观点和关键信息\n2. 用简洁明了的语言表达\n3. 保持逻辑结构清晰\n4. 如果内容较长，请分层次总结\n\n内容：\n',
       fix: '润色文本',
@@ -303,6 +304,7 @@ export default {
     intentTypeLabel: '类型',
     intentRouteLabel: '路由',
     unsupportedProvider: '不支持的 AI 提供商: {provider}',
+    providerError: '{provider} 请求失败：{error}',
     apiErrorWithStatus: 'API 错误 ({status}): {error}',
     quickPrompts: {
       polishText: '润色文字',
@@ -523,6 +525,7 @@ export default {
       formula: '公式',
       relation: '关联',
     },
+    unsupportedType: '不支持的列类型：{type}',
     createDialog: {
       title: '创建数据库',
       nameLabel: '数据库名称',
@@ -1156,6 +1159,9 @@ export default {
     recursive: '递归',
     paths: '路径',
     file: '文件',
+    url: 'URL',
+    query: '查询',
+    pattern: '模式',
     timeoutWarning: '当前 LLM 请求响应时间过长（超过 2 分钟）',
     interruptRetry: '中断并重试',
     copy: '复制',

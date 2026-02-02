@@ -87,6 +87,7 @@ function EditorWithGraph() {
 
 // Component that shows diff view
 function DiffViewWrapper() {
+  const { t } = useLocaleStore();
   const { pendingDiff, setPendingDiff, clearPendingEdits, diffResolver } = useAIStore();
   const { openFile } = useFileStore();
 
