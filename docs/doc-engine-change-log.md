@@ -65,3 +65,9 @@
 - Scope: `src/typesetting/irSchema.ts`, `docs/typesetting-ir-schema.md`.
 - Impact: Establishes a stable schema target for Phase 3 and future IR-driven editing.
 - Rollback: Remove the schema file and doc.
+
+## 2026-02-02 (IR operation set)
+- Change: Add draft IR operation set for AI edits.
+- Scope: `src/typesetting/irOps.ts`, `docs/typesetting-ir-ops.md`.
+- Impact: Defines minimal op vocabulary (insert/replace/move/style/delete) for future AI editing.
+- Rollback: Remove the ops file and doc.
