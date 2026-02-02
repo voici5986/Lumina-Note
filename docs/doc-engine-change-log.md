@@ -11,3 +11,9 @@
 - Scope: `scripts/typesetting_openoffice_render.mjs`, `scripts/typesetting_pixel_diff.mjs`, `scripts/typesetting_baseline_compare.mjs`.
 - Impact: Enables OpenOffice-based PDF rendering, pixel-level diffing via pdftoppm, and combined structural+visual comparisons.
 - Rollback: Remove the new scripts; existing pdf diff tooling remains intact.
+
+## 2026-02-02 (baseline batch render)
+- Change: Add batch renderer to generate OpenOffice baselines from the sample manifest.
+- Scope: `scripts/typesetting_baseline_batch.mjs`.
+- Impact: Enables repeatable baseline PDF/PNG generation across sample fixtures.
+- Rollback: Delete the batch script; manual rendering remains possible.
