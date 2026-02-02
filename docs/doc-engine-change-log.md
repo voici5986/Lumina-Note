@@ -59,3 +59,9 @@
 - Scope: `scripts/typesetting_lumina_batch_export.mjs`, `docs/doc-engine-phase1-report.md`.
 - Impact: Simplifies candidate generation and ensures layout/perf artifacts per sample.
 - Rollback: Remove the batch script and doc references.
+
+## 2026-02-02 (IR schema draft)
+- Change: Add initial IR schema draft (types + doc) for AI-editable structure.
+- Scope: `src/typesetting/irSchema.ts`, `docs/typesetting-ir-schema.md`.
+- Impact: Establishes a stable schema target for Phase 3 and future IR-driven editing.
+- Rollback: Remove the schema file and doc.
