@@ -66,7 +66,7 @@ function parseArgs(argv) {
   const args = [...argv];
   if (args.length < 2) {
     throw new Error(
-      "Usage: node scripts/typesetting_export_harness.mjs <docx> <output.pdf> [--baseline <baseline.pdf>] [--port <port>] [--no-server] [--font <path>] [--report <file>] [--layout-out <file>]",
+      "Usage: node scripts/typesetting_export_harness.mjs <docx> <output.pdf> [--baseline <baseline.pdf>] [--port <port>] [--no-server] [--font <path>] [--report <file>] [--layout-out <file>] [--ir-out <file>]",
     );
   }
   const docxPath = args.shift();
@@ -78,6 +78,7 @@ function parseArgs(argv) {
     fontPath: null,
     reportPath: null,
     layoutPath: null,
+    irPath: null,
   };
 
   while (args.length > 0) {
@@ -97,6 +98,9 @@ function parseArgs(argv) {
         break;
       case "--layout-out":
         options.layoutPath = args.shift() ?? null;
+        break;
+      case "--ir-out":
+        options.irPath = args.shift() ?? null;
         break;
       case "--font":
         options.fontPath = args.shift() ?? null;
@@ -266,6 +270,14 @@ async function main() {
       fs.writeFileSync(options.layoutPath, layoutJson, "utf8");
     }
 
+    if (options.irPath) {
+      const irJson = await page.evaluate(async () => {
+        return window.__luminaTypesettingHarness.exportIrJson();
+      });
+      fs.mkdirSync(path.dirname(options.irPath), { recursive: true });
+      fs.writeFileSync(options.irPath, irJson, "utf8");
+    }
+
     if (options.reportPath) {
       const durationMs = Date.now() - startedAt;
       const report = {
@@ -273,6 +285,7 @@ async function main() {
         outputPdf: absolutePdf,
         durationMs,
         layoutPath: options.layoutPath ? path.resolve(options.layoutPath) : null,
+        irPath: options.irPath ? path.resolve(options.irPath) : null,
       };
       fs.mkdirSync(path.dirname(options.reportPath), { recursive: true });
       fs.writeFileSync(options.reportPath, JSON.stringify(report, null, 2), "utf8");

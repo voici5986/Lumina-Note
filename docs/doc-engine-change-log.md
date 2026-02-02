@@ -77,3 +77,9 @@
 - Scope: `src/typesetting/docxToIr.ts`, `docs/typesetting-ir-schema.md`.
 - Impact: Provides a starting point for IR adoption without wiring it into runtime yet.
 - Rollback: Remove the converter file and doc reference.
+
+## 2026-02-02 (IR export in harness)
+- Change: Add IR JSON export to typesetting harness and batch exporter.
+- Scope: `src/components/typesetting/TypesettingExportHarness.tsx`, `scripts/typesetting_export_harness.mjs`, `scripts/typesetting_lumina_batch_export.mjs`.
+- Impact: Enables IR snapshots per sample alongside layout/perf data.
+- Rollback: Remove the IR export function and related flags.

@@ -74,6 +74,7 @@ const main = () => {
     const pdfPath = path.join(sampleDir, `${sample.id}.pdf`);
     const reportPath = path.join(sampleDir, `${sample.id}.report.json`);
     const layoutPath = path.join(sampleDir, `${sample.id}.layout.json`);
+    const irPath = path.join(sampleDir, `${sample.id}.ir.json`);
 
     const args = [
       "scripts/typesetting_export_harness.mjs",
@@ -83,6 +84,8 @@ const main = () => {
       reportPath,
       "--layout-out",
       layoutPath,
+      "--ir-out",
+      irPath,
     ];
 
     if (options.noServer) args.push("--no-server");
@@ -96,6 +99,7 @@ const main = () => {
       pdf: pdfPath,
       report: reportPath,
       layout: layoutPath,
+      ir: irPath,
       status: result.status,
       stdout: result.stdout,
       stderr: result.stderr,

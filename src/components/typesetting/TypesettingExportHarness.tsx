@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { TypesettingDocumentPane } from "@/components/typesetting/TypesettingDocumentPane";
 import { useTypesettingDocStore } from "@/stores/useTypesettingDocStore";
 import { decodeBase64ToBytes, encodeBytesToBase64 } from "@/typesetting/base64";
+import { buildIrDocumentFromDocx } from "@/typesetting/docxToIr";
 
 const HARNESS_DEFAULT_PATH = "C:/__lumina_harness__/input.docx";
 
@@ -9,6 +10,7 @@ type TypesettingHarnessApi = {
   loadDocxBase64: (base64: string, fileName?: string) => Promise<void>;
   exportPdfBase64: () => Promise<string>;
   exportLayoutJson: () => Promise<string>;
+  exportIrJson: () => Promise<string>;
   setFontBase64: (base64: string, fontName?: string, fileName?: string) => Promise<void>;
 };
 
@@ -67,6 +69,14 @@ export function TypesettingExportHarness() {
     return JSON.stringify(window.__luminaTypesettingLayout);
   }, []);
 
+  const exportIrJson = useCallback(async () => {
+    const doc = docs[docPath];
+    if (!doc) {
+      throw new Error("Typesetting document not ready");
+    }
+    return JSON.stringify(buildIrDocumentFromDocx(doc.blocks, doc.headerBlocks, doc.footerBlocks));
+  }, [docs, docPath]);
+
   const setFontBase64 = useCallback(async (base64: string, fontName?: string, fileName?: string) => {
     setFontAsset({
       name: fontName ?? "SimHei",
@@ -80,12 +90,13 @@ export function TypesettingExportHarness() {
       loadDocxBase64,
       exportPdfBase64,
       exportLayoutJson,
+      exportIrJson,
       setFontBase64,
     };
     return () => {
       delete window.__luminaTypesettingHarness;
     };
-  }, [exportLayoutJson, exportPdfBase64, loadDocxBase64, setFontBase64]);
+  }, [exportIrJson, exportLayoutJson, exportPdfBase64, loadDocxBase64, setFontBase64]);
 
   useEffect(() => {
     window.__luminaTypesettingReady = docReady;
