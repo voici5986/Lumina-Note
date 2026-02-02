@@ -83,3 +83,9 @@
 - Scope: `src/components/typesetting/TypesettingExportHarness.tsx`, `scripts/typesetting_export_harness.mjs`, `scripts/typesetting_lumina_batch_export.mjs`.
 - Impact: Enables IR snapshots per sample alongside layout/perf data.
 - Rollback: Remove the IR export function and related flags.
+
+## 2026-02-02 (IR metrics + diff)
+- Change: Add IR structure metrics and diff scripts.
+- Scope: `scripts/typesetting_ir_metrics.mjs`, `scripts/typesetting_ir_diff.mjs`, `docs/doc-engine-phase1-report.md`.
+- Impact: Provides structural comparisons for paragraph/list/table counts independent of rendering.
+- Rollback: Remove the scripts and doc references.

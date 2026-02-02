@@ -38,6 +38,8 @@ Establish a repeatable baseline docx sample set and dual comparison tooling (vis
    - `node scripts/typesetting_baseline_compare_manifest.mjs --baseline tests/typesetting/openoffice-baselines --candidate tests/typesetting/lumina-baselines --out tests/typesetting/compare-reports`
 6) Aggregate performance timings:
    - `node scripts/typesetting_report_aggregate.mjs --dir tests/typesetting/lumina-baselines --out tests/typesetting/perf/summary.json`
+7) Compute IR structure metrics (optional):
+   - `node scripts/typesetting_ir_metrics.mjs tests/typesetting/lumina-baselines/basic-paragraphs/basic-paragraphs.ir.json --out tests/typesetting/compare-reports/basic-paragraphs/ir-metrics.json`
 
 ## Current Results
 - Baseline fixtures generated and versioned.
