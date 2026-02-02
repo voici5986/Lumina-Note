@@ -119,3 +119,9 @@
 - Scope: `scripts/typesetting_baseline_compare_manifest.mjs`.
 - Impact: Adds structural metrics to comparison reports.
 - Rollback: Remove the IR metrics integration.
+
+## 2026-02-02 (layout metrics tooling)
+- Change: Add layout metrics script and integrate into compare manifest output.
+- Scope: `scripts/typesetting_layout_metrics.mjs`, `scripts/typesetting_baseline_compare_manifest.mjs`.
+- Impact: Produces per-sample pagination metrics from layout JSON.
+- Rollback: Remove the layout metrics script and integration.

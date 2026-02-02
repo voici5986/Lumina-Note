@@ -86,6 +86,14 @@ const resolveCandidatePdf = (candidateDir, sampleId) => {
   return findFirstPdf(path.join(candidateDir, sampleId));
 };
 
+const resolveCandidateLayout = (candidateDir, sampleId) => {
+  const flat = path.join(candidateDir, `${sampleId}.layout.json`);
+  if (fs.existsSync(flat)) return flat;
+  const nested = path.join(candidateDir, sampleId, `${sampleId}.layout.json`);
+  if (fs.existsSync(nested)) return nested;
+  return null;
+};
+
 const resolveCandidateIr = (candidateDir, sampleId) => {
   const flat = path.join(candidateDir, `${sampleId}.ir.json`);
   if (fs.existsSync(flat)) return flat;
@@ -96,6 +104,16 @@ const resolveCandidateIr = (candidateDir, sampleId) => {
 
 const runIrMetrics = (irPath, outPath) => {
   const args = ["scripts/typesetting_ir_metrics.mjs", irPath, "--out", outPath];
+  const result = spawnSync(process.execPath ?? "node", args, { encoding: "utf8" });
+  return {
+    status: result.status ?? 1,
+    stdout: result.stdout?.trim() ?? "",
+    stderr: result.stderr?.trim() ?? "",
+  };
+};
+
+const runLayoutMetrics = (layoutPath, outPath) => {
+  const args = ["scripts/typesetting_layout_metrics.mjs", layoutPath, "--out", outPath];
   const result = spawnSync(process.execPath ?? "node", args, { encoding: "utf8" });
   return {
     status: result.status ?? 1,
@@ -130,6 +148,7 @@ const main = () => {
   const results = [];
   const missing = [];
   const irMetricsMissing = [];
+  const layoutMetricsMissing = [];
 
   for (const sample of samples) {
     const sampleId = sample.id;
@@ -145,7 +164,9 @@ const main = () => {
 
     const result = runCompare(baselinePdf, candidatePdf, sampleOutDir, options);
     const irPath = resolveCandidateIr(candidateDir, sampleId);
+    const layoutPath = resolveCandidateLayout(candidateDir, sampleId);
     let irMetrics = null;
+    let layoutMetrics = null;
     if (irPath) {
       const irOutPath = path.join(sampleOutDir, "ir-metrics.json");
       const irResult = runIrMetrics(irPath, irOutPath);
@@ -161,12 +182,29 @@ const main = () => {
       irMetricsMissing.push({ id: sampleId, irPath: null, error: "missing IR json" });
     }
 
+    if (layoutPath) {
+      const layoutOutPath = path.join(sampleOutDir, "layout-metrics.json");
+      const layoutResult = runLayoutMetrics(layoutPath, layoutOutPath);
+      layoutMetrics = {
+        path: layoutOutPath,
+        status: layoutResult.status,
+        stderr: layoutResult.stderr,
+      };
+      if (layoutResult.status !== 0) {
+        layoutMetricsMissing.push({ id: sampleId, layoutPath, error: layoutResult.stderr });
+      }
+    } else {
+      layoutMetricsMissing.push({ id: sampleId, layoutPath: null, error: "missing layout json" });
+    }
+
     const payload = {
       id: sampleId,
       baselinePdf,
       candidatePdf,
       irPath,
       irMetrics,
+      layoutPath,
+      layoutMetrics,
       status: result.status ?? 1,
       stdout: result.stdout?.trim() ?? "",
       stderr: result.stderr?.trim() ?? "",
@@ -187,6 +225,7 @@ const main = () => {
     compared: results.length,
     missing,
     irMetricsMissing,
+    layoutMetricsMissing,
     results,
   };
 
