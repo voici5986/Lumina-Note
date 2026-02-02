@@ -95,3 +95,9 @@
 - Scope: `docs/doc-engine-roadmap.md`.
 - Impact: Keeps roadmap aligned with new scripts.
 - Rollback: Revert the roadmap additions.
+
+## 2026-02-02 (Word baseline guide)
+- Change: Add missing Word baseline capture guide referenced by fixtures.
+- Scope: `docs/WORD_BASELINE_CAPTURE.md`.
+- Impact: Documents how to produce Word PDF baselines with metadata.
+- Rollback: Remove the guide.
