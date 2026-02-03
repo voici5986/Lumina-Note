@@ -837,7 +837,7 @@ export const useRustAgentStore = create<RustAgentState>()(
         const vaultPath = resolveVaultPath();
         if (vaultPath && vaultPath !== lastMobileWorkspacePath) {
           try {
-            await invoke("mobile_set_workspace", { workspace_path: vaultPath });
+            await invoke("mobile_set_workspace", { workspacePath: vaultPath });
             lastMobileWorkspacePath = vaultPath;
           } catch (e) {
             console.warn("[RustAgent] Failed to sync mobile workspace:", e);
@@ -873,8 +873,8 @@ export const useRustAgentStore = create<RustAgentState>()(
         try {
           await invoke("mobile_sync_sessions", {
             sessions: summaries,
-            workspace_path: vaultPath,
-            agent_config: mobileAgentConfig,
+            workspacePath: vaultPath,
+            agentConfig: mobileAgentConfig,
           });
         } catch (e) {
           console.warn("[RustAgent] Failed to sync mobile sessions:", e);

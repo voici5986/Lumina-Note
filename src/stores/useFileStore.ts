@@ -1840,7 +1840,7 @@ export const useFileStore = create<FileState>()(
             error: null,
             source: "invoke",
           });
-          await invoke("mobile_set_workspace", { workspace_path: path });
+          await invoke("mobile_set_workspace", { workspacePath: path });
           lastMobileWorkspaceSync = { path, at: now };
         } catch (error) {
           console.warn("Failed to sync mobile workspace:", error);
