@@ -263,12 +263,22 @@ pub fn emit_agent_event(app: &AppHandle, event: AgentEvent) {
 }
 
 pub fn emit_agent_event_payload(app: &AppHandle, payload: Value) {
-    let _ = app.emit("agent-event", payload.clone());
     let state = app.state::<MobileGatewayState>();
+    let session_id = state.get_current_session_id_snapshot();
+    let payload_for_app = match session_id.clone() {
+        Some(id) => match payload.clone() {
+            Value::Object(mut map) => {
+                map.insert("session_id".to_string(), Value::String(id));
+                Value::Object(map)
+            }
+            other => other,
+        },
+        None => payload.clone(),
+    };
+    let _ = app.emit("agent-event", payload_for_app);
     if state.events.receiver_count() == 0 {
         return;
     }
-    let session_id = state.get_current_session_id_snapshot();
     state.broadcast_agent_event(session_id, payload);
 }
 
@@ -630,6 +640,15 @@ async fn handle_connection(
                                     continue;
                                 }
                             };
+                            let task_for_event = task.clone();
+                            let _ = app.emit(
+                                "mobile-command",
+                                json!({
+                                    "session_id": session_id,
+                                    "task": task_for_event,
+                                    "timestamp": current_timestamp(),
+                                }),
+                            );
 
                             let state = app.state::<MobileGatewayState>();
                             let mut workspace_path = state.get_workspace().await;

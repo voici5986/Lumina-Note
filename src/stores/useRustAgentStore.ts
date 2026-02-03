@@ -147,6 +147,12 @@ export interface RustAgentSession {
   totalTokensUsed: number;
 }
 
+interface AgentEventPayload {
+  type: string;
+  data: unknown;
+  session_id?: string;
+}
+
 interface MobileSessionSummary {
   id: string;
   title: string;
@@ -287,6 +293,134 @@ function splitMessagesForCompaction(messages: Message[]) {
   return { summaryMessage, toSummarize, tail };
 }
 
+const BACKGROUND_STREAMING_ID_PREFIX = "mobile-streaming-";
+
+function appendMobileUserMessage(
+  sessions: RustAgentSession[],
+  sessionId: string,
+  task: string
+) {
+  const t = getCurrentTranslations();
+  const index = sessions.findIndex(session => session.id === sessionId);
+  const now = Date.now();
+  if (index === -1) {
+    const newSession: RustAgentSession = {
+      id: sessionId,
+      title: task.trim().slice(0, 20) || t.common.newConversation,
+      messages: [{ role: "user", content: task }],
+      createdAt: now,
+      updatedAt: now,
+      totalTokensUsed: 0,
+    };
+    return [...sessions, newSession];
+  }
+
+  const session = sessions[index];
+  const title =
+    session.title === t.common.newConversation && task.trim()
+      ? task.trim().slice(0, 20)
+      : session.title;
+  const updatedSession: RustAgentSession = {
+    ...session,
+    title,
+    updatedAt: now,
+    messages: [...session.messages, { role: "user", content: task }],
+  };
+  const next = [...sessions];
+  next[index] = updatedSession;
+  return next;
+}
+
+function applyBackgroundEventToSession(
+  session: RustAgentSession,
+  event: AgentEventPayload,
+  sessionId: string
+) {
+  let messages = session.messages;
+  const now = Date.now();
+  const streamingId = `${BACKGROUND_STREAMING_ID_PREFIX}${sessionId}`;
+
+  switch (event.type) {
+    case "text_delta": {
+      const { delta } = event.data as { delta?: string };
+      if (!delta) return session;
+      const last = messages[messages.length - 1];
+      if (last && last.id === streamingId && last.role === "assistant") {
+        messages = [
+          ...messages.slice(0, -1),
+          { ...last, content: last.content + delta },
+        ];
+      } else {
+        messages = [
+          ...messages,
+          { role: "assistant", content: delta, agent: "coordinator", id: streamingId },
+        ];
+      }
+      return { ...session, messages, updatedAt: now };
+    }
+    case "text_final": {
+      const { text } = event.data as { text?: string };
+      if (!text) return session;
+      const index = messages.findIndex(msg => msg.id === streamingId);
+      const finalMessage: Message = { role: "assistant", content: text, agent: "coordinator" };
+      if (index >= 0) {
+        messages = [...messages];
+        messages[index] = finalMessage;
+      } else {
+        messages = [...messages, finalMessage];
+      }
+      return { ...session, messages, updatedAt: now };
+    }
+    case "tool_start": {
+      const { tool, input } = event.data as { tool: string; input: unknown };
+      messages = [
+        ...messages,
+        { role: "tool", content: `🔧 ${tool}: ${JSON.stringify(input)}` },
+      ];
+      return { ...session, messages, updatedAt: now };
+    }
+    case "tool_result": {
+      const { tool, output } = event.data as { tool: string; output: { content?: unknown } };
+      const content =
+        typeof output?.content === "string"
+          ? output.content
+          : JSON.stringify(output?.content ?? output);
+      messages = [
+        ...messages,
+        { role: "tool", content: `✅ ${tool}: ${content}` },
+      ];
+      return { ...session, messages, updatedAt: now };
+    }
+    case "complete": {
+      const { result } = event.data as { result?: string };
+      if (!result || !result.trim()) return session;
+      const last = messages[messages.length - 1];
+      if (last && last.role === "assistant" && last.content === result) {
+        return session;
+      }
+      messages = [
+        ...messages,
+        { role: "assistant", content: result, agent: "reporter" },
+      ];
+      return { ...session, messages, updatedAt: now };
+    }
+    case "error": {
+      const { message } = event.data as { message?: string };
+      const content = message ? `Error: ${message}` : "Error";
+      messages = [...messages, { role: "assistant", content }];
+      return { ...session, messages, updatedAt: now };
+    }
+    case "run_failed": {
+      const { error } = event.data as { error?: string };
+      const content = error ? `Error: ${error}` : "Error";
+      messages = [...messages, { role: "assistant", content }];
+      return { ...session, messages, updatedAt: now };
+    }
+    default:
+      return session;
+  }
+}
+
 function shouldAutoCompact(tokensTotal: number) {
   if (tokensTotal <= 0) return false;
   const resolvedConfig = resolveCompactionConfig();
@@ -405,7 +539,7 @@ interface RustAgentState {
   syncMobileSessions: () => Promise<void>;
   
   // 内部方法
-  _handleEvent: (event: { type: string; data: unknown }) => void;
+  _handleEvent: (event: AgentEventPayload) => void;
   _setupListeners: () => Promise<UnlistenFn | null>;
   _saveCurrentSession: () => void;
   _compactSession: () => Promise<void>;
@@ -1009,8 +1143,28 @@ export const useRustAgentStore = create<RustAgentState>()(
       },
 
       // 处理事件
-      _handleEvent: (event: { type: string; data: unknown }) => {
+      _handleEvent: (event: AgentEventPayload) => {
         const state = get();
+        const eventSessionId = event.session_id;
+        if (eventSessionId && eventSessionId !== state.currentSessionId) {
+          set((current) => {
+            const index = current.sessions.findIndex(s => s.id === eventSessionId);
+            if (index === -1) {
+              return current;
+            }
+            const session = current.sessions[index];
+            const updatedSession = applyBackgroundEventToSession(session, event, eventSessionId);
+            if (updatedSession === session) {
+              return current;
+            }
+            const nextSessions = [...current.sessions];
+            nextSessions[index] = updatedSession;
+            return {
+              sessions: nextSessions,
+            };
+          });
+          return;
+        }
         const flushStreamingToMessages = () => {
           if (!state.streamingContent || !state.streamingContent.trim()) {
             return { messages: state.messages, flushed: false };
@@ -1457,10 +1611,32 @@ export const useRustAgentStore = create<RustAgentState>()(
       // 设置监听器
       _setupListeners: async () => {
         try {
-          const unlistenAgent = await listen<{ type: string; data: unknown }>(
+          const unlistenAgent = await listen<AgentEventPayload>(
             "agent-event",
             (event) => {
               get()._handleEvent(event.payload);
+            }
+          );
+          const unlistenMobileCommand = await listen<{ session_id?: string; task?: string }>(
+            "mobile-command",
+            (event) => {
+              const payload = event.payload ?? {};
+              if (!payload.session_id || !payload.task) return;
+              set((state) => {
+                const nextSessions = appendMobileUserMessage(
+                  state.sessions,
+                  payload.session_id,
+                  payload.task
+                );
+                const isCurrent = state.currentSessionId === payload.session_id;
+                const updatedMessages = isCurrent
+                  ? nextSessions.find(s => s.id === payload.session_id)?.messages ?? state.messages
+                  : state.messages;
+                return {
+                  sessions: nextSessions,
+                  messages: updatedMessages,
+                };
+              });
             }
           );
           const unlistenMobile = await listen<MobileSessionCommand>(
