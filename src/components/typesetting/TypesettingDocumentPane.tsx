@@ -1259,15 +1259,6 @@ export function TypesettingDocumentPane({ path, onExportReady, autoOpen = true }
     }
   }, [doc?.isDirty, openOfficePreview]);
 
-  useEffect(() => {
-    scheduleOpenOfficeRefresh();
-    return () => {
-      if (openOfficeRefreshRef.current) {
-        clearTimeout(openOfficeRefreshRef.current);
-      }
-    };
-  }, [doc?.lastOp, doc?.isDirty, scheduleOpenOfficeRefresh]);
-
   const handleInput = () => {
     if (!editableRef.current) return;
     const blocks = docxHtmlToBlocks(editableRef.current);
@@ -1569,6 +1560,15 @@ export function TypesettingDocumentPane({ path, onExportReady, autoOpen = true }
     openOfficePreview,
     renderOpenOfficePdfBytes,
   ]);
+
+  useEffect(() => {
+    scheduleOpenOfficeRefresh();
+    return () => {
+      if (openOfficeRefreshRef.current) {
+        clearTimeout(openOfficeRefreshRef.current);
+      }
+    };
+  }, [doc?.lastOp, doc?.isDirty, scheduleOpenOfficeRefresh]);
 
   useEffect(() => {
     if (!onExportReady) return;

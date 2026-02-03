@@ -24,7 +24,6 @@ declare global {
       exporterReady: boolean;
       ready: boolean;
     };
-    __luminaTypesettingLayout?: unknown;
     __luminaTypesettingFont?: {
       name: string;
       fileName: string;

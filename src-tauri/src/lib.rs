@@ -6,11 +6,13 @@ mod fs;
 mod vector_db;
 mod llm;
 mod typesetting;
+mod node_runtime;
 pub mod agent;
 pub mod langgraph;
 pub mod mcp;
 pub mod forge_runtime;
 pub mod mobile_gateway;
+mod doc_tools;
 
 pub use commands::*;
 pub use error::*;

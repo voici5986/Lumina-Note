@@ -39,11 +39,12 @@ describe("docxToIr", () => {
       return (prefix: string) => `${prefix}_${++i}`;
     })()));
 
-    expect(irBlocks[0].type).toBe("paragraph");
-    expect(irBlocks[1].type).toBe("heading");
-    expect(irBlocks[2].type).toBe("list");
-    expect(irBlocks[3].type).toBe("table");
-    expect(irBlocks[4].type).toBe("image");
+    const blockTypes = irBlocks as Array<{ type: string }>;
+    expect(blockTypes[0].type).toBe("paragraph");
+    expect(blockTypes[1].type).toBe("heading");
+    expect(blockTypes[2].type).toBe("list");
+    expect(blockTypes[3].type).toBe("table");
+    expect(blockTypes[4].type).toBe("image");
   });
 
   it("builds an IR document wrapper", () => {
