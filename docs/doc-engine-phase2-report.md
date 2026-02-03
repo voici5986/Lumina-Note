@@ -18,7 +18,7 @@ Provide a reliable preview/export path aligned with OpenOffice output.
 3) Export PDF while OpenOffice preview is active to use the rendered output.
 
 ## Known Limitations
-- Requires `soffice` to be installed or available via doc tools pack.
+- Requires `soffice` to be installed or available via doc tools pack (availability is checked before render).
 - Preview is manual refresh (not real-time).
 - Rendering is per full document; no incremental update yet.
 

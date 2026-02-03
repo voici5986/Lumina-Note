@@ -155,3 +155,9 @@
 - Scope: `src/components/typesetting/TypesettingDocumentPane.tsx`.
 - Impact: Keeps OpenOffice preview updated after edits when enabled.
 - Rollback: Remove auto-refresh state/effects and button.
+
+## 2026-02-02 (OpenOffice availability check)
+- Change: Add doc tools status check before OpenOffice rendering.
+- Scope: `src/components/typesetting/TypesettingDocumentPane.tsx`.
+- Impact: Clearer error when soffice is missing.
+- Rollback: Remove the availability check.

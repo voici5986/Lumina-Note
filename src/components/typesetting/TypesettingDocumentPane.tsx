@@ -12,6 +12,7 @@ import {
   getTypesettingLayoutText,
   getTypesettingPreviewPageMm,
   getTypesettingRenderDocxPdfBase64,
+  getDocToolsStatus,
   isTauriAvailable,
   TypesettingPreviewBoxMm,
   TypesettingPreviewPageMm,
@@ -1431,11 +1432,28 @@ export function TypesettingDocumentPane({ path, onExportReady, autoOpen = true }
     totalPages,
   ]);
 
-  const renderOpenOfficePdfBytes = useCallback(async (): Promise<Uint8Array | null> => {
+  const ensureOpenOfficeAvailable = useCallback(async (): Promise<boolean> => {
     if (!tauriAvailable) {
       setOpenOfficeError("OpenOffice preview requires desktop app.");
-      return null;
+      return false;
     }
+    try {
+      const status = await getDocToolsStatus();
+      const soffice = status.tools?.soffice;
+      if (!soffice?.available) {
+        setOpenOfficeError("soffice not available. Install doc tools.");
+        return false;
+      }
+      return true;
+    } catch (err) {
+      setOpenOfficeError(String(err));
+      return false;
+    }
+  }, [tauriAvailable]);
+
+  const renderOpenOfficePdfBytes = useCallback(async (): Promise<Uint8Array | null> => {
+    const available = await ensureOpenOfficeAvailable();
+    if (!available) return null;
     if (!doc) {
       setOpenOfficeError("OpenOffice preview requires a document.");
       return null;
@@ -1461,7 +1479,7 @@ export function TypesettingDocumentPane({ path, onExportReady, autoOpen = true }
     } finally {
       setOpenOfficeLoading(false);
     }
-  }, [doc, exportDocx, path, tauriAvailable]);
+  }, [doc, ensureOpenOfficeAvailable, exportDocx, path]);
 
   const getExportPdfBytes = useCallback(async (): Promise<Uint8Array> => {
     if (openOfficePreview) {
