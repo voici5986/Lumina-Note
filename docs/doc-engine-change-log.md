@@ -131,3 +131,9 @@
 - Scope: `.gitignore`.
 - Impact: Keeps perf artifacts out of version control.
 - Rollback: Remove the ignore entry.
+
+## 2026-02-02 (compare summary)
+- Change: Add summary script to aggregate compare reports into pass/fail counts.
+- Scope: `scripts/typesetting_compare_summary.mjs`, `docs/doc-engine-phase1-report.md`.
+- Impact: Provides a single summary snapshot for Phase 1 quality tracking.
+- Rollback: Remove the summary script and doc reference.
