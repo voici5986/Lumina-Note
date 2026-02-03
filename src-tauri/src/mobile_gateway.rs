@@ -9,9 +9,11 @@ use serde_json::{json, Value};
 use std::fs;
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::net::TcpListener;
 use tokio::sync::{broadcast, mpsc, oneshot, Mutex};
+use tokio::time::{sleep, Instant};
 use tokio_tungstenite::accept_async;
 
 #[derive(Debug, Clone, Serialize)]
@@ -93,6 +95,9 @@ pub struct MobileGatewayState {
     shutdown: broadcast::Sender<()>,
     starting: Mutex<bool>,
 }
+
+const MOBILE_SYNC_WAIT_TIMEOUT: Duration = Duration::from_secs(3);
+const MOBILE_SYNC_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
 #[derive(Debug, Clone)]
 enum MobileBroadcast {
@@ -277,6 +282,60 @@ fn emit_mobile_sync_request(app: &AppHandle, workspace: bool, agent_config: bool
         "timestamp": current_timestamp(),
     });
     let _ = app.emit("mobile-sync-request", payload);
+}
+
+async fn await_sync_requirements(
+    app: &AppHandle,
+    state: &MobileGatewayState,
+    wait_for_workspace: bool,
+    wait_for_agent_config: bool,
+) -> (Option<String>, Option<AgentConfig>) {
+    let mut workspace_path = state.get_workspace().await;
+    let mut agent_config = state.get_agent_config().await;
+
+    if wait_for_workspace || wait_for_agent_config {
+        let deadline = Instant::now() + MOBILE_SYNC_WAIT_TIMEOUT;
+        loop {
+            if wait_for_workspace && workspace_path.is_none() {
+                workspace_path = state.get_workspace().await;
+            }
+            if wait_for_agent_config && agent_config.is_none() {
+                agent_config = state.get_agent_config().await;
+            }
+
+            let workspace_ready = !wait_for_workspace || workspace_path.is_some();
+            let agent_ready = !wait_for_agent_config || agent_config.is_some();
+            if workspace_ready && agent_ready {
+                break;
+            }
+
+            if Instant::now() >= deadline {
+                break;
+            }
+            sleep(MOBILE_SYNC_POLL_INTERVAL).await;
+        }
+    }
+
+    if (wait_for_workspace && workspace_path.is_none())
+        || (wait_for_agent_config && agent_config.is_none())
+    {
+        if let Some(settings) = load_settings(app) {
+            if wait_for_workspace && workspace_path.is_none() {
+                if let Some(path) = settings.workspace_path.clone() {
+                    state.set_workspace(Some(path.clone())).await;
+                    workspace_path = Some(path);
+                }
+            }
+            if wait_for_agent_config && agent_config.is_none() {
+                if let Some(config) = settings.agent_config.clone() {
+                    state.set_agent_config(Some(config.clone())).await;
+                    agent_config = Some(config);
+                }
+            }
+        }
+    }
+
+    (workspace_path, agent_config)
 }
 
 pub fn hydrate_state(app: &AppHandle) -> Result<(), String> {
@@ -516,6 +575,7 @@ async fn handle_connection(
                                 });
                                 let sessions = app.state::<MobileGatewayState>().get_sessions().await;
                                 let _ = out_tx.send(MobileServerMessage::SessionList { sessions });
+                                emit_mobile_sync_request(&app, true, true);
                             } else {
                                 let _ = out_tx.send(MobileServerMessage::Error {
                                     message: "Invalid pairing token".to_string(),
@@ -575,6 +635,25 @@ async fn handle_connection(
                                             agent_config = Some(config);
                                         }
                                     }
+                                }
+                            }
+
+                            let missing_workspace = workspace_path.is_none();
+                            let missing_agent_config = agent_config.is_none();
+                            if missing_workspace || missing_agent_config {
+                                emit_mobile_sync_request(&app, missing_workspace, missing_agent_config);
+                                let (synced_workspace, synced_agent_config) = await_sync_requirements(
+                                    &app,
+                                    &state,
+                                    missing_workspace,
+                                    missing_agent_config,
+                                )
+                                .await;
+                                if missing_workspace {
+                                    workspace_path = synced_workspace;
+                                }
+                                if missing_agent_config {
+                                    agent_config = synced_agent_config;
                                 }
                             }
 
