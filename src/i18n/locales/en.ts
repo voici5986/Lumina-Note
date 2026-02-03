@@ -938,6 +938,8 @@ export default {
     mobileGatewayQrHint: 'Scan this QR code on your phone to pair.',
     mobileGatewayCopy: 'Copy',
     mobileGatewayCopied: 'Copied',
+    mobileGatewayWorkspace: 'Workspace sync',
+    mobileGatewaySyncNow: 'Sync now',
     docToolsTitle: 'Doc Tools Pack',
     docToolsDesc: 'Optional Python + document conversion tools for docx skills.',
     docToolsInstall: 'Download and install',

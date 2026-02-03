@@ -141,6 +141,49 @@ function DiffViewWrapper() {
   );
 }
 
+function MobileWorkspaceToast() {
+  const { mobileWorkspaceSync } = useFileStore();
+  const [message, setMessage] = useState<string | null>(null);
+  const [visible, setVisible] = useState(false);
+  const hideTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (mobileWorkspaceSync.status !== "error" || !mobileWorkspaceSync.error) {
+      return;
+    }
+    const pathLabel = mobileWorkspaceSync.path ? ` (${mobileWorkspaceSync.path})` : "";
+    const nextMessage = `Workspace sync failed${pathLabel}: ${mobileWorkspaceSync.error}`;
+    setMessage(nextMessage);
+    setVisible(true);
+    if (hideTimerRef.current) {
+      window.clearTimeout(hideTimerRef.current);
+    }
+    hideTimerRef.current = window.setTimeout(() => {
+      setVisible(false);
+    }, 6000);
+    return () => {
+      if (hideTimerRef.current) {
+        window.clearTimeout(hideTimerRef.current);
+      }
+    };
+  }, [
+    mobileWorkspaceSync.status,
+    mobileWorkspaceSync.error,
+    mobileWorkspaceSync.path,
+    mobileWorkspaceSync.lastInvokeAt,
+  ]);
+
+  if (!visible || !message) {
+    return null;
+  }
+
+  return (
+    <div className="fixed bottom-4 right-4 z-[200] max-w-sm rounded-lg border border-red-500/30 bg-background/90 px-3 py-2 text-xs text-red-500 shadow-lg">
+      {message}
+    </div>
+  );
+}
+
 interface BrowserNewTabEventPayload {
   parent_tab_id: string;
   url: string;
@@ -813,6 +856,8 @@ function App() {
           <CodexVscodeHostPanel onClose={() => setCodexPanelOpen(false)} />
         </div>
       )}
+
+      <MobileWorkspaceToast />
     </div>
   );
 }

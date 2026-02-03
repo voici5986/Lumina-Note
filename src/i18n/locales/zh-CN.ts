@@ -939,6 +939,8 @@ export default {
     mobileGatewayQrHint: '用手机扫码完成配对。',
     mobileGatewayCopy: '复制',
     mobileGatewayCopied: '已复制',
+    mobileGatewayWorkspace: '工作区同步',
+    mobileGatewaySyncNow: '立即同步',
     docToolsTitle: 'Doc 工具包',
     docToolsDesc: '为 docx 技能提供 Python 与文档转换工具支持（可选安装）。',
     docToolsInstall: '下载并安装',

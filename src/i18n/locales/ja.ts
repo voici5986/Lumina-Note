@@ -833,6 +833,8 @@ export default {
     mobileGatewayQrHint: 'スマホでQRを読み取ってペアリングします。',
     mobileGatewayCopy: 'コピー',
     mobileGatewayCopied: 'コピー済み',
+    mobileGatewayWorkspace: 'ワークスペース同期',
+    mobileGatewaySyncNow: '今すぐ同期',
     docToolsTitle: 'Doc ツールパック',
     docToolsDesc: 'docx スキル向けの Python と文書変換ツール（任意）。',
     docToolsInstall: 'ダウンロードしてインストール',

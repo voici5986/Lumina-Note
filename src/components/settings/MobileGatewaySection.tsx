@@ -94,6 +94,19 @@ export function MobileGatewaySection() {
     }
   };
 
+  const handleSyncWorkspace = async () => {
+    if (!vaultPath) {
+      setError("Workspace path not set");
+      return;
+    }
+    try {
+      await syncMobileWorkspace({ path: vaultPath, force: true });
+    } catch (err) {
+      console.error("Failed to sync workspace:", err);
+      setError(String(err));
+    }
+  };
+
   const isRunning = Boolean(status?.running);
 
   return (
@@ -185,6 +198,17 @@ export function MobileGatewaySection() {
                   </div>
                 </div>
               )}
+              <div className="flex items-center justify-between gap-2">
+                <span>{t.settingsModal.mobileGatewayWorkspace}</span>
+                <button
+                  type="button"
+                  onClick={handleSyncWorkspace}
+                  disabled={!vaultPath || loading}
+                  className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground disabled:opacity-60"
+                >
+                  {t.settingsModal.mobileGatewaySyncNow}
+                </button>
+              </div>
               <div className="rounded-lg border border-border bg-background/70 p-2 text-[10px] text-foreground/70 space-y-1">
                 <div>Workspace sync: {mobileWorkspaceSync?.status ?? "unknown"}</div>
                 {mobileWorkspaceSync?.path && (

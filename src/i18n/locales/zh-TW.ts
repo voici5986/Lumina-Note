@@ -833,6 +833,8 @@ export default {
     mobileGatewayQrHint: '用手機掃碼完成配對。',
     mobileGatewayCopy: '複製',
     mobileGatewayCopied: '已複製',
+    mobileGatewayWorkspace: '工作區同步',
+    mobileGatewaySyncNow: '立即同步',
     docToolsTitle: 'Doc 工具包',
     docToolsDesc: '為 docx 技能提供 Python 與文件轉換工具（可選安裝）。',
     docToolsInstall: '下載並安裝',
