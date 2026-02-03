@@ -1511,6 +1511,16 @@ export function TypesettingDocumentPane({ path, onExportReady, autoOpen = true }
     await renderOpenOfficePdfBytes();
   };
 
+  useEffect(() => {
+    setOpenOfficePdf(null);
+    setOpenOfficeTotalPages(0);
+    setOpenOfficeError(null);
+    setOpenOfficeStale(false);
+    if (openOfficePreview && openOfficeAutoRefresh) {
+      renderOpenOfficePdfBytes().catch(() => null);
+    }
+  }, [openOfficeAutoRefresh, openOfficePreview, path, renderOpenOfficePdfBytes]);
+
   const scheduleOpenOfficeRefresh = useCallback(() => {
     if (!openOfficePreview || !openOfficeAutoRefresh) return;
     if (openOfficeLoading) return;

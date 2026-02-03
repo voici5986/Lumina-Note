@@ -161,3 +161,9 @@
 - Scope: `src/components/typesetting/TypesettingDocumentPane.tsx`.
 - Impact: Clearer error when soffice is missing.
 - Rollback: Remove the availability check.
+
+## 2026-02-02 (OpenOffice preview reset on doc change)
+- Change: Reset OpenOffice preview state when switching documents.
+- Scope: `src/components/typesetting/TypesettingDocumentPane.tsx`.
+- Impact: Prevents stale preview content across document switches.
+- Rollback: Remove the reset effect.
