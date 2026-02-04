@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  lumina-server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    environment:
+      LUMINA_BIND: 0.0.0.0:8787
+      LUMINA_DB_URL: sqlite:///data/lumina.db
+      LUMINA_DATA_DIR: /data
+      LUMINA_JWT_SECRET: ${LUMINA_JWT_SECRET:?set in .env}
+    volumes:
+      - lumina-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8787/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  caddy:
+    image: caddy:2
+    depends_on:
+      lumina-server:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      LUMINA_DOMAIN: ${LUMINA_DOMAIN:?set in .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  lumina-data:
+  caddy_data:
+  caddy_config:

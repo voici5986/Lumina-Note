@@ -89,6 +89,15 @@ Go to [Releases](https://github.com/blueberrycongee/Lumina-Note/releases) to dow
 
 ---
 
+## Self-Hosted Relay
+
+Want cross-network mobile access? You can self-host the relay server with Docker:
+
+- English guide: `docs/self-host.md`
+- 简体中文: `docs/self-host.zh-CN.md`
+
+---
+
 ## Build from Source
 
 Requires Node.js 20+ (recommended 20.11.1) and Rust 1.70+
