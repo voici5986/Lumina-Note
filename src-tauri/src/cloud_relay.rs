@@ -8,8 +8,11 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tauri::{http, AppHandle, Manager, State};
+use tauri::{AppHandle, Manager, State};
 use tokio::sync::{broadcast, mpsc, Mutex};
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::tungstenite::http::header::AUTHORIZATION;
+use tokio_tungstenite::tungstenite::http::HeaderValue;
 use tokio_tungstenite::tungstenite::Message;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -160,11 +163,12 @@ async fn run_relay(
     let token = login_for_token(&config).await?;
     let relay_url = ensure_client_query(&config.relay_url, "desktop")?;
 
-    let request = http::Request::builder()
-        .uri(&relay_url)
-        .header("Authorization", format!("Bearer {}", token))
-        .body(())
+    let mut request = relay_url
+        .into_client_request()
         .map_err(|e| format!("Failed to build relay request: {}", e))?;
+    let auth_value = HeaderValue::from_str(&format!("Bearer {}", token))
+        .map_err(|e| format!("Invalid authorization header: {}", e))?;
+    request.headers_mut().insert(AUTHORIZATION, auth_value);
 
     let (ws_stream, _) = tokio_tungstenite::connect_async(request)
         .await
