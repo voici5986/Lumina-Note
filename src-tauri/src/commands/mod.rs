@@ -365,6 +365,7 @@ pub async fn save_file(path: String, content: String) -> Result<(), AppError> {
 #[tauri::command]
 pub async fn write_binary_file(path: String, data: Vec<u8>) -> Result<(), AppError> {
     let path = std::path::Path::new(&path);
+    fs::ensure_allowed_path(path, false)?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
@@ -375,6 +376,8 @@ pub async fn write_binary_file(path: String, data: Vec<u8>) -> Result<(), AppErr
 #[tauri::command]
 pub async fn read_binary_file_base64(path: String) -> Result<String, AppError> {
     use base64::{Engine as _, engine::general_purpose::STANDARD};
+    let path_ref = std::path::Path::new(&path);
+    fs::ensure_allowed_path(path_ref, true)?;
     let data = std::fs::read(&path)?;
     Ok(STANDARD.encode(&data))
 }
@@ -393,6 +396,7 @@ pub async fn list_directory_tree(path: String, max_depth: Option<usize>) -> Resu
     
     let max_depth = max_depth.unwrap_or(3);
     let base_path = Path::new(&path);
+    fs::ensure_allowed_path(base_path, true)?;
     let mut result = Vec::new();
     
     result.push(format!("📁 {} (工作区根目录)", base_path.file_name().unwrap_or_default().to_string_lossy()));
@@ -470,6 +474,7 @@ pub async fn move_folder(source: String, target_folder: String) -> Result<String
 /// Show file/folder in system file explorer
 #[tauri::command]
 pub async fn show_in_explorer(path: String) -> Result<(), AppError> {
+    fs::ensure_allowed_path(std::path::Path::new(&path), true)?;
     #[cfg(target_os = "windows")]
     {
         std::process::Command::new("explorer")
@@ -911,6 +916,7 @@ pub struct VideoTimeInfo {
 /// Emits "fs:change" events when files are created, modified, or deleted
 #[tauri::command]
 pub async fn start_file_watcher(app: AppHandle, watch_path: String) -> Result<(), AppError> {
+    fs::ensure_allowed_path(std::path::Path::new(&watch_path), true)?;
     watcher::start_watcher(app, watch_path)
         .map_err(|e| AppError::InvalidPath(e))
 }

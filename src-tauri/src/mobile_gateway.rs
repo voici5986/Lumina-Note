@@ -7,9 +7,10 @@ use rand::{distributions::Alphanumeric, Rng};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::fs;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::net::TcpListener;
@@ -127,6 +128,7 @@ pub struct MobileGatewayState {
     events: broadcast::Sender<MobileBroadcast>,
     shutdown: broadcast::Sender<()>,
     starting: Mutex<bool>,
+    metrics: Arc<MobileGatewayMetrics>,
 }
 
 const MOBILE_SYNC_WAIT_TIMEOUT: Duration = Duration::from_secs(3);
@@ -155,11 +157,15 @@ impl MobileGatewayState {
             events,
             shutdown,
             starting: Mutex::new(false),
+            metrics: Arc::new(MobileGatewayMetrics::new()),
         }
     }
 
     fn build_status(&self, server: Option<&MobileServer>) -> MobileGatewayStatus {
-        let addresses = list_ipv4_addresses();
+        let addresses = match server {
+            Some(server) => list_ipv4_addresses_for_bind(server.addr.ip()),
+            None => list_ipv4_addresses(),
+        };
         let (token, port) = match server {
             Some(server) => (Some(server.token.clone()), Some(server.addr.port())),
             None => (None, None),
@@ -270,6 +276,53 @@ impl MobileGatewayState {
 impl Default for MobileGatewayState {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[derive(Debug)]
+struct MobileGatewayMetrics {
+    connections: AtomicU64,
+    active_connections: AtomicU64,
+    failures: AtomicU64,
+    bytes_in: AtomicU64,
+    bytes_out: AtomicU64,
+}
+
+impl MobileGatewayMetrics {
+    fn new() -> Self {
+        Self {
+            connections: AtomicU64::new(0),
+            active_connections: AtomicU64::new(0),
+            failures: AtomicU64::new(0),
+            bytes_in: AtomicU64::new(0),
+            bytes_out: AtomicU64::new(0),
+        }
+    }
+
+    fn on_connect(&self) -> u64 {
+        self.connections.fetch_add(1, Ordering::Relaxed) + 1
+    }
+
+    fn on_disconnect(&self) -> u64 {
+        self.active_connections
+            .fetch_sub(1, Ordering::Relaxed)
+            .saturating_sub(1)
+    }
+
+    fn add_active(&self) -> u64 {
+        self.active_connections.fetch_add(1, Ordering::Relaxed) + 1
+    }
+
+    fn record_failure(&self) -> u64 {
+        self.failures.fetch_add(1, Ordering::Relaxed) + 1
+    }
+
+    fn record_incoming(&self, size: u64) -> u64 {
+        self.bytes_in.fetch_add(size, Ordering::Relaxed) + size
+    }
+
+    fn record_outgoing(&self, size: u64) -> u64 {
+        self.bytes_out.fetch_add(size, Ordering::Relaxed) + size
     }
 }
 
@@ -653,13 +706,15 @@ pub async fn mobile_start_server(
     }
 
     let start_result = async {
-        let listener = TcpListener::bind("0.0.0.0:0")
+        let bind_addr = std::env::var("LUMINA_MOBILE_BIND")
+            .unwrap_or_else(|_| "127.0.0.1:0".to_string());
+        let listener = TcpListener::bind(&bind_addr)
             .await
             .map_err(|e| format!("Failed to bind mobile gateway: {}", e))?;
         let addr = listener
             .local_addr()
             .map_err(|e| format!("Failed to get server address: {}", e))?;
-        let token = generate_token(8);
+        let token = generate_token(32);
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
         let events = state.events.clone();
         let shutdown = state.shutdown.clone();
@@ -826,10 +881,26 @@ async fn handle_connection(
     let ws_stream = match accept_async(stream).await {
         Ok(ws) => ws,
         Err(err) => {
+            let metrics = app.state::<MobileGatewayState>().metrics.clone();
+            let failures = metrics.record_failure();
             eprintln!("[MobileGateway] WebSocket handshake failed: {}", err);
+            eprintln!(
+                "[MobileGateway][metrics] event=handshake_failed failures={}",
+                failures
+            );
             return;
         }
     };
+
+    let metrics = app.state::<MobileGatewayState>().metrics.clone();
+    let connection_in = Arc::new(AtomicU64::new(0));
+    let connection_out = Arc::new(AtomicU64::new(0));
+    let total_connections = metrics.on_connect();
+    let active = metrics.add_active();
+    eprintln!(
+        "[MobileGateway][metrics] event=connected total_connections={} active_connections={}",
+        total_connections, active
+    );
 
     let (mut ws_sink, mut ws_stream) = ws_stream.split();
     let (out_tx, mut out_rx) = mpsc::unbounded_channel::<MobileServerMessage>();
@@ -837,12 +908,16 @@ async fn handle_connection(
     let mut shutdown_rx = shutdown.subscribe();
     let mut paired = false;
 
+    let metrics_writer = metrics.clone();
+    let connection_out_writer = Arc::clone(&connection_out);
     let writer = tokio::spawn(async move {
         while let Some(message) = out_rx.recv().await {
             let payload = match serde_json::to_string(&message) {
                 Ok(text) => text,
                 Err(_) => continue,
             };
+            metrics_writer.record_outgoing(payload.len() as u64);
+            connection_out_writer.fetch_add(payload.len() as u64, Ordering::Relaxed);
             if ws_sink
                 .send(tokio_tungstenite::tungstenite::Message::Text(payload))
                 .await
@@ -862,6 +937,7 @@ async fn handle_connection(
                 let message = match incoming {
                     Some(Ok(msg)) => msg,
                     Some(Err(err)) => {
+                        metrics.record_failure();
                         eprintln!("[MobileGateway] WebSocket error: {}", err);
                         break;
                     }
@@ -869,6 +945,8 @@ async fn handle_connection(
                 };
 
                 if let tokio_tungstenite::tungstenite::Message::Text(text) = message {
+                    metrics.record_incoming(text.len() as u64);
+                    connection_in.fetch_add(text.len() as u64, Ordering::Relaxed);
                     let sender: MobileMessageSender = {
                         let out_tx = out_tx.clone();
                         Arc::new(move |message| {
@@ -922,6 +1000,13 @@ async fn handle_connection(
     }
 
     writer.abort();
+    let active = metrics.on_disconnect();
+    let total_in = connection_in.load(Ordering::Relaxed);
+    let total_out = connection_out.load(Ordering::Relaxed);
+    eprintln!(
+        "[MobileGateway][metrics] event=disconnected active_connections={} bytes_in={} bytes_out={}",
+        active, total_in, total_out
+    );
 }
 
 fn build_task_context(
@@ -959,6 +1044,16 @@ fn list_ipv4_addresses() -> Vec<String> {
         addresses.push("127.0.0.1".to_string());
     }
     addresses
+}
+
+fn list_ipv4_addresses_for_bind(ip: IpAddr) -> Vec<String> {
+    if ip.is_loopback() {
+        return vec!["127.0.0.1".to_string()];
+    }
+    if ip.is_unspecified() {
+        return list_ipv4_addresses();
+    }
+    vec![ip.to_string()]
 }
 
 fn generate_token(length: usize) -> String {

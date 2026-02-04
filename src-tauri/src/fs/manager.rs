@@ -1,5 +1,6 @@
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::env;
 use serde::Serialize;
 
 use crate::error::AppError;
@@ -12,9 +13,88 @@ pub struct FileEntry {
     pub children: Option<Vec<FileEntry>>,
 }
 
+fn absolute_path(path: &Path) -> Result<PathBuf, AppError> {
+    if path.is_absolute() {
+        Ok(path.to_path_buf())
+    } else {
+        Ok(env::current_dir()?.join(path))
+    }
+}
+
+fn canonicalize_existing_ancestor(path: &Path) -> Result<PathBuf, AppError> {
+    let mut cursor = path.to_path_buf();
+    loop {
+        if cursor.exists() {
+            return fs::canonicalize(&cursor).map_err(AppError::from);
+        }
+        if !cursor.pop() {
+            break;
+        }
+    }
+    Err(AppError::InvalidPath(
+        "Path has no existing ancestor".to_string(),
+    ))
+}
+
+fn allowed_roots() -> Vec<PathBuf> {
+    if let Some(value) = env::var_os("LUMINA_ALLOWED_FS_ROOTS") {
+        return env::split_paths(&value)
+            .filter(|path| path.exists())
+            .filter_map(|path| fs::canonicalize(path).ok())
+            .collect();
+    }
+
+    let mut roots = Vec::new();
+    if let Some(home) = env::var_os("HOME").or_else(|| env::var_os("USERPROFILE")) {
+        let home = PathBuf::from(home);
+        roots.push(home.clone());
+        roots.push(home.join("Documents"));
+        roots.push(home.join("Desktop"));
+    }
+    if let Some(appdata) = env::var_os("APPDATA") {
+        roots.push(PathBuf::from(appdata));
+    }
+    if let Some(local_appdata) = env::var_os("LOCALAPPDATA") {
+        roots.push(PathBuf::from(local_appdata));
+    }
+    if let Ok(cwd) = env::current_dir() {
+        roots.push(cwd);
+    }
+
+    roots
+        .into_iter()
+        .filter(|path| path.exists())
+        .filter_map(|path| fs::canonicalize(path).ok())
+        .collect()
+}
+
+pub fn ensure_allowed_path(path: &Path, must_exist: bool) -> Result<(), AppError> {
+    let absolute = absolute_path(path)?;
+    let candidate = if must_exist {
+        fs::canonicalize(&absolute).map_err(AppError::from)?
+    } else {
+        canonicalize_existing_ancestor(&absolute)?
+    };
+
+    let roots = allowed_roots();
+    if roots.is_empty() {
+        return Err(AppError::InvalidPath("No allowed roots configured".to_string()));
+    }
+
+    if roots.iter().any(|root| candidate.starts_with(root)) {
+        Ok(())
+    } else {
+        Err(AppError::InvalidPath(format!(
+            "Path not permitted: {}",
+            path.display()
+        )))
+    }
+}
+
 /// Read file content as UTF-8 string
 pub fn read_file_content(path: &str) -> Result<String, AppError> {
     let path = Path::new(path);
+    ensure_allowed_path(path, true)?;
     if !path.exists() {
         return Err(AppError::FileNotFound(path.display().to_string()));
     }
@@ -24,6 +104,7 @@ pub fn read_file_content(path: &str) -> Result<String, AppError> {
 /// Write content to file, creating parent directories if needed
 pub fn write_file_content(path: &str, content: &str) -> Result<(), AppError> {
     let path = Path::new(path);
+    ensure_allowed_path(path, false)?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -33,6 +114,7 @@ pub fn write_file_content(path: &str, content: &str) -> Result<(), AppError> {
 /// List directory contents recursively (all files)
 pub fn list_dir_recursive(path: &str) -> Result<Vec<FileEntry>, AppError> {
     let root = Path::new(path);
+    ensure_allowed_path(root, true)?;
     if !root.exists() {
         return Err(AppError::FileNotFound(path.to_string()));
     }
@@ -92,6 +174,7 @@ pub fn list_dir_recursive(path: &str) -> Result<Vec<FileEntry>, AppError> {
 /// Create a new .md file
 pub fn create_new_file(path: &str) -> Result<(), AppError> {
     let path = Path::new(path);
+    ensure_allowed_path(path, false)?;
     if path.exists() {
         return Err(AppError::FileExists(path.display().to_string()));
     }
@@ -104,6 +187,7 @@ pub fn create_new_file(path: &str) -> Result<(), AppError> {
 /// Delete a file or directory (move to trash/recycle bin)
 pub fn delete_entry(path: &str) -> Result<(), AppError> {
     let path = Path::new(path);
+    ensure_allowed_path(path, true)?;
     if !path.exists() {
         return Err(AppError::FileNotFound(path.display().to_string()));
     }
@@ -115,6 +199,7 @@ pub fn delete_entry(path: &str) -> Result<(), AppError> {
 /// Create a new directory
 pub fn create_new_dir(path: &str) -> Result<(), AppError> {
     let path = Path::new(path);
+    ensure_allowed_path(path, false)?;
     if path.exists() {
         return Err(AppError::FileExists(path.display().to_string()));
     }
@@ -125,6 +210,8 @@ pub fn create_new_dir(path: &str) -> Result<(), AppError> {
 pub fn rename_entry(old_path: &str, new_path: &str) -> Result<(), AppError> {
     let old = Path::new(old_path);
     let new = Path::new(new_path);
+    ensure_allowed_path(old, true)?;
+    ensure_allowed_path(new, false)?;
     if !old.exists() {
         return Err(AppError::FileNotFound(old_path.to_string()));
     }
@@ -142,6 +229,8 @@ pub fn rename_entry(old_path: &str, new_path: &str) -> Result<(), AppError> {
 pub fn move_file_to_folder(source: &str, target_folder: &str) -> Result<String, AppError> {
     let source_path = Path::new(source);
     let target_folder_path = Path::new(target_folder);
+    ensure_allowed_path(source_path, true)?;
+    ensure_allowed_path(target_folder_path, true)?;
     
     // Check source exists and is a file
     if !source_path.exists() {
@@ -180,6 +269,8 @@ pub fn move_file_to_folder(source: &str, target_folder: &str) -> Result<String, 
 pub fn move_folder_to_folder(source: &str, target_folder: &str) -> Result<String, AppError> {
     let source_path = Path::new(source);
     let target_folder_path = Path::new(target_folder);
+    ensure_allowed_path(source_path, true)?;
+    ensure_allowed_path(target_folder_path, true)?;
     
     // Check source exists and is a directory
     if !source_path.exists() {
@@ -221,4 +312,50 @@ pub fn move_folder_to_folder(source: &str, target_folder: &str) -> Result<String
     fs::rename(source_path, &new_path).map_err(AppError::from)?;
     
     Ok(new_path.to_string_lossy().to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use once_cell::sync::Lazy;
+    use std::sync::Mutex;
+    use tempfile::TempDir;
+
+    static ENV_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+
+    fn with_allowed_root<F: FnOnce()>(root: &Path, f: F) {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let original = env::var_os("LUMINA_ALLOWED_FS_ROOTS");
+        env::set_var("LUMINA_ALLOWED_FS_ROOTS", root);
+        f();
+        match original {
+            Some(value) => env::set_var("LUMINA_ALLOWED_FS_ROOTS", value),
+            None => env::remove_var("LUMINA_ALLOWED_FS_ROOTS"),
+        }
+    }
+
+    #[test]
+    fn write_and_read_within_allowed_root() {
+        let dir = TempDir::new().expect("temp dir");
+        let file_path = dir.path().join("note.md");
+        with_allowed_root(dir.path(), || {
+            write_file_content(file_path.to_string_lossy().as_ref(), "hello")
+                .expect("write within allowed root");
+            let content = read_file_content(file_path.to_string_lossy().as_ref())
+                .expect("read within allowed root");
+            assert_eq!(content, "hello");
+        });
+    }
+
+    #[test]
+    fn rejects_access_outside_allowed_root() {
+        let allowed = TempDir::new().expect("allowed temp dir");
+        let outside = TempDir::new().expect("outside temp dir");
+        let outside_file = outside.path().join("secret.txt");
+        with_allowed_root(allowed.path(), || {
+            let err = write_file_content(outside_file.to_string_lossy().as_ref(), "nope")
+                .expect_err("should reject outside root");
+            assert!(matches!(err, AppError::InvalidPath(_)));
+        });
+    }
 }

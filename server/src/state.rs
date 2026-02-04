@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 use axum::extract::ws::Message;
@@ -36,4 +37,54 @@ pub struct AppState {
     pub pool: SqlitePool,
     pub config: Config,
     pub relay: RelayHub,
+    pub metrics: Arc<ServerMetrics>,
+}
+
+#[derive(Debug, Default)]
+pub struct ServerMetrics {
+    pub dav_requests: AtomicU64,
+    pub dav_failures: AtomicU64,
+    pub dav_bytes_in: AtomicU64,
+    pub dav_bytes_out: AtomicU64,
+    pub relay_connections: AtomicU64,
+    pub relay_active: AtomicU64,
+    pub relay_failures: AtomicU64,
+}
+
+impl ServerMetrics {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn inc_dav_requests(&self) -> u64 {
+        self.dav_requests.fetch_add(1, Ordering::Relaxed) + 1
+    }
+
+    pub fn inc_dav_failures(&self) -> u64 {
+        self.dav_failures.fetch_add(1, Ordering::Relaxed) + 1
+    }
+
+    pub fn add_dav_bytes_in(&self, bytes: u64) -> u64 {
+        self.dav_bytes_in.fetch_add(bytes, Ordering::Relaxed) + bytes
+    }
+
+    pub fn add_dav_bytes_out(&self, bytes: u64) -> u64 {
+        self.dav_bytes_out.fetch_add(bytes, Ordering::Relaxed) + bytes
+    }
+
+    pub fn inc_relay_connections(&self) -> u64 {
+        self.relay_connections.fetch_add(1, Ordering::Relaxed) + 1
+    }
+
+    pub fn inc_relay_failures(&self) -> u64 {
+        self.relay_failures.fetch_add(1, Ordering::Relaxed) + 1
+    }
+
+    pub fn inc_relay_active(&self) -> u64 {
+        self.relay_active.fetch_add(1, Ordering::Relaxed) + 1
+    }
+
+    pub fn dec_relay_active(&self) -> u64 {
+        self.relay_active.fetch_sub(1, Ordering::Relaxed).saturating_sub(1)
+    }
 }

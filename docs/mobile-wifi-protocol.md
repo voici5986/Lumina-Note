@@ -17,15 +17,21 @@ This doc defines the LAN-only mobile pairing and command protocol used by Lumina
 - Stop: `invoke("mobile_stop_server")`
 - Status: `invoke("mobile_get_status")`
 
+默认只绑定本机回环地址（`127.0.0.1:0`）以降低 LAN 暴露风险。如需局域网配对，请设置：
+
+```
+LUMINA_MOBILE_BIND=0.0.0.0:0
+```
+
 `mobile_start_server` returns:
 ```json
 {
   "running": true,
-  "token": "ABC123XY",
+  "token": "ABC123XYABC123XYABC123XYABC123XY",
   "port": 18999,
   "addresses": ["192.168.1.10"],
   "ws_urls": ["ws://192.168.1.10:18999/ws"],
-  "pairing_payload": "{\"v\":1,\"token\":\"ABC123XY\",\"port\":18999,\"addresses\":[\"192.168.1.10\"],\"ws_path\":\"/ws\"}"
+  "pairing_payload": "{\"v\":1,\"token\":\"ABC123XYABC123XYABC123XYABC123XY\",\"port\":18999,\"addresses\":[\"192.168.1.10\"],\"ws_path\":\"/ws\"}"
 }
 ```
 
@@ -34,7 +40,7 @@ The QR code should encode the `pairing_payload` JSON string. Example:
 ```json
 {
   "v": 1,
-  "token": "ABC123XY",
+  "token": "ABC123XYABC123XYABC123XYABC123XY",
   "port": 18999,
   "addresses": ["192.168.1.10"],
   "ws_path": "/ws"
@@ -55,7 +61,7 @@ All messages are JSON with `type` + `data`:
 ### Client -> Server
 Pair:
 ```json
-{ "type": "pair", "data": { "token": "ABC123XY", "device_name": "iPhone" } }
+{ "type": "pair", "data": { "token": "ABC123XYABC123XYABC123XYABC123XY", "device_name": "iPhone" } }
 ```
 
 Session create:

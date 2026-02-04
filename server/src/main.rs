@@ -15,11 +15,19 @@ use sqlx::sqlite::SqlitePoolOptions;
 use state::AppState;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenvy::dotenv().ok();
     let config = Config::from_env();
+    if config.jwt_secret == "dev-secret-change-me" {
+        if cfg!(debug_assertions) {
+            tracing::warn!("LUMINA_JWT_SECRET is using the default value; do not use this in production.");
+        } else {
+            return Err("LUMINA_JWT_SECRET must be set for production".into());
+        }
+    }
 
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
@@ -42,6 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         pool,
         config,
         relay: state::RelayHub::new(),
+        metrics: Arc::new(state::ServerMetrics::new()),
     };
 
     let app = Router::new()

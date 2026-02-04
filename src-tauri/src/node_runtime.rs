@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use futures_util::StreamExt;
+use sha2::{Digest, Sha256};
 use tokio::io::AsyncWriteExt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -154,6 +155,7 @@ pub async fn download_node_runtime(app_data_dir: &Path) -> Result<PathBuf, Strin
         .ok_or_else(|| "Unsupported platform for Node runtime download".to_string())?;
     let url = node_archive_url(version, platform, arch)
         .ok_or_else(|| "Unsupported platform for Node runtime download".to_string())?;
+    let shasums_url = format!("https://nodejs.org/dist/v{version}/SHASUMS256.txt");
 
     let runtime_dir = node_runtime_dir(app_data_dir);
     tokio::fs::create_dir_all(&runtime_dir)
@@ -165,6 +167,34 @@ pub async fn download_node_runtime(app_data_dir: &Path) -> Result<PathBuf, Strin
         .await
         .map_err(|e| format!("Failed to create temp dir: {e}"))?;
     let archive_path = temp_dir.join(&archive_name);
+
+    let shasums_response = reqwest::get(&shasums_url)
+        .await
+        .map_err(|e| format!("Failed to download Node SHASUMS: {e}"))?;
+    if !shasums_response.status().is_success() {
+        return Err(format!(
+            "Failed to download Node SHASUMS: HTTP {}",
+            shasums_response.status()
+        ));
+    }
+    let shasums_text = shasums_response
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read Node SHASUMS: {e}"))?;
+    let expected_hash = shasums_text
+        .lines()
+        .filter_map(|line| {
+            let mut parts = line.split_whitespace();
+            let hash = parts.next()?;
+            let name = parts.next()?;
+            if name == archive_name {
+                Some(hash.to_string())
+            } else {
+                None
+            }
+        })
+        .next()
+        .ok_or_else(|| format!("Checksum not found for {}", archive_name))?;
 
     let response = reqwest::get(&url)
         .await
@@ -180,8 +210,10 @@ pub async fn download_node_runtime(app_data_dir: &Path) -> Result<PathBuf, Strin
         .await
         .map_err(|e| format!("Failed to create archive file: {e}"))?;
     let mut stream = response.bytes_stream();
+    let mut hasher = Sha256::new();
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|e| format!("Failed to read download stream: {e}"))?;
+        hasher.update(&chunk);
         file.write_all(&chunk)
             .await
             .map_err(|e| format!("Failed to write archive file: {e}"))?;
@@ -189,6 +221,13 @@ pub async fn download_node_runtime(app_data_dir: &Path) -> Result<PathBuf, Strin
     file.flush()
         .await
         .map_err(|e| format!("Failed to flush archive file: {e}"))?;
+    let actual_hash = hex::encode(hasher.finalize());
+    if actual_hash != expected_hash {
+        return Err(format!(
+            "Node runtime checksum mismatch: expected {}, got {}",
+            expected_hash, actual_hash
+        ));
+    }
 
     let extract_dir = temp_dir.join("extract");
     tokio::fs::create_dir_all(&extract_dir)

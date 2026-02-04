@@ -33,8 +33,7 @@
         "$HOME/**",
         "$APPDATA/**",
         "$DOCUMENT/**",
-        "$DESKTOP/**",
-        "**"
+        "$DESKTOP/**"
       ]
     }
   ]

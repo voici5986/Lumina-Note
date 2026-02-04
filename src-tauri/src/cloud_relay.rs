@@ -63,7 +63,8 @@ pub async fn cloud_relay_set_config(
         let mut guard = state.config.lock().await;
         *guard = Some(config.clone());
     }
-    persist_config(&app, &config)?;
+    let config_to_store = redact_password_if_needed(&config);
+    persist_config(&app, &config_to_store)?;
     Ok(())
 }
 
@@ -114,6 +115,11 @@ pub async fn cloud_relay_start(
             return Err("Cloud relay config missing".to_string());
         }
     };
+    if config.password.trim().is_empty() {
+        let mut starting = state.starting.lock().await;
+        *starting = false;
+        return Err("Cloud relay password missing; re-authenticate to connect".to_string());
+    }
 
     {
         let mut status = state.status.lock().await;
@@ -396,4 +402,18 @@ fn persist_config(app: &AppHandle, config: &CloudRelayConfig) -> Result<(), Stri
         .map_err(|e| format!("Failed to serialize cloud relay config: {}", e))?;
     fs::write(path, payload).map_err(|e| format!("Failed to write cloud relay config: {}", e))?;
     Ok(())
+}
+
+fn redact_password_if_needed(config: &CloudRelayConfig) -> CloudRelayConfig {
+    let persist_password = std::env::var("LUMINA_CLOUD_RELAY_STORE_PASSWORD")
+        .map(|value| matches!(value.as_str(), "1" | "true" | "TRUE" | "yes" | "YES"))
+        .unwrap_or(false);
+    if persist_password {
+        return config.clone();
+    }
+    CloudRelayConfig {
+        relay_url: config.relay_url.clone(),
+        email: config.email.clone(),
+        password: String::new(),
+    }
 }

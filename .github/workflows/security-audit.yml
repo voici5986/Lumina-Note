@@ -1,0 +1,42 @@
+name: Security Audit
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  rust-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Audit server
+        run: cargo audit --manifest-path server/Cargo.toml
+
+      - name: Audit src-tauri
+        run: cargo audit --manifest-path src-tauri/Cargo.toml
+
+  npm-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: npm audit (high+)
+        run: npm audit --audit-level=high --omit=dev

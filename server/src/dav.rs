@@ -7,14 +7,18 @@ use axum::http::{HeaderMap, Request, Response, StatusCode};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use httpdate::fmt_http_date;
 use mime_guess::MimeGuess;
+use hyper::body::HttpBody;
 use tokio::io::AsyncWriteExt;
+use tokio_util::io::ReaderStream;
 use uuid::Uuid;
 use urlencoding::encode;
 
 use crate::auth::{decode_token, verify_password};
 use crate::db;
 use crate::error::AppError;
-use crate::state::AppState;
+use crate::state::{AppState, ServerMetrics};
+
+const MAX_DAV_UPLOAD_BYTES: u64 = 200 * 1024 * 1024;
 
 pub async fn handle_dav_root(
     State(state): State<AppState>,
@@ -38,6 +42,15 @@ async fn handle_dav_request(
     path: String,
     req: Request<Body>,
 ) -> Result<Response<Body>, AppError> {
+    let request_id = state.metrics.inc_dav_requests();
+    let method = req.method().clone();
+    tracing::info!(
+        target: "metrics",
+        event = "dav_request",
+        request_id,
+        method = %method,
+        workspace_id = %workspace_id
+    );
     Uuid::parse_str(&workspace_id).map_err(|_| AppError::NotFound)?;
     let user_id = match authorize_request(&state, req.headers()).await {
         Ok(user_id) => user_id,
@@ -65,19 +78,34 @@ async fn handle_dav_request(
     let relative = sanitize_path(&path)?;
     let absolute = workspace_root.join(&relative);
 
-    match req.method().as_str() {
+    let result = match req.method().as_str() {
         "OPTIONS" => respond_options(),
         "PROPFIND" => respond_propfind(&workspace_id, &relative, &absolute, req.headers()).await,
-        "GET" => respond_get(&absolute).await,
+        "GET" => respond_get(&absolute, &state.metrics).await,
         "HEAD" => respond_head(&absolute).await,
-        "PUT" => respond_put(&absolute, req).await,
+        "PUT" => respond_put(&absolute, req, &state.metrics).await,
         "MKCOL" => respond_mkcol(&absolute).await,
         "DELETE" => respond_delete(&absolute).await,
         _ => Ok(Response::builder()
             .status(StatusCode::METHOD_NOT_ALLOWED)
             .body(Body::empty())
             .map_err(|e| AppError::Internal(format!("build response: {}", e)))?),
+    };
+
+    if let Err(err) = &result {
+        let failures = state.metrics.inc_dav_failures();
+        tracing::warn!(
+            target: "metrics",
+            event = "dav_failure",
+            request_id,
+            method = %method,
+            workspace_id = %workspace_id,
+            failures,
+            error = %err
+        );
     }
+
+    result
 }
 
 fn respond_options() -> Result<Response<Body>, AppError> {
@@ -167,16 +195,26 @@ async fn build_prop_entry(
     })
 }
 
-async fn respond_get(absolute: &Path) -> Result<Response<Body>, AppError> {
+async fn respond_get(absolute: &Path, metrics: &ServerMetrics) -> Result<Response<Body>, AppError> {
     let metadata = tokio::fs::metadata(absolute)
         .await
         .map_err(|_| AppError::NotFound)?;
     if metadata.is_dir() {
         return Err(AppError::BadRequest("cannot GET directory".to_string()));
     }
-    let bytes = tokio::fs::read(absolute)
+    let file = tokio::fs::File::open(absolute)
         .await
-        .map_err(|e| AppError::Internal(format!("read file: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("open file: {}", e)))?;
+    let bytes_out = metadata.len();
+    metrics.add_dav_bytes_out(bytes_out);
+    tracing::info!(
+        target: "metrics",
+        event = "dav_download",
+        bytes = bytes_out,
+        path = %absolute.display()
+    );
+    let stream = ReaderStream::new(file);
+    let body = Body::wrap_stream(stream);
     let content_type = MimeGuess::from_path(absolute)
         .first_or_octet_stream()
         .essence_str()
@@ -193,7 +231,8 @@ async fn respond_get(absolute: &Path) -> Result<Response<Body>, AppError> {
         .header("Content-Type", content_type)
         .header("Last-Modified", fmt_http_date(modified))
         .header("ETag", etag)
-        .body(Body::from(bytes))
+        .header("Content-Length", bytes_out)
+        .body(body)
         .map_err(|e| AppError::Internal(format!("build response: {}", e)))
 }
 
@@ -225,21 +264,48 @@ async fn respond_head(absolute: &Path) -> Result<Response<Body>, AppError> {
         .map_err(|e| AppError::Internal(format!("build response: {}", e)))
 }
 
-async fn respond_put(absolute: &Path, req: Request<Body>) -> Result<Response<Body>, AppError> {
+async fn respond_put(
+    absolute: &Path,
+    req: Request<Body>,
+    metrics: &ServerMetrics,
+) -> Result<Response<Body>, AppError> {
+    if let Some(len) = req
+        .headers()
+        .get(axum::http::header::CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<u64>().ok())
+    {
+        if len > MAX_DAV_UPLOAD_BYTES {
+            return Err(AppError::BadRequest("payload too large".to_string()));
+        }
+    }
     if let Some(parent) = absolute.parent() {
         tokio::fs::create_dir_all(parent)
             .await
             .map_err(|e| AppError::Internal(format!("create dir: {}", e)))?;
     }
-    let bytes = hyper::body::to_bytes(req.into_body())
-        .await
-        .map_err(|e| AppError::Internal(format!("read body: {}", e)))?;
+    let mut body = req.into_body();
     let mut file = tokio::fs::File::create(absolute)
         .await
         .map_err(|e| AppError::Internal(format!("create file: {}", e)))?;
-    file.write_all(&bytes)
-        .await
-        .map_err(|e| AppError::Internal(format!("write file: {}", e)))?;
+    let mut written: u64 = 0;
+    while let Some(chunk) = body.data().await {
+        let chunk = chunk.map_err(|e| AppError::Internal(format!("read body: {}", e)))?;
+        written = written.saturating_add(chunk.len() as u64);
+        if written > MAX_DAV_UPLOAD_BYTES {
+            return Err(AppError::BadRequest("payload too large".to_string()));
+        }
+        file.write_all(&chunk)
+            .await
+            .map_err(|e| AppError::Internal(format!("write file: {}", e)))?;
+    }
+    metrics.add_dav_bytes_in(written);
+    tracing::info!(
+        target: "metrics",
+        event = "dav_upload",
+        bytes = written,
+        path = %absolute.display()
+    );
     Ok(Response::builder()
         .status(StatusCode::CREATED)
         .body(Body::empty())

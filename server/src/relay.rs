@@ -31,6 +31,14 @@ pub async fn relay_handler(
     }
 
     let user_id = authorize_request(&state, &headers).await?;
+    let connections = state.metrics.inc_relay_connections();
+    tracing::info!(
+        target: "metrics",
+        event = "relay_connection",
+        connections,
+        user_id = %user_id,
+        client = %client
+    );
 
     Ok(ws.on_upgrade(move |socket| async move {
         handle_socket(state, socket, user_id, client).await;
@@ -64,6 +72,15 @@ async fn handle_socket(state: AppState, socket: WebSocket, user_id: String, clie
         }
     }
 
+    let active = state.metrics.inc_relay_active();
+    tracing::info!(
+        target: "metrics",
+        event = "relay_connected",
+        active,
+        user_id = %user_id,
+        client = %client
+    );
+
     let send_task = tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
             if ws_tx.send(msg).await.is_err() {
@@ -72,7 +89,22 @@ async fn handle_socket(state: AppState, socket: WebSocket, user_id: String, clie
         }
     });
 
-    while let Some(Ok(msg)) = ws_rx.next().await {
+    while let Some(message) = ws_rx.next().await {
+        let msg = match message {
+            Ok(msg) => msg,
+            Err(err) => {
+                let failures = state.metrics.inc_relay_failures();
+                tracing::warn!(
+                    target: "metrics",
+                    event = "relay_ws_error",
+                    failures,
+                    user_id = %user_id,
+                    client = %client,
+                    error = %err
+                );
+                break;
+            }
+        };
         match msg {
             Message::Text(text) => {
                 if client == "mobile" {
@@ -111,6 +143,15 @@ async fn handle_socket(state: AppState, socket: WebSocket, user_id: String, clie
             mobiles.remove(&user_id);
         }
     }
+
+    let active = state.metrics.dec_relay_active();
+    tracing::info!(
+        target: "metrics",
+        event = "relay_disconnected",
+        active,
+        user_id = %user_id,
+        client = %client
+    );
 }
 
 async fn authorize_request(state: &AppState, headers: &HeaderMap) -> Result<String, AppError> {
