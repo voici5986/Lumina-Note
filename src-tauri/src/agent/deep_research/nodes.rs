@@ -517,6 +517,7 @@ pub async fn crawl_web_node(
     });
 
     let mut total_content_chars = 0usize;
+    #[cfg(debug_assertions)]
     let mut crawled_count = 0usize;
 
     // 分批爬取
@@ -559,11 +560,16 @@ pub async fn crawl_web_node(
                 });
 
                 total_content_chars += content_len;
-                crawled_count += 1;
-            }
-            Err(e) => {
                 #[cfg(debug_assertions)]
-                eprintln!("[DeepResearch] 爬取网页失败: {} - {}", web_result.url, e);
+                {
+                    crawled_count += 1;
+                }
+            }
+            Err(err) => {
+                #[cfg(debug_assertions)]
+                eprintln!("[DeepResearch] 爬取网页失败: {} - {}", web_result.url, err);
+                #[cfg(not(debug_assertions))]
+                let _ = err;
                 // 爬取失败不影响整体流程，继续处理下一个
             }
         }
@@ -868,9 +874,11 @@ pub async fn read_notes_node(
         let full_path = std::path::Path::new(&state.workspace_path).join(&note_ref.path);
         let content = match tokio::fs::read_to_string(&full_path).await {
             Ok(c) => c,
-            Err(e) => {
+            Err(err) => {
                 #[cfg(debug_assertions)]
-                eprintln!("[DeepResearch] 读取笔记 {} 失败: {}", note_ref.path, e);
+                eprintln!("[DeepResearch] 读取笔记 {} 失败: {}", note_ref.path, err);
+                #[cfg(not(debug_assertions))]
+                let _ = err;
                 continue;
             }
         };

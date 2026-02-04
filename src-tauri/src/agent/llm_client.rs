@@ -1003,8 +1003,11 @@ impl LlmClient {
         let mut stream = response.bytes_stream();
         tokio::spawn(async move {
             let mut buffer = String::new();
+            #[cfg(debug_assertions)]
             let mut chunk_count = 0usize;
+            #[cfg(debug_assertions)]
             let mut total_chars = 0usize;
+            #[cfg(debug_assertions)]
             let start_time = std::time::Instant::now();
             
             // 流式读取超时：如果 60 秒没有新数据，认为流结束
@@ -1015,9 +1018,11 @@ impl LlmClient {
                 
                 let chunk = match chunk_result {
                     Ok(Some(Ok(bytes))) => bytes,
-                    Ok(Some(Err(e))) => {
+                    Ok(Some(Err(err))) => {
                         #[cfg(debug_assertions)]
-                        eprintln!("[LLM] 流式读取错误: {}", e);
+                        eprintln!("[LLM] 流式读取错误: {}", err);
+                        #[cfg(not(debug_assertions))]
+                        let _ = err;
                         break;
                     }
                     Ok(None) => {
@@ -1058,15 +1063,20 @@ impl LlmClient {
                         
                         if let Ok(json) = serde_json::from_str::<Value>(data) {
                             // 检查是否有错误
-                            if let Some(error) = json.get("error") {
+                            if json.get("error").is_some() {
                                 #[cfg(debug_assertions)]
-                                eprintln!("[LLM] API 返回错误: {}", error);
+                                if let Some(error) = json.get("error") {
+                                    eprintln!("[LLM] API 返回错误: {}", error);
+                                }
                                 return;
                             }
                             
                             if let Some(content) = json["choices"][0]["delta"]["content"].as_str() {
-                                chunk_count += 1;
-                                total_chars += content.chars().count();
+                                #[cfg(debug_assertions)]
+                                {
+                                    chunk_count += 1;
+                                    total_chars += content.chars().count();
+                                }
                                 if tx.send(content.to_string()).await.is_err() {
                                     // 接收端已关闭
                                     #[cfg(debug_assertions)]
