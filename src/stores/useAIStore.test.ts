@@ -36,10 +36,24 @@ vi.mock("@/lib/tauri", () => ({
 
 vi.mock("@/stores/useLocaleStore", () => ({
   getCurrentTranslations: () => ({
+    common: {
+      newConversation: "新对话",
+    },
+    ai: {
+      apiKeyRequired: "请先配置 API Key",
+      sendFailed: "发送失败",
+    },
     prompts: {
       chat: {
         system: "You are Lumina.",
         contextFiles: "Context files:",
+        emptyFile: "(empty)",
+      },
+      edit: {
+        system: "You are Lumina.",
+        currentFiles: "Current files:",
+        contentNotLoaded: "(not loaded)",
+        fileEnd: "END",
       },
     },
   }),

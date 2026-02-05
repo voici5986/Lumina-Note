@@ -4,6 +4,14 @@
 import { vi } from 'vitest';
 import '@testing-library/jest-dom';
 
+// Most unit tests assert Chinese UI copy. Make the locale deterministic in CI
+// (jsdom defaults to en-US) by pre-seeding the persisted locale store.
+try {
+  localStorage.setItem('lumina-locale', JSON.stringify({ state: { locale: 'zh-CN' } }));
+} catch {
+  // ignore (jsdom/localStorage not available)
+}
+
 function ensureResizableBufferSupport() {
   const define = (ctor: typeof ArrayBuffer | typeof SharedArrayBuffer | undefined) => {
     if (!ctor?.prototype) return;
@@ -134,6 +142,10 @@ vi.mock('@tauri-apps/plugin-shell', () => ({
   open: vi.fn(),
 }));
 
+// pdfjs-dist depends on browser-only APIs (e.g. DOMMatrix) that jsdom doesn't provide.
+// Components import this module for side-effects; no-op it for unit tests.
+vi.mock('@/pdfWorker', () => ({}));
+
 vi.mock('@tauri-apps/api/path', () => ({
   join: vi.fn((...parts: string[]) => Promise.resolve(parts.join("\\"))),
   tempDir: vi.fn(() => Promise.resolve("C:\\Temp")),
@@ -161,4 +173,39 @@ if (typeof window !== "undefined") {
       dispatchEvent: vi.fn(),
     })),
   });
+}
+
+// jsdom doesn't implement scrollIntoView; some components call it in effects.
+if (typeof Element !== "undefined" && !(Element.prototype as unknown as { scrollIntoView?: unknown }).scrollIntoView) {
+  (Element.prototype as unknown as { scrollIntoView: () => void }).scrollIntoView = vi.fn();
+}
+
+// pdfjs/react-pdf expect browser geometry APIs that jsdom doesn't provide.
+// A lightweight shim is enough for our unit tests (no real canvas rendering).
+if (!(globalThis as { DOMMatrix?: unknown }).DOMMatrix) {
+  class DOMMatrixShim {}
+  (globalThis as { DOMMatrix: unknown }).DOMMatrix = DOMMatrixShim;
+}
+if (!(globalThis as { ImageData?: unknown }).ImageData) {
+  class ImageDataShim {
+    data: Uint8ClampedArray;
+    width: number;
+    height: number;
+    constructor(dataOrWidth: Uint8ClampedArray | number, width?: number, height?: number) {
+      if (typeof dataOrWidth === "number") {
+        this.width = dataOrWidth;
+        this.height = width ?? 0;
+        this.data = new Uint8ClampedArray(this.width * this.height * 4);
+      } else {
+        this.data = dataOrWidth;
+        this.width = width ?? 0;
+        this.height = height ?? 0;
+      }
+    }
+  }
+  (globalThis as { ImageData: unknown }).ImageData = ImageDataShim;
+}
+if (!(globalThis as { Path2D?: unknown }).Path2D) {
+  class Path2DShim {}
+  (globalThis as { Path2D: unknown }).Path2D = Path2DShim;
 }

@@ -33,6 +33,9 @@ describe("useTypesettingDocStore", () => {
     if (!globalThis.DOMParser) {
       const dom = new JSDOM();
       globalThis.DOMParser = dom.window.DOMParser;
+      // docx parsing code relies on DOM constants in non-jsdom environments.
+      // Keep this test node-based (to avoid full jsdom env) but provide the needed globals.
+      (globalThis as unknown as { Node?: unknown }).Node = dom.window.Node;
     }
     useTypesettingDocStore.setState({ docs: {} });
   });

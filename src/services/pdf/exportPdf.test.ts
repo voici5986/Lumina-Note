@@ -2,6 +2,7 @@
  * PDF 导出工具函数测试
  */
 import { describe, it, expect } from 'vitest';
+import { getTranslations } from '@/i18n';
 import { getExportFileName } from './exportPdf';
 
 describe('getExportFileName', () => {
@@ -15,7 +16,7 @@ describe('getExportFileName', () => {
   });
 
   it('should return default for null path', () => {
-    expect(getExportFileName(null)).toBe('未命名笔记');
+    expect(getExportFileName(null)).toBe(getTranslations('zh-CN').common.untitled);
   });
 
   it('should handle case insensitive .md extension', () => {

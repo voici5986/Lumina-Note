@@ -39,7 +39,8 @@ vi.mock('@/services/llm', () => ({
 
 vi.mock('@/stores/useLocaleStore', () => ({
   getCurrentTranslations: () => ({
-    ai: { contextSummaryTitle: 'Context Summary' },
+    common: { newConversation: '新对话' },
+    ai: { apiKeyRequired: '请先配置 API Key', contextSummaryTitle: 'Context Summary' },
     prompts: {
       contextSummary: { system: 'Summarize the conversation.' },
     },

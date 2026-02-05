@@ -2,6 +2,7 @@
  * AI 工具函数测试
  */
 import { describe, it, expect } from 'vitest';
+import { getTranslations } from '@/i18n';
 import { 
   parseFileReferences, 
   parseEditSuggestions, 
@@ -88,7 +89,7 @@ Here is my suggestion:
 `;
     const result = parseEditSuggestions(response);
     expect(result).toHaveLength(1);
-    expect(result[0].description).toBe('内容修改');
+    expect(result[0].description).toBe(getTranslations('zh-CN').ai.editSuggestionDefault);
   });
 
   it('should return empty array for no edit tags', () => {
