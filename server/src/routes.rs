@@ -27,7 +27,9 @@ pub async fn register(
     let email = payload.email.trim().to_lowercase();
     let password = payload.password.trim().to_string();
     if email.is_empty() || password.len() < 6 {
-        return Err(AppError::BadRequest("invalid email or password".to_string()));
+        return Err(AppError::BadRequest(
+            "invalid email or password".to_string(),
+        ));
     }
 
     let hash = hash_password(&password)?;
@@ -50,7 +52,9 @@ pub async fn login(
     let email = payload.email.trim().to_lowercase();
     let password = payload.password.trim().to_string();
     if email.is_empty() || password.is_empty() {
-        return Err(AppError::BadRequest("invalid email or password".to_string()));
+        return Err(AppError::BadRequest(
+            "invalid email or password".to_string(),
+        ));
     }
 
     let user = db::find_user_by_email(&state.pool, &email).await?;
@@ -95,7 +99,9 @@ pub async fn create_workspace(
     let user_id = require_user(&state, &headers).await?;
     let name = payload.name.trim();
     if name.is_empty() {
-        return Err(AppError::BadRequest("workspace name is required".to_string()));
+        return Err(AppError::BadRequest(
+            "workspace name is required".to_string(),
+        ));
     }
     let workspace_id = db::create_workspace(&state.pool, &user_id, name).await?;
     Ok(Json(WorkspaceSummary {
@@ -104,7 +110,10 @@ pub async fn create_workspace(
     }))
 }
 
-async fn build_workspaces(state: &AppState, user_id: &str) -> Result<Vec<WorkspaceSummary>, AppError> {
+async fn build_workspaces(
+    state: &AppState,
+    user_id: &str,
+) -> Result<Vec<WorkspaceSummary>, AppError> {
     let workspaces = db::list_workspaces(&state.pool, user_id).await?;
     Ok(workspaces
         .into_iter()

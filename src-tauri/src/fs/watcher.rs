@@ -47,7 +47,9 @@ pub fn start_watcher(app: AppHandle, watch_path: String) -> Result<(), String> {
 
             let first_relevant = event.paths.iter().find(|p| is_relevant(p));
 
-            if first_relevant.is_none() && !matches!(event.kind, notify::EventKind::Modify(ModifyKind::Name(_))) {
+            if first_relevant.is_none()
+                && !matches!(event.kind, notify::EventKind::Modify(ModifyKind::Name(_)))
+            {
                 continue;
             }
 

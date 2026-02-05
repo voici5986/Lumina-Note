@@ -104,10 +104,13 @@ async fn handle(call: ToolCall, ctx: ToolContext, env: ToolEnvironment) -> Graph
             message: format!("Failed to create request: {}", err),
         })?;
 
-    let mut resp = client.execute(request).await.map_err(|err| GraphError::ExecutionError {
-        node: format!("tool:{}", call.tool),
-        message: format!("Failed to fetch URL: {}", err),
-    })?;
+    let mut resp = client
+        .execute(request)
+        .await
+        .map_err(|err| GraphError::ExecutionError {
+            node: format!("tool:{}", call.tool),
+            message: format!("Failed to fetch URL: {}", err),
+        })?;
 
     if resp.status() != StatusCode::OK {
         return Ok(tool_error(format!(
@@ -125,12 +128,7 @@ async fn handle(call: ToolCall, ctx: ToolContext, env: ToolEnvironment) -> Graph
 
     let body = match read_body_limited(&mut resp).await {
         Ok(body) => body,
-        Err(err) => {
-            return Ok(tool_error(format!(
-                "Failed to read response body: {}",
-                err
-            )))
-        }
+        Err(err) => return Ok(tool_error(format!("Failed to read response body: {}", err))),
     };
 
     let content = String::from_utf8_lossy(&body).to_string();

@@ -16,7 +16,10 @@ impl PreviewViewport {
         let width_px = scale_px(page_size.width_px, zoom);
         let height_px = scale_px(page_size.height_px, zoom);
 
-        PreviewPageSize { width_px, height_px }
+        PreviewPageSize {
+            width_px,
+            height_px,
+        }
     }
 
     pub fn page_span_px(self, page_size: PreviewPageSize) -> i32 {
@@ -42,9 +45,9 @@ impl PreviewViewport {
         let gap = normalize_gap(self.page_gap_px) as i64;
         let height = scaled.height_px.max(0) as i64;
         let pages = page_count as i64;
-        let total = pages.saturating_mul(height).saturating_add(
-            pages.saturating_sub(1).saturating_mul(gap),
-        );
+        let total = pages
+            .saturating_mul(height)
+            .saturating_add(pages.saturating_sub(1).saturating_mul(gap));
         clamp_i64_to_i32(total)
     }
 
@@ -77,9 +80,7 @@ impl PreviewViewport {
             return (0, 0);
         }
         let start = self.page_index_at_scroll(scroll_y, page_size, page_count);
-        let end_scroll = scroll_y
-            .max(0)
-            .saturating_add(viewport_height.max(0));
+        let end_scroll = scroll_y.max(0).saturating_add(viewport_height.max(0));
         let end_index = self.page_index_at_scroll(end_scroll, page_size, page_count);
         let mut end = end_index.saturating_add(1);
         if end > page_count {

@@ -1,4 +1,4 @@
-﻿use crate::forge_runtime::permissions::{request_permission, PermissionSession};
+use crate::forge_runtime::permissions::{request_permission, PermissionSession};
 use forge::runtime::error::{GraphError, GraphResult};
 use forge::runtime::tool::{ToolCall, ToolContext};
 use serde::de::DeserializeOwned;
@@ -67,7 +67,11 @@ pub fn ensure_external_directory_permission(
         return Ok(());
     }
 
-    let parent = if kind == "directory" { target } else { target.parent().unwrap_or(target) };
+    let parent = if kind == "directory" {
+        target
+    } else {
+        target.parent().unwrap_or(target)
+    };
     let glob = parent.join("*");
     let mut metadata = Map::new();
     metadata.insert(

@@ -17,13 +17,8 @@ pub fn write_empty_pdf(page_style: PageStyle) -> Result<Vec<u8>, PdfExportError>
 
     let mut offsets = vec![0usize; 5];
 
-    offsets[1] =
-        write_object(&mut output, 1, "<< /Type /Catalog /Pages 2 0 R >>");
-    offsets[2] = write_object(
-        &mut output,
-        2,
-        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-    );
+    offsets[1] = write_object(&mut output, 1, "<< /Type /Catalog /Pages 2 0 R >>");
+    offsets[2] = write_object(&mut output, 2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>");
 
     let page_body = format!(
         "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {:.2} {:.2}] /Contents 4 0 R >>",
@@ -42,10 +37,7 @@ pub fn write_empty_pdf(page_style: PageStyle) -> Result<Vec<u8>, PdfExportError>
         output.push_str(&format!("{:010} 00000 n \n", offset));
     }
     output.push_str("trailer\n");
-    output.push_str(&format!(
-        "<< /Size {} /Root 1 0 R >>\n",
-        offsets.len()
-    ));
+    output.push_str(&format!("<< /Size {} /Root 1 0 R >>\n", offsets.len()));
     output.push_str("startxref\n");
     output.push_str(&format!("{}\n", xref_offset));
     output.push_str("%%EOF\n");
@@ -64,8 +56,8 @@ pub fn write_pdf_with_embedded_font(
         return Err(PdfExportError::InvalidFontData);
     }
 
-    let face = ttf_parser::Face::parse(font_bytes, 0)
-        .map_err(|_| PdfExportError::InvalidFontData)?;
+    let face =
+        ttf_parser::Face::parse(font_bytes, 0).map_err(|_| PdfExportError::InvalidFontData)?;
     let bbox = face.global_bounding_box();
     let ascent = face.ascender() as i32;
     let descent = face.descender() as i32;
@@ -80,13 +72,8 @@ pub fn write_pdf_with_embedded_font(
 
     let mut offsets = vec![0usize; 8];
 
-    offsets[1] =
-        write_object(&mut output, 1, "<< /Type /Catalog /Pages 2 0 R >>");
-    offsets[2] = write_object(
-        &mut output,
-        2,
-        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-    );
+    offsets[1] = write_object(&mut output, 1, "<< /Type /Catalog /Pages 2 0 R >>");
+    offsets[2] = write_object(&mut output, 2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>");
 
     let page_body = format!(
         "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {:.2} {:.2}] \
@@ -135,10 +122,7 @@ pub fn write_pdf_with_embedded_font(
         output.push_str(&format!("{:010} 00000 n \n", offset));
     }
     output.push_str("trailer\n");
-    output.push_str(&format!(
-        "<< /Size {} /Root 1 0 R >>\n",
-        offsets.len()
-    ));
+    output.push_str(&format!("<< /Size {} /Root 1 0 R >>\n", offsets.len()));
     output.push_str("startxref\n");
     output.push_str(&format!("{}\n", xref_offset));
     output.push_str("%%EOF\n");
@@ -196,9 +180,7 @@ fn subset_tag(font_bytes: &[u8]) -> String {
     for idx in 0..6 {
         let seed = acc
             .wrapping_add((idx as u32) * 13)
-            .wrapping_add(
-                font_bytes.get(idx).copied().unwrap_or_default() as u32,
-            );
+            .wrapping_add(font_bytes.get(idx).copied().unwrap_or_default() as u32);
         let letter = (seed % 26) as u8 + b'A';
         tag.push(letter as char);
     }
@@ -300,10 +282,8 @@ mod tests {
         let dpi = 96.0;
 
         let (width_pt, height_pt) = pdf_page_size_points(style).unwrap();
-        let expected_width_px =
-            (width_pt * dpi / POINTS_PER_INCH).round() as i32;
-        let expected_height_px =
-            (height_pt * dpi / POINTS_PER_INCH).round() as i32;
+        let expected_width_px = (width_pt * dpi / POINTS_PER_INCH).round() as i32;
+        let expected_height_px = (height_pt * dpi / POINTS_PER_INCH).round() as i32;
 
         let metrics = preview_page_metrics(style, dpi);
 
@@ -345,12 +325,9 @@ mod tests {
 
     #[test]
     fn embedded_font_errors_on_invalid_font_data() {
-        let err = write_pdf_with_embedded_font(
-            sample_style(PageSize::A4),
-            "BadFont",
-            b"not-a-font",
-        )
-        .unwrap_err();
+        let err =
+            write_pdf_with_embedded_font(sample_style(PageSize::A4), "BadFont", b"not-a-font")
+                .unwrap_err();
 
         assert_eq!(err, PdfExportError::InvalidFontData);
     }

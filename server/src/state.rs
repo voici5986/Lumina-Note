@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::Instant;
 
 use axum::extract::ws::Message;
@@ -109,6 +109,8 @@ impl ServerMetrics {
     }
 
     pub fn dec_relay_active(&self) -> u64 {
-        self.relay_active.fetch_sub(1, Ordering::Relaxed).saturating_sub(1)
+        self.relay_active
+            .fetch_sub(1, Ordering::Relaxed)
+            .saturating_sub(1)
     }
 }

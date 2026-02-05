@@ -1,20 +1,19 @@
+use futures_util::StreamExt;
 /**
  * LLM HTTP Client
  * 使用 Rust reqwest 库发送 HTTP 请求，避免 WebView 的 HTTP/2 协议问题
  * 支持流式传输 (SSE)
  */
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tauri::{AppHandle, Emitter, Manager};
-use futures_util::StreamExt;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LLMRequest {
     pub url: String,
-    pub method: String,  // "POST" | "GET"
+    pub method: String, // "POST" | "GET"
     pub headers: HashMap<String, String>,
-    pub body: Option<String>,  // JSON string
+    pub body: Option<String>, // JSON string
     pub timeout_secs: Option<u64>,
 }
 
@@ -29,7 +28,9 @@ pub struct LLMResponse {
 #[tauri::command]
 pub async fn llm_fetch(request: LLMRequest) -> Result<LLMResponse, String> {
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(request.timeout_secs.unwrap_or(120)))
+        .timeout(std::time::Duration::from_secs(
+            request.timeout_secs.unwrap_or(120),
+        ))
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
@@ -40,7 +41,10 @@ pub async fn llm_fetch(request: LLMRequest) -> Result<LLMResponse, String> {
         if attempt > 0 {
             // 重试前等待 1 秒
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            eprintln!("[LLM] Retry attempt {} after error: {}", attempt, last_error);
+            eprintln!(
+                "[LLM] Retry attempt {} after error: {}",
+                attempt, last_error
+            );
         }
 
         let mut req_builder = match request.method.to_uppercase().as_str() {
@@ -96,8 +100,8 @@ pub async fn llm_fetch(request: LLMRequest) -> Result<LLMResponse, String> {
 #[derive(Debug, Clone, Serialize)]
 pub struct StreamChunk {
     pub request_id: String,
-    pub chunk: String,      // SSE data 内容
-    pub done: bool,         // 是否完成
+    pub chunk: String, // SSE data 内容
+    pub done: bool,    // 是否完成
     pub error: Option<String>,
 }
 
@@ -109,7 +113,9 @@ pub async fn llm_fetch_stream(
     request: LLMRequest,
 ) -> Result<(), String> {
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(request.timeout_secs.unwrap_or(300)))
+        .timeout(std::time::Duration::from_secs(
+            request.timeout_secs.unwrap_or(300),
+        ))
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
@@ -133,12 +139,15 @@ pub async fn llm_fetch_stream(
     let response = match req_builder.send().await {
         Ok(r) => r,
         Err(e) => {
-            let _ = app.emit("llm-stream-chunk", StreamChunk {
-                request_id,
-                chunk: String::new(),
-                done: true,
-                error: Some(format!("Request failed: {}", e)),
-            });
+            let _ = app.emit(
+                "llm-stream-chunk",
+                StreamChunk {
+                    request_id,
+                    chunk: String::new(),
+                    done: true,
+                    error: Some(format!("Request failed: {}", e)),
+                },
+            );
             return Ok(());
         }
     };
@@ -146,12 +155,15 @@ pub async fn llm_fetch_stream(
     if !response.status().is_success() {
         let status = response.status().as_u16();
         let body = response.text().await.unwrap_or_default();
-        let _ = app.emit("llm-stream-chunk", StreamChunk {
-            request_id,
-            chunk: String::new(),
-            done: true,
-            error: Some(format!("HTTP {} error: {}", status, body)),
-        });
+        let _ = app.emit(
+            "llm-stream-chunk",
+            StreamChunk {
+                request_id,
+                chunk: String::new(),
+                done: true,
+                error: Some(format!("HTTP {} error: {}", status, body)),
+            },
+        );
         return Ok(());
     }
 
@@ -178,47 +190,59 @@ pub async fn llm_fetch_stream(
                     // 解析 SSE data 行
                     if line.starts_with("data: ") {
                         let data = &line[6..];
-                        
+
                         // [DONE] 表示流结束
                         if data == "[DONE]" {
-                            let _ = app.emit("llm-stream-chunk", StreamChunk {
-                                request_id: request_id.clone(),
-                                chunk: String::new(),
-                                done: true,
-                                error: None,
-                            });
+                            let _ = app.emit(
+                                "llm-stream-chunk",
+                                StreamChunk {
+                                    request_id: request_id.clone(),
+                                    chunk: String::new(),
+                                    done: true,
+                                    error: None,
+                                },
+                            );
                             return Ok(());
                         }
 
                         // 发送数据块
-                        let _ = app.emit("llm-stream-chunk", StreamChunk {
-                            request_id: request_id.clone(),
-                            chunk: data.to_string(),
-                            done: false,
-                            error: None,
-                        });
+                        let _ = app.emit(
+                            "llm-stream-chunk",
+                            StreamChunk {
+                                request_id: request_id.clone(),
+                                chunk: data.to_string(),
+                                done: false,
+                                error: None,
+                            },
+                        );
                     }
                 }
             }
             Err(e) => {
-                let _ = app.emit("llm-stream-chunk", StreamChunk {
-                    request_id,
-                    chunk: String::new(),
-                    done: true,
-                    error: Some(format!("Stream read error: {}", e)),
-                });
+                let _ = app.emit(
+                    "llm-stream-chunk",
+                    StreamChunk {
+                        request_id,
+                        chunk: String::new(),
+                        done: true,
+                        error: Some(format!("Stream read error: {}", e)),
+                    },
+                );
                 return Ok(());
             }
         }
     }
 
     // 流正常结束
-    let _ = app.emit("llm-stream-chunk", StreamChunk {
-        request_id,
-        chunk: String::new(),
-        done: true,
-        error: None,
-    });
+    let _ = app.emit(
+        "llm-stream-chunk",
+        StreamChunk {
+            request_id,
+            chunk: String::new(),
+            done: true,
+            error: None,
+        },
+    );
 
     Ok(())
 }
@@ -228,37 +252,40 @@ pub async fn llm_fetch_stream(
 pub async fn append_debug_log(app: AppHandle, content: String) -> Result<(), String> {
     use std::fs::{create_dir_all, OpenOptions};
     use std::io::Write;
-    
+
     // 获取应用目录
-    let app_dir = app.path().app_data_dir()
+    let app_dir = app
+        .path()
+        .app_data_dir()
         .map_err(|e| format!("Failed to get app dir: {}", e))?;
-    
+
     let log_dir = app_dir.join("debug-logs");
-    create_dir_all(&log_dir)
-        .map_err(|e| format!("Failed to create log dir: {}", e))?;
-    
+    create_dir_all(&log_dir).map_err(|e| format!("Failed to create log dir: {}", e))?;
+
     // 使用日期作为文件名
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
     let log_file = log_dir.join(format!("{}.log", today));
-    
+
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
         .open(&log_file)
         .map_err(|e| format!("Failed to open log file: {}", e))?;
-    
+
     file.write_all(content.as_bytes())
         .map_err(|e| format!("Failed to write log: {}", e))?;
-    
+
     Ok(())
 }
 
 /// 获取调试日志目录路径
 #[tauri::command]
 pub fn get_debug_log_path(app: AppHandle) -> Result<String, String> {
-    let app_dir = app.path().app_data_dir()
+    let app_dir = app
+        .path()
+        .app_data_dir()
         .map_err(|e| format!("Failed to get app dir: {}", e))?;
-    
+
     let log_dir = app_dir.join("debug-logs");
     Ok(log_dir.to_string_lossy().to_string())
 }

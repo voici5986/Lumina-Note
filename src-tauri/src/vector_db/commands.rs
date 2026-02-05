@@ -1,9 +1,9 @@
 //! Tauri commands for vector database operations
 
 use super::{
-    VectorChunk, SearchResult, IndexStatus,
-    init_db, upsert_vectors, search_vectors, delete_vectors_by_file,
-    delete_vectors_by_ids, get_index_status, file_needs_reindex, clear_all_vectors,
+    clear_all_vectors, delete_vectors_by_file, delete_vectors_by_ids, file_needs_reindex,
+    get_index_status, init_db, search_vectors, upsert_vectors, IndexStatus, SearchResult,
+    VectorChunk,
 };
 use crate::error::AppError;
 
@@ -50,7 +50,10 @@ pub async fn get_vector_index_status() -> Result<IndexStatus, AppError> {
 
 /// Check if file needs reindexing
 #[tauri::command]
-pub async fn check_file_needs_reindex(file_path: String, modified_time: i64) -> Result<bool, AppError> {
+pub async fn check_file_needs_reindex(
+    file_path: String,
+    modified_time: i64,
+) -> Result<bool, AppError> {
     file_needs_reindex(&file_path, modified_time)
 }
 

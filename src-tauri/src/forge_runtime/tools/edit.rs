@@ -1,4 +1,4 @@
-﻿use crate::forge_runtime::permissions::request_permission;
+use crate::forge_runtime::permissions::request_permission;
 use crate::forge_runtime::tools::shared::{
     ensure_external_directory_permission, parse_tool_input, permission_path, resolve_path,
 };
@@ -53,7 +53,13 @@ async fn handle(call: ToolCall, ctx: ToolContext, env: ToolEnvironment) -> Graph
     }
 
     let target = resolve_path(&env.workspace_root, &input.file_path);
-    ensure_external_directory_permission(&ctx, &env.permissions, &env.workspace_root, &target, "file")?;
+    ensure_external_directory_permission(
+        &ctx,
+        &env.permissions,
+        &env.workspace_root,
+        &target,
+        "file",
+    )?;
 
     let pattern = permission_path(&env.workspace_root, &target);
     let mut metadata = Map::new();
@@ -68,10 +74,13 @@ async fn handle(call: ToolCall, ctx: ToolContext, env: ToolEnvironment) -> Graph
         vec!["*".to_string()],
     )?;
 
-    let content = tokio::fs::read_to_string(&target).await.map_err(|err| GraphError::ExecutionError {
-        node: format!("tool:{}", call.tool),
-        message: format!("Failed to read file: {}", err),
-    })?;
+    let content =
+        tokio::fs::read_to_string(&target)
+            .await
+            .map_err(|err| GraphError::ExecutionError {
+                node: format!("tool:{}", call.tool),
+                message: format!("Failed to read file: {}", err),
+            })?;
 
     let replace_all = input.replace_all.unwrap_or(false);
     let (new_content, replaced) = if input.old_string.is_empty() {
@@ -87,7 +96,9 @@ async fn handle(call: ToolCall, ctx: ToolContext, env: ToolEnvironment) -> Graph
         if !replace_all && count > 1 {
             return Err(GraphError::ExecutionError {
                 node: format!("tool:{}", call.tool),
-                message: "Found multiple matches for oldString. Provide more context or set replaceAll.".to_string(),
+                message:
+                    "Found multiple matches for oldString. Provide more context or set replaceAll."
+                        .to_string(),
             });
         }
         let updated = if replace_all {

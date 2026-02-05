@@ -1,13 +1,13 @@
 //! WebDAV Tauri 命令
-//! 
+//!
 //! 暴露给前端的命令接口
 
 use std::sync::Mutex;
 use tauri::State;
 
-use super::types::*;
 use super::client::WebDAVClient;
 use super::sync::SyncEngine;
+use super::types::*;
 use crate::error::AppError;
 
 /// WebDAV 状态管理
@@ -35,9 +35,10 @@ pub async fn webdav_set_config(
     state: State<'_, WebDAVState>,
     config: WebDAVConfig,
 ) -> Result<(), AppError> {
-    let mut guard = state.config.lock().map_err(|_| {
-        AppError::WebDAV("Failed to acquire lock".to_string())
-    })?;
+    let mut guard = state
+        .config
+        .lock()
+        .map_err(|_| AppError::WebDAV("Failed to acquire lock".to_string()))?;
     *guard = Some(config);
     Ok(())
 }
@@ -47,9 +48,10 @@ pub async fn webdav_set_config(
 pub async fn webdav_get_config(
     state: State<'_, WebDAVState>,
 ) -> Result<Option<WebDAVConfig>, AppError> {
-    let guard = state.config.lock().map_err(|_| {
-        AppError::WebDAV("Failed to acquire lock".to_string())
-    })?;
+    let guard = state
+        .config
+        .lock()
+        .map_err(|_| AppError::WebDAV("Failed to acquire lock".to_string()))?;
     Ok(guard.clone())
 }
 
@@ -72,9 +74,7 @@ pub async fn webdav_list_remote(
 
 /// 列出所有远程文件（递归）
 #[tauri::command]
-pub async fn webdav_list_all_remote(
-    config: WebDAVConfig,
-) -> Result<Vec<RemoteEntry>, AppError> {
+pub async fn webdav_list_all_remote(config: WebDAVConfig) -> Result<Vec<RemoteEntry>, AppError> {
     let client = WebDAVClient::new(config)?;
     client.list_all_recursive("").await
 }
@@ -102,20 +102,14 @@ pub async fn webdav_upload(
 
 /// 在远程创建目录
 #[tauri::command]
-pub async fn webdav_create_dir(
-    config: WebDAVConfig,
-    remote_path: String,
-) -> Result<(), AppError> {
+pub async fn webdav_create_dir(config: WebDAVConfig, remote_path: String) -> Result<(), AppError> {
     let client = WebDAVClient::new(config)?;
     client.ensure_dir(&remote_path).await
 }
 
 /// 删除远程文件/目录
 #[tauri::command]
-pub async fn webdav_delete(
-    config: WebDAVConfig,
-    remote_path: String,
-) -> Result<(), AppError> {
+pub async fn webdav_delete(config: WebDAVConfig, remote_path: String) -> Result<(), AppError> {
     let client = WebDAVClient::new(config)?;
     client.delete(&remote_path).await
 }

@@ -1,16 +1,19 @@
-use crate::error::AppError;
 use crate::doc_tools;
-use crate::fs::{self, FileEntry, watcher};
+use crate::error::AppError;
+use crate::fs::{self, watcher, FileEntry};
 use crate::typesetting::{
-    layout_text_paragraph, shape_mixed_text, write_empty_pdf, FontManager, Glyph,
-    ParagraphAlign, PageBox, PageMargins, PageSize, PageStyle, TextLayoutOptions,
+    layout_text_paragraph, shape_mixed_text, write_empty_pdf, FontManager, Glyph, PageBox,
+    PageMargins, PageSize, PageStyle, ParagraphAlign, TextLayoutOptions,
 };
-use tauri::{AppHandle, Manager, WebviewWindowBuilder, WebviewBuilder, LogicalPosition, LogicalSize, Position, Size};
-use tauri::WebviewUrl;
-use tauri::webview::NewWindowResponse;
-use tauri::Emitter;
 use std::io::Read;
 use std::path::PathBuf;
+use tauri::webview::NewWindowResponse;
+use tauri::Emitter;
+use tauri::WebviewUrl;
+use tauri::{
+    AppHandle, LogicalPosition, LogicalSize, Manager, Position, Size, WebviewBuilder,
+    WebviewWindowBuilder,
+};
 use uuid::Uuid;
 
 // Browser / WebView 调试日志，写入与前端相同的 debug-logs 目录，方便统一排查
@@ -191,11 +194,10 @@ pub async fn typesetting_fixture_font_path() -> Option<String> {
 /// Typesetting PDF export (placeholder). Returns base64-encoded PDF bytes.
 #[tauri::command]
 pub async fn typesetting_export_pdf_base64() -> Result<String, AppError> {
-    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
 
-    let pdf = write_empty_pdf(default_typesetting_page_style()).map_err(|err| {
-        AppError::InvalidPath(format!("Typesetting PDF export failed: {err}"))
-    })?;
+    let pdf = write_empty_pdf(default_typesetting_page_style())
+        .map_err(|err| AppError::InvalidPath(format!("Typesetting PDF export failed: {err}")))?;
 
     Ok(STANDARD.encode(pdf))
 }
@@ -230,11 +232,13 @@ pub async fn typesetting_render_docx_pdf_base64(
     app: AppHandle,
     docx_path: String,
 ) -> Result<String, AppError> {
-    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
 
     let docx_path = PathBuf::from(docx_path);
     if !docx_path.exists() {
-        return Err(AppError::FileNotFound(docx_path.to_string_lossy().to_string()));
+        return Err(AppError::FileNotFound(
+            docx_path.to_string_lossy().to_string(),
+        ));
     }
 
     let status = doc_tools::doc_tools_get_status(app).await?;
@@ -304,9 +308,9 @@ pub async fn typesetting_layout_text(
         }
     }
     let mut manager = FontManager::new();
-    let font = manager.load_from_path(&font_path).map_err(|err| {
-        AppError::InvalidPath(format!("Typesetting font load failed: {err}"))
-    })?;
+    let font = manager
+        .load_from_path(&font_path)
+        .map_err(|err| AppError::InvalidPath(format!("Typesetting font load failed: {err}")))?;
     let options = TextLayoutOptions {
         max_width,
         line_height,
@@ -316,33 +320,29 @@ pub async fn typesetting_layout_text(
         space_before: space_before.unwrap_or(0),
         space_after: space_after.unwrap_or(0),
     };
-    let lines =
-        layout_text_paragraph(&font, &text, options).map_err(|err| {
-            AppError::InvalidPath(format!("Typesetting layout failed: {err}"))
-        })?;
+    let lines = layout_text_paragraph(&font, &text, options)
+        .map_err(|err| AppError::InvalidPath(format!("Typesetting layout failed: {err}")))?;
     let byte_ranges = if lines.is_empty() {
         Vec::new()
     } else {
-        let glyph_run = shape_mixed_text(&font, &text).map_err(|err| {
-            AppError::InvalidPath(format!("Typesetting layout failed: {err}"))
-        })?;
+        let glyph_run = shape_mixed_text(&font, &text)
+            .map_err(|err| AppError::InvalidPath(format!("Typesetting layout failed: {err}")))?;
         line_byte_ranges(&text, &glyph_run.glyphs, &lines)
     };
     let lines = lines
         .into_iter()
         .enumerate()
         .map(|(index, line)| {
-            let (start_byte, end_byte) =
-                byte_ranges.get(index).copied().unwrap_or((0, 0));
+            let (start_byte, end_byte) = byte_ranges.get(index).copied().unwrap_or((0, 0));
             TypesettingTextLine {
-            start: line.start,
-            end: line.end,
-            width: line.width,
-            x_offset: line.x_offset,
-            y_offset: line.y_offset,
-            start_byte,
-            end_byte,
-        }
+                start: line.start,
+                end: line.end,
+                width: line.width,
+                x_offset: line.x_offset,
+                y_offset: line.y_offset,
+                start_byte,
+                end_byte,
+            }
         })
         .collect();
 
@@ -375,7 +375,7 @@ pub async fn write_binary_file(path: String, data: Vec<u8>) -> Result<(), AppErr
 /// Read binary file and return as base64
 #[tauri::command]
 pub async fn read_binary_file_base64(path: String) -> Result<String, AppError> {
-    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
     let path_ref = std::path::Path::new(&path);
     fs::ensure_allowed_path(path_ref, true)?;
     let data = std::fs::read(&path)?;
@@ -390,46 +390,55 @@ pub async fn list_directory(path: String) -> Result<Vec<FileEntry>, AppError> {
 
 /// List directory tree as formatted string (for Agent context)
 #[tauri::command]
-pub async fn list_directory_tree(path: String, max_depth: Option<usize>) -> Result<String, AppError> {
-    use walkdir::WalkDir;
+pub async fn list_directory_tree(
+    path: String,
+    max_depth: Option<usize>,
+) -> Result<String, AppError> {
     use std::path::Path;
-    
+    use walkdir::WalkDir;
+
     let max_depth = max_depth.unwrap_or(3);
     let base_path = Path::new(&path);
     fs::ensure_allowed_path(base_path, true)?;
     let mut result = Vec::new();
-    
-    result.push(format!("📁 {} (工作区根目录)", base_path.file_name().unwrap_or_default().to_string_lossy()));
-    
+
+    result.push(format!(
+        "📁 {} (工作区根目录)",
+        base_path.file_name().unwrap_or_default().to_string_lossy()
+    ));
+
     let walker = WalkDir::new(&path)
         .max_depth(max_depth)
         .into_iter()
         .filter_map(|e| e.ok());
-    
+
     for entry in walker {
         let entry_path = entry.path();
         if entry_path == base_path {
             continue;
         }
-        
+
         let name = entry.file_name().to_string_lossy().to_string();
-        
+
         // 跳过隐藏文件和常见忽略目录（允许 .lumina）
-        if (name.starts_with('.') && name != ".lumina") || name == "node_modules" || name == "target" {
+        if (name.starts_with('.') && name != ".lumina")
+            || name == "node_modules"
+            || name == "target"
+        {
             continue;
         }
-        
+
         let depth = entry.depth();
         let indent = "  ".repeat(depth);
         let is_dir = entry.file_type().is_dir();
         let prefix = if is_dir { "📁" } else { "📄" };
-        
+
         // 只显示 .md 文件或目录
         if is_dir || name.ends_with(".md") {
             result.push(format!("{}{} {}", indent, prefix, name));
         }
     }
-    
+
     Ok(result.join("\n"))
 }
 
@@ -481,14 +490,14 @@ pub async fn show_in_explorer(path: String) -> Result<(), AppError> {
             .args(["/select,", &path])
             .spawn()?;
     }
-    
+
     #[cfg(target_os = "macos")]
     {
         std::process::Command::new("open")
             .args(["-R", &path])
             .spawn()?;
     }
-    
+
     #[cfg(target_os = "linux")]
     {
         // Try xdg-open for the parent directory
@@ -500,45 +509,54 @@ pub async fn show_in_explorer(path: String) -> Result<(), AppError> {
             .arg(&parent)
             .spawn()?;
     }
-    
+
     Ok(())
 }
 
 /// 在主窗口内创建内嵌 WebView
 #[tauri::command]
 pub async fn create_embedded_webview(
-    app: AppHandle, 
+    app: AppHandle,
     url: String,
     x: f64,
     y: f64,
     width: f64,
-    height: f64
+    height: f64,
 ) -> Result<(), AppError> {
     // 获取主窗口（通过 Manager::windows()）
     let windows = app.windows();
-    let main_window = windows.get("main")
+    let main_window = windows
+        .get("main")
         .ok_or_else(|| AppError::InvalidPath("Main window not found".into()))?;
-    
+
     // 如果已存在内嵌 webview，先关闭
     if let Some(webview) = app.get_webview("video-webview") {
         let _ = webview.close();
     }
-    
+
     // 创建 WebView Builder
     let webview_builder = WebviewBuilder::new(
         "video-webview",
-        WebviewUrl::External(url.parse().map_err(|_| AppError::InvalidPath("Invalid URL".into()))?)
+        WebviewUrl::External(
+            url.parse()
+                .map_err(|_| AppError::InvalidPath("Invalid URL".into()))?,
+        ),
     );
-    
+
     // 创建内嵌 WebView
-    let _webview = main_window.add_child(
-        webview_builder,
-        Position::Logical(LogicalPosition::new(x, y)),
-        Size::Logical(LogicalSize::new(width, height)),
-    ).map_err(|e| AppError::InvalidPath(e.to_string()))?;
-    
-    println!("[EmbeddedWebview] 创建成功: {} at ({}, {}) size {}x{}", url, x, y, width, height);
-    
+    let _webview = main_window
+        .add_child(
+            webview_builder,
+            Position::Logical(LogicalPosition::new(x, y)),
+            Size::Logical(LogicalSize::new(width, height)),
+        )
+        .map_err(|e| AppError::InvalidPath(e.to_string()))?;
+
+    println!(
+        "[EmbeddedWebview] 创建成功: {} at ({}, {}) size {}x{}",
+        url, x, y, width, height
+    );
+
     Ok(())
 }
 
@@ -549,12 +567,14 @@ pub async fn update_webview_bounds(
     x: f64,
     y: f64,
     width: f64,
-    height: f64
+    height: f64,
 ) -> Result<(), AppError> {
     if let Some(webview) = app.get_webview("video-webview") {
-        webview.set_position(Position::Logical(LogicalPosition::new(x, y)))
+        webview
+            .set_position(Position::Logical(LogicalPosition::new(x, y)))
             .map_err(|e| AppError::InvalidPath(e.to_string()))?;
-        webview.set_size(Size::Logical(LogicalSize::new(width, height)))
+        webview
+            .set_size(Size::Logical(LogicalSize::new(width, height)))
             .map_err(|e| AppError::InvalidPath(e.to_string()))?;
     }
     Ok(())
@@ -564,7 +584,9 @@ pub async fn update_webview_bounds(
 #[tauri::command]
 pub async fn close_embedded_webview(app: AppHandle) -> Result<(), AppError> {
     if let Some(webview) = app.get_webview("video-webview") {
-        webview.close().map_err(|e| AppError::InvalidPath(e.to_string()))?;
+        webview
+            .close()
+            .map_err(|e| AppError::InvalidPath(e.to_string()))?;
     }
     Ok(())
 }
@@ -572,46 +594,53 @@ pub async fn close_embedded_webview(app: AppHandle) -> Result<(), AppError> {
 /// Open a new main window
 #[tauri::command]
 pub async fn open_new_window(app: AppHandle) -> Result<(), AppError> {
-    let label = format!("window-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis());
-    
-    WebviewWindowBuilder::new(
-        &app,
-        &label,
-        WebviewUrl::App("index.html".into())
-    )
-    .title("Lumina Note")
-    .inner_size(1200.0, 800.0)
-    .min_inner_size(800.0, 600.0)
-    .resizable(true)
-    .center()
-    .build()
-    .map_err(|e| AppError::InvalidPath(e.to_string()))?;
-    
+    let label = format!(
+        "window-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+    );
+
+    WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
+        .title("Lumina Note")
+        .inner_size(1200.0, 800.0)
+        .min_inner_size(800.0, 600.0)
+        .resizable(true)
+        .center()
+        .build()
+        .map_err(|e| AppError::InvalidPath(e.to_string()))?;
+
     Ok(())
 }
 
 /// 获取 B站视频 CID
 #[tauri::command]
 pub async fn get_bilibili_cid(bvid: String) -> Result<Option<u64>, AppError> {
-    let url = format!("https://api.bilibili.com/x/web-interface/view?bvid={}", bvid);
-    
+    let url = format!(
+        "https://api.bilibili.com/x/web-interface/view?bvid={}",
+        bvid
+    );
+
     let client = reqwest::Client::new();
-    let resp = client.get(&url)
+    let resp = client
+        .get(&url)
         .header("User-Agent", "Mozilla/5.0")
         .send()
         .await
         .map_err(|e| AppError::InvalidPath(e.to_string()))?;
-    
-    let json: serde_json::Value = resp.json()
+
+    let json: serde_json::Value = resp
+        .json()
         .await
         .map_err(|e| AppError::InvalidPath(e.to_string()))?;
-    
+
     if json["code"].as_i64() == Some(0) {
         if let Some(cid) = json["data"]["cid"].as_u64() {
             return Ok(Some(cid));
         }
     }
-    
+
     Ok(None)
 }
 
@@ -619,42 +648,47 @@ pub async fn get_bilibili_cid(bvid: String) -> Result<Option<u64>, AppError> {
 #[tauri::command]
 pub async fn get_bilibili_danmaku(cid: u64) -> Result<Vec<DanmakuItem>, AppError> {
     let url = format!("https://api.bilibili.com/x/v1/dm/list.so?oid={}", cid);
-    
+
     let client = reqwest::Client::new();
-    let resp = client.get(&url)
+    let resp = client
+        .get(&url)
         .header("User-Agent", "Mozilla/5.0")
         .send()
         .await
         .map_err(|e| AppError::InvalidPath(e.to_string()))?;
-    
-    let bytes = resp.bytes()
+
+    let bytes = resp
+        .bytes()
         .await
         .map_err(|e| AppError::InvalidPath(e.to_string()))?;
-    
+
     // 尝试解压 deflate
-    let text = match flate2::read::DeflateDecoder::new(&bytes[..]).bytes().collect::<Result<Vec<u8>, _>>() {
+    let text = match flate2::read::DeflateDecoder::new(&bytes[..])
+        .bytes()
+        .collect::<Result<Vec<u8>, _>>()
+    {
         Ok(decompressed) => String::from_utf8_lossy(&decompressed).to_string(),
         Err(_) => String::from_utf8_lossy(&bytes).to_string(),
     };
-    
+
     // 使用正则解析 XML 中的 <d> 标签
     let mut danmakus = Vec::new();
-    
+
     // 查找所有 <d p="...">...</d> 模式
     let mut pos = 0;
     while let Some(start) = text[pos..].find("<d p=\"") {
         let abs_start = pos + start;
-        
+
         // 找到 p 属性的结束引号
         if let Some(attr_end) = text[abs_start + 6..].find("\"") {
             let attr = &text[abs_start + 6..abs_start + 6 + attr_end];
             let parts: Vec<&str> = attr.split(',').collect();
-            
+
             // 找到 > 和 </d>
             let content_start = abs_start + 6 + attr_end + 2; // 跳过 ">
             if let Some(content_end) = text[content_start..].find("</d>") {
                 let content = &text[content_start..content_start + content_end];
-                
+
                 if parts.len() >= 5 {
                     danmakus.push(DanmakuItem {
                         time: parts[0].parse().unwrap_or(0.0),
@@ -662,7 +696,7 @@ pub async fn get_bilibili_danmaku(cid: u64) -> Result<Vec<DanmakuItem>, AppError
                         timestamp: parts[4].parse().unwrap_or(0),
                     });
                 }
-                
+
                 pos = content_start + content_end + 4; // 跳过 </d>
             } else {
                 pos = abs_start + 1;
@@ -671,12 +705,16 @@ pub async fn get_bilibili_danmaku(cid: u64) -> Result<Vec<DanmakuItem>, AppError
             pos = abs_start + 1;
         }
     }
-    
+
     // 按时间排序
-    danmakus.sort_by(|a, b| a.time.partial_cmp(&b.time).unwrap_or(std::cmp::Ordering::Equal));
-    
+    danmakus.sort_by(|a, b| {
+        a.time
+            .partial_cmp(&b.time)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
     println!("[Danmaku] 解析到 {} 条弹幕", danmakus.len());
-    
+
     Ok(danmakus)
 }
 
@@ -704,7 +742,9 @@ pub async fn seek_video_time(app: AppHandle, seconds: f64) -> Result<(), AppErro
             "#,
             seconds, seconds
         );
-        webview.eval(&js).map_err(|e| AppError::InvalidPath(e.to_string()))?;
+        webview
+            .eval(&js)
+            .map_err(|e| AppError::InvalidPath(e.to_string()))?;
     }
     Ok(())
 }
@@ -746,7 +786,9 @@ pub async fn fill_danmaku_prefix(app: AppHandle, prefix: String) -> Result<(), A
             "#,
             prefix, prefix
         );
-        webview.eval(&js).map_err(|e| AppError::InvalidPath(e.to_string()))?;
+        webview
+            .eval(&js)
+            .map_err(|e| AppError::InvalidPath(e.to_string()))?;
     }
     Ok(())
 }
@@ -803,7 +845,9 @@ pub async fn setup_danmaku_autofill(app: AppHandle, prefix: String) -> Result<()
             "#,
             prefix
         );
-        webview.eval(&js).map_err(|e| AppError::InvalidPath(e.to_string()))?;
+        webview
+            .eval(&js)
+            .map_err(|e| AppError::InvalidPath(e.to_string()))?;
     }
     Ok(())
 }
@@ -815,12 +859,15 @@ pub async fn open_video_window(app: AppHandle, url: String) -> Result<(), AppErr
     if let Some(window) = app.get_webview_window("video-player") {
         let _ = window.close();
     }
-    
+
     // 创建新的 WebView 窗口
     let _window = WebviewWindowBuilder::new(
         &app,
         "video-player",
-        WebviewUrl::External(url.parse().map_err(|_| AppError::InvalidPath("Invalid URL".into()))?)
+        WebviewUrl::External(
+            url.parse()
+                .map_err(|_| AppError::InvalidPath("Invalid URL".into()))?,
+        ),
     )
     .title("视频播放器 - Lumina Note")
     .inner_size(960.0, 640.0)
@@ -828,9 +875,9 @@ pub async fn open_video_window(app: AppHandle, url: String) -> Result<(), AppErr
     .center()
     .build()
     .map_err(|e| AppError::InvalidPath(e.to_string()))?;
-    
+
     println!("[VideoWindow] 窗口已创建: {}", url);
-    
+
     Ok(())
 }
 
@@ -838,7 +885,9 @@ pub async fn open_video_window(app: AppHandle, url: String) -> Result<(), AppErr
 #[tauri::command]
 pub async fn close_video_window(app: AppHandle) -> Result<(), AppError> {
     if let Some(window) = app.get_webview_window("video-player") {
-        window.close().map_err(|e| AppError::InvalidPath(e.to_string()))?;
+        window
+            .close()
+            .map_err(|e| AppError::InvalidPath(e.to_string()))?;
     }
     Ok(())
 }
@@ -862,7 +911,7 @@ pub async fn get_video_time(app: AppHandle) -> Result<Option<String>, AppError> 
                 return null;
             })();
         "#;
-        
+
         match window.eval(script) {
             Ok(_) => {
                 // eval 不直接返回值，需要用其他方式
@@ -870,9 +919,7 @@ pub async fn get_video_time(app: AppHandle) -> Result<Option<String>, AppError> 
                 // 暂时返回 None，让前端用其他方式处理
                 Ok(None)
             }
-            Err(e) => {
-                Err(AppError::InvalidPath(e.to_string()))
-            }
+            Err(e) => Err(AppError::InvalidPath(e.to_string())),
         }
     } else {
         Ok(None)
@@ -892,7 +939,7 @@ pub async fn sync_video_time(app: AppHandle) -> Result<Option<VideoTimeInfo>, Ap
                     let current_time = parts[0].parse::<f64>().unwrap_or(0.0) / 1000.0;
                     let duration = parts[1].parse::<f64>().unwrap_or(0.0) / 1000.0;
                     let paused = parts[2] == "1";
-                    
+
                     return Ok(Some(VideoTimeInfo {
                         current_time,
                         duration,
@@ -917,8 +964,7 @@ pub struct VideoTimeInfo {
 #[tauri::command]
 pub async fn start_file_watcher(app: AppHandle, watch_path: String) -> Result<(), AppError> {
     fs::ensure_allowed_path(std::path::Path::new(&watch_path), true)?;
-    watcher::start_watcher(app, watch_path)
-        .map_err(|e| AppError::InvalidPath(e))
+    watcher::start_watcher(app, watch_path).map_err(|e| AppError::InvalidPath(e))
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -941,13 +987,17 @@ pub async fn create_browser_webview(
     height: f64,
 ) -> Result<(), AppError> {
     let windows = app.windows();
-    let main_window = windows.get("main")
+    let main_window = windows
+        .get("main")
         .ok_or_else(|| AppError::InvalidPath("Main window not found".into()))?;
 
-    browser_debug_log(&app, format!(
-        "create_browser_webview: tab_id={} url={} rect=({}, {}) {}x{}",
-        tab_id, url, x, y, width, height
-    ));
+    browser_debug_log(
+        &app,
+        format!(
+            "create_browser_webview: tab_id={} url={} rect=({}, {}) {}x{}",
+            tab_id, url, x, y, width, height
+        ),
+    );
 
     // 使用 tab_id 作为 webview 标识
     let webview_id = format!("browser-{}", tab_id);
@@ -966,34 +1016,35 @@ pub async fn create_browser_webview(
     let app_handle = app.clone();
     let parent_tab_id = tab_id.clone();
 
-    let webview_builder = WebviewBuilder::new(
-        &webview_id,
-        WebviewUrl::External(parsed_url),
-    )
-    .on_new_window(move |new_url, _features| {
-        if new_url.scheme() == "http" || new_url.scheme() == "https" {
-            browser_debug_log(&app_handle, format!(
-                "on_new_window: parent_tab_id={} new_url={}",
-                parent_tab_id,
-                new_url,
-            ));
-            let payload = BrowserNewTabEventPayload {
-                parent_tab_id: parent_tab_id.clone(),
-                url: new_url.to_string(),
-            };
-            // 向前端广播新标签事件（忽略发送错误）
-            let _ = app_handle.emit("browser:new-tab", payload);
-            NewWindowResponse::Deny
-        } else {
-            NewWindowResponse::Allow
-        }
-    });
+    let webview_builder = WebviewBuilder::new(&webview_id, WebviewUrl::External(parsed_url))
+        .on_new_window(move |new_url, _features| {
+            if new_url.scheme() == "http" || new_url.scheme() == "https" {
+                browser_debug_log(
+                    &app_handle,
+                    format!(
+                        "on_new_window: parent_tab_id={} new_url={}",
+                        parent_tab_id, new_url,
+                    ),
+                );
+                let payload = BrowserNewTabEventPayload {
+                    parent_tab_id: parent_tab_id.clone(),
+                    url: new_url.to_string(),
+                };
+                // 向前端广播新标签事件（忽略发送错误）
+                let _ = app_handle.emit("browser:new-tab", payload);
+                NewWindowResponse::Deny
+            } else {
+                NewWindowResponse::Allow
+            }
+        });
 
-    let _webview = main_window.add_child(
-        webview_builder,
-        Position::Logical(LogicalPosition::new(x, y)),
-        Size::Logical(LogicalSize::new(width, height)),
-    ).map_err(|e| AppError::InvalidPath(e.to_string()))?;
+    let _webview = main_window
+        .add_child(
+            webview_builder,
+            Position::Logical(LogicalPosition::new(x, y)),
+            Size::Logical(LogicalSize::new(width, height)),
+        )
+        .map_err(|e| AppError::InvalidPath(e.to_string()))?;
 
     println!(
         "[Browser] WebView 创建成功: {} -> {} at ({}, {}) size {}x{}",
@@ -1011,17 +1062,22 @@ pub async fn update_browser_webview_bounds(
     x: f64,
     y: f64,
     width: f64,
-    height: f64
+    height: f64,
 ) -> Result<(), AppError> {
     let webview_id = format!("browser-{}", tab_id);
     if let Some(webview) = app.get_webview(&webview_id) {
-        browser_debug_log(&app, format!(
-            "update_browser_webview_bounds: tab_id={} rect=({}, {}) {}x{}",
-            tab_id, x, y, width, height
-        ));
-        webview.set_position(Position::Logical(LogicalPosition::new(x, y)))
+        browser_debug_log(
+            &app,
+            format!(
+                "update_browser_webview_bounds: tab_id={} rect=({}, {}) {}x{}",
+                tab_id, x, y, width, height
+            ),
+        );
+        webview
+            .set_position(Position::Logical(LogicalPosition::new(x, y)))
             .map_err(|e| AppError::InvalidPath(e.to_string()))?;
-        webview.set_size(Size::Logical(LogicalSize::new(width, height)))
+        webview
+            .set_size(Size::Logical(LogicalSize::new(width, height)))
             .map_err(|e| AppError::InvalidPath(e.to_string()))?;
     }
     Ok(())
@@ -1032,7 +1088,9 @@ pub async fn update_browser_webview_bounds(
 pub async fn close_browser_webview(app: AppHandle, tab_id: String) -> Result<(), AppError> {
     let webview_id = format!("browser-{}", tab_id);
     if let Some(webview) = app.get_webview(&webview_id) {
-        webview.close().map_err(|e| AppError::InvalidPath(e.to_string()))?;
+        webview
+            .close()
+            .map_err(|e| AppError::InvalidPath(e.to_string()))?;
         println!("[Browser] WebView 已关闭: {}", webview_id);
         browser_debug_log(&app, format!("close_browser_webview: tab_id={}", tab_id));
     }
@@ -1044,14 +1102,19 @@ pub async fn close_browser_webview(app: AppHandle, tab_id: String) -> Result<(),
 pub async fn navigate_browser_webview(
     app: AppHandle,
     tab_id: String,
-    url: String
+    url: String,
 ) -> Result<(), AppError> {
     let webview_id = format!("browser-{}", tab_id);
     if let Some(webview) = app.get_webview(&webview_id) {
-        browser_debug_log(&app, format!("navigate_browser_webview: tab_id={} url={}", tab_id, url));
-        let parsed_url: tauri::Url = url.parse()
+        browser_debug_log(
+            &app,
+            format!("navigate_browser_webview: tab_id={} url={}", tab_id, url),
+        );
+        let parsed_url: tauri::Url = url
+            .parse()
             .map_err(|_| AppError::InvalidPath("Invalid URL".into()))?;
-        webview.navigate(parsed_url)
+        webview
+            .navigate(parsed_url)
             .map_err(|e| AppError::InvalidPath(e.to_string()))?;
         println!("[Browser] 导航到: {}", url);
     }
@@ -1065,7 +1128,8 @@ pub async fn browser_webview_go_back(app: AppHandle, tab_id: String) -> Result<(
     if let Some(webview) = app.get_webview(&webview_id) {
         browser_debug_log(&app, format!("browser_webview_go_back: tab_id={}", tab_id));
         // 通过 JS 执行后退
-        webview.eval("history.back()")
+        webview
+            .eval("history.back()")
             .map_err(|e| AppError::InvalidPath(e.to_string()))?;
     }
     Ok(())
@@ -1076,8 +1140,12 @@ pub async fn browser_webview_go_back(app: AppHandle, tab_id: String) -> Result<(
 pub async fn browser_webview_go_forward(app: AppHandle, tab_id: String) -> Result<(), AppError> {
     let webview_id = format!("browser-{}", tab_id);
     if let Some(webview) = app.get_webview(&webview_id) {
-        browser_debug_log(&app, format!("browser_webview_go_forward: tab_id={}", tab_id));
-        webview.eval("history.forward()")
+        browser_debug_log(
+            &app,
+            format!("browser_webview_go_forward: tab_id={}", tab_id),
+        );
+        webview
+            .eval("history.forward()")
             .map_err(|e| AppError::InvalidPath(e.to_string()))?;
     }
     Ok(())
@@ -1089,7 +1157,8 @@ pub async fn browser_webview_reload(app: AppHandle, tab_id: String) -> Result<()
     let webview_id = format!("browser-{}", tab_id);
     if let Some(webview) = app.get_webview(&webview_id) {
         browser_debug_log(&app, format!("browser_webview_reload: tab_id={}", tab_id));
-        webview.eval("location.reload()")
+        webview
+            .eval("location.reload()")
             .map_err(|e| AppError::InvalidPath(e.to_string()))?;
     }
     Ok(())
@@ -1100,26 +1169,30 @@ pub async fn browser_webview_reload(app: AppHandle, tab_id: String) -> Result<()
 pub async fn set_browser_webview_visible(
     app: AppHandle,
     tab_id: String,
-    visible: bool
+    visible: bool,
 ) -> Result<(), AppError> {
     let webview_id = format!("browser-{}", tab_id);
     if let Some(webview) = app.get_webview(&webview_id) {
-        browser_debug_log(&app, format!(
-            "set_browser_webview_visible: tab_id={} visible={}",
-            tab_id, visible
-        ));
+        browser_debug_log(
+            &app,
+            format!(
+                "set_browser_webview_visible: tab_id={} visible={}",
+                tab_id, visible
+            ),
+        );
         if visible {
-            webview.set_position(Position::Logical(LogicalPosition::new(0.0, 0.0)))
+            webview
+                .set_position(Position::Logical(LogicalPosition::new(0.0, 0.0)))
                 .map_err(|e| AppError::InvalidPath(e.to_string()))?;
         } else {
             // 移到屏幕外隐藏
-            webview.set_position(Position::Logical(LogicalPosition::new(-10000.0, -10000.0)))
+            webview
+                .set_position(Position::Logical(LogicalPosition::new(-10000.0, -10000.0)))
                 .map_err(|e| AppError::InvalidPath(e.to_string()))?;
         }
     }
     Ok(())
 }
-
 
 /// 冻结浏览器 WebView（暂停 JS 执行，降低资源占用）
 #[tauri::command]
@@ -1127,7 +1200,7 @@ pub async fn browser_webview_freeze(app: AppHandle, tab_id: String) -> Result<()
     let webview_id = format!("browser-{}", tab_id);
     if let Some(webview) = app.get_webview(&webview_id) {
         browser_debug_log(&app, format!("browser_webview_freeze: tab_id={}", tab_id));
-        
+
         // 注入 JS 暂停页面活动
         // 1. 暂停所有定时器
         // 2. 暂停所有动画
@@ -1157,14 +1230,16 @@ pub async fn browser_webview_freeze(app: AppHandle, tab_id: String) -> Result<()
                 }
             })();
         "#;
-        
-        webview.eval(freeze_js)
+
+        webview
+            .eval(freeze_js)
             .map_err(|e| AppError::InvalidPath(e.to_string()))?;
-        
+
         // 移到屏幕外
-        webview.set_position(Position::Logical(LogicalPosition::new(-10000.0, -10000.0)))
+        webview
+            .set_position(Position::Logical(LogicalPosition::new(-10000.0, -10000.0)))
             .map_err(|e| AppError::InvalidPath(e.to_string()))?;
-        
+
         println!("[Browser] WebView 已冻结: {}", webview_id);
     }
     Ok(())
@@ -1176,7 +1251,7 @@ pub async fn browser_webview_unfreeze(app: AppHandle, tab_id: String) -> Result<
     let webview_id = format!("browser-{}", tab_id);
     if let Some(webview) = app.get_webview(&webview_id) {
         browser_debug_log(&app, format!("browser_webview_unfreeze: tab_id={}", tab_id));
-        
+
         // 注入 JS 恢复页面活动
         let unfreeze_js = r#"
             (function() {
@@ -1198,10 +1273,11 @@ pub async fn browser_webview_unfreeze(app: AppHandle, tab_id: String) -> Result<
                 }
             })();
         "#;
-        
-        webview.eval(unfreeze_js)
+
+        webview
+            .eval(unfreeze_js)
             .map_err(|e| AppError::InvalidPath(e.to_string()))?;
-        
+
         println!("[Browser] WebView 已解冻: {}", webview_id);
     }
     Ok(())
@@ -1239,7 +1315,7 @@ mod tests {
 
     #[tokio::test]
     async fn typesetting_export_pdf_base64_returns_pdf_header() {
-        use base64::{Engine as _, engine::general_purpose::STANDARD};
+        use base64::{engine::general_purpose::STANDARD, Engine as _};
 
         let payload = typesetting_export_pdf_base64()
             .await

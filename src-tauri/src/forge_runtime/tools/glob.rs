@@ -1,4 +1,4 @@
-﻿use crate::forge_runtime::permissions::request_permission;
+use crate::forge_runtime::permissions::request_permission;
 use crate::forge_runtime::tools::shared::{
     ensure_external_directory_permission, parse_tool_input, resolve_path,
 };
@@ -91,7 +91,10 @@ async fn handle(call: ToolCall, ctx: ToolContext, env: ToolEnvironment) -> Graph
         if !entry.file_type().is_file() {
             continue;
         }
-        let rel = entry.path().strip_prefix(&search_root).unwrap_or(entry.path());
+        let rel = entry
+            .path()
+            .strip_prefix(&search_root)
+            .unwrap_or(entry.path());
         if !matcher.is_match(rel) {
             continue;
         }
@@ -121,7 +124,10 @@ async fn handle(call: ToolCall, ctx: ToolContext, env: ToolEnvironment) -> Graph
         output.extend(entries.iter().map(|(path, _)| path.clone()));
         if truncated {
             output.push("".to_string());
-            output.push("(Results are truncated. Consider using a more specific path or pattern.)".to_string());
+            output.push(
+                "(Results are truncated. Consider using a more specific path or pattern.)"
+                    .to_string(),
+            );
         }
     }
 

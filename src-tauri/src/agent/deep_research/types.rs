@@ -1,7 +1,7 @@
 //! Deep Research 类型定义
 
-use serde::{Deserialize, Serialize};
 use crate::langgraph::state::GraphState as LangGraphState;
+use serde::{Deserialize, Serialize};
 
 /// 研究阶段
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -158,7 +158,7 @@ pub struct DeepResearchConfig {
     /// 语言
     #[serde(default = "default_locale")]
     pub locale: String,
-    
+
     // ============ 网络搜索配置 ============
     /// 是否启用网络搜索
     #[serde(default)]
@@ -171,13 +171,25 @@ pub struct DeepResearchConfig {
     pub max_web_search_results: usize,
 }
 
-fn default_web_search_results() -> usize { 10 }
+fn default_web_search_results() -> usize {
+    10
+}
 
-fn default_temperature() -> f32 { 0.7 }
-fn default_max_search_results() -> usize { 20 }
-fn default_max_notes_to_read() -> usize { 10 }
-fn default_true() -> bool { true }
-fn default_locale() -> String { "zh-CN".to_string() }
+fn default_temperature() -> f32 {
+    0.7
+}
+fn default_max_search_results() -> usize {
+    20
+}
+fn default_max_notes_to_read() -> usize {
+    10
+}
+fn default_true() -> bool {
+    true
+}
+fn default_locale() -> String {
+    "zh-CN".to_string()
+}
 
 impl Default for DeepResearchConfig {
     fn default() -> Self {
@@ -261,15 +273,15 @@ impl LangGraphState for DeepResearchState {
             Some(&self.goto)
         }
     }
-    
+
     fn set_next(&mut self, next: Option<String>) {
         self.goto = next.unwrap_or_default();
     }
-    
+
     fn is_complete(&self) -> bool {
         matches!(self.phase, ResearchPhase::Completed | ResearchPhase::Error)
     }
-    
+
     fn mark_complete(&mut self) {
         self.phase = ResearchPhase::Completed;
     }
@@ -281,7 +293,10 @@ impl LangGraphState for DeepResearchState {
 #[serde(rename_all = "snake_case")]
 pub enum DeepResearchEvent {
     /// 阶段变化
-    PhaseChange { phase: ResearchPhase, message: String },
+    PhaseChange {
+        phase: ResearchPhase,
+        message: String,
+    },
     /// 关键词提取完成
     KeywordsExtracted { keywords: Vec<String> },
     /// 找到笔记
@@ -289,13 +304,31 @@ pub enum DeepResearchEvent {
     /// 网络搜索完成
     WebSearchComplete { results: Vec<WebSearchResult> },
     /// 正在爬取网页
-    CrawlingPage { url: String, title: String, index: usize, total: usize },
+    CrawlingPage {
+        url: String,
+        title: String,
+        index: usize,
+        total: usize,
+    },
     /// 网页爬取完成
-    PageCrawled { url: String, title: String, content_preview: String },
+    PageCrawled {
+        url: String,
+        title: String,
+        content_preview: String,
+    },
     /// 正在阅读笔记
-    ReadingNote { path: String, title: String, index: usize, total: usize },
+    ReadingNote {
+        path: String,
+        title: String,
+        index: usize,
+        total: usize,
+    },
     /// 笔记读取完成
-    NoteRead { path: String, title: String, summary: Option<String> },
+    NoteRead {
+        path: String,
+        title: String,
+        summary: Option<String>,
+    },
     /// 大纲生成
     OutlineGenerated { outline: ReportOutline },
     /// 报告块（流式输出）
@@ -307,7 +340,7 @@ pub enum DeepResearchEvent {
         total_tokens: usize,
     },
     /// 需要用户澄清
-    NeedsClarification { 
+    NeedsClarification {
         question: String,
         suggestions: Vec<String>,
         interrupt_id: String,

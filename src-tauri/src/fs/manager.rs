@@ -1,7 +1,7 @@
+use serde::Serialize;
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::env;
-use serde::Serialize;
 
 use crate::error::AppError;
 
@@ -78,7 +78,9 @@ pub fn ensure_allowed_path(path: &Path, must_exist: bool) -> Result<(), AppError
 
     let roots = allowed_roots();
     if roots.is_empty() {
-        return Err(AppError::InvalidPath("No allowed roots configured".to_string()));
+        return Err(AppError::InvalidPath(
+            "No allowed roots configured".to_string(),
+        ));
     }
 
     if roots.iter().any(|root| candidate.starts_with(root)) {
@@ -133,7 +135,7 @@ pub fn list_dir_recursive(path: &str) -> Result<Vec<FileEntry>, AppError> {
         if name.starts_with('.') && name != ".lumina" {
             continue;
         }
-        
+
         // Skip node_modules and other common non-user directories
         if name == "node_modules" || name == "target" || name == ".git" {
             continue;
@@ -160,12 +162,10 @@ pub fn list_dir_recursive(path: &str) -> Result<Vec<FileEntry>, AppError> {
     }
 
     // Sort: directories first, then files, alphabetically
-    entries.sort_by(|a, b| {
-        match (a.is_dir, b.is_dir) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        }
+    entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
     });
 
     Ok(entries)
@@ -231,36 +231,41 @@ pub fn move_file_to_folder(source: &str, target_folder: &str) -> Result<String, 
     let target_folder_path = Path::new(target_folder);
     ensure_allowed_path(source_path, true)?;
     ensure_allowed_path(target_folder_path, true)?;
-    
+
     // Check source exists and is a file
     if !source_path.exists() {
         return Err(AppError::FileNotFound(source.to_string()));
     }
     if source_path.is_dir() {
-        return Err(AppError::InvalidPath("Source is a directory, use move_folder instead".to_string()));
+        return Err(AppError::InvalidPath(
+            "Source is a directory, use move_folder instead".to_string(),
+        ));
     }
-    
+
     // Check target folder exists and is a directory
     if !target_folder_path.exists() {
         return Err(AppError::FileNotFound(target_folder.to_string()));
     }
     if !target_folder_path.is_dir() {
-        return Err(AppError::InvalidPath("Target is not a directory".to_string()));
+        return Err(AppError::InvalidPath(
+            "Target is not a directory".to_string(),
+        ));
     }
-    
+
     // Build new path
-    let file_name = source_path.file_name()
+    let file_name = source_path
+        .file_name()
         .ok_or_else(|| AppError::InvalidPath("Invalid source file name".to_string()))?;
     let new_path = target_folder_path.join(file_name);
-    
+
     // Check if target already exists
     if new_path.exists() {
         return Err(AppError::FileExists(new_path.display().to_string()));
     }
-    
+
     // Move the file
     fs::rename(source_path, &new_path).map_err(AppError::from)?;
-    
+
     Ok(new_path.to_string_lossy().to_string())
 }
 
@@ -271,46 +276,55 @@ pub fn move_folder_to_folder(source: &str, target_folder: &str) -> Result<String
     let target_folder_path = Path::new(target_folder);
     ensure_allowed_path(source_path, true)?;
     ensure_allowed_path(target_folder_path, true)?;
-    
+
     // Check source exists and is a directory
     if !source_path.exists() {
         return Err(AppError::FileNotFound(source.to_string()));
     }
     if !source_path.is_dir() {
-        return Err(AppError::InvalidPath("Source is not a directory".to_string()));
+        return Err(AppError::InvalidPath(
+            "Source is not a directory".to_string(),
+        ));
     }
-    
+
     // Check target folder exists and is a directory
     if !target_folder_path.exists() {
         return Err(AppError::FileNotFound(target_folder.to_string()));
     }
     if !target_folder_path.is_dir() {
-        return Err(AppError::InvalidPath("Target is not a directory".to_string()));
+        return Err(AppError::InvalidPath(
+            "Target is not a directory".to_string(),
+        ));
     }
-    
+
     // Build new path
-    let folder_name = source_path.file_name()
+    let folder_name = source_path
+        .file_name()
         .ok_or_else(|| AppError::InvalidPath("Invalid source folder name".to_string()))?;
     let new_path = target_folder_path.join(folder_name);
-    
+
     // Check if moving to self or subdirectory
-    let source_canonical = source_path.canonicalize()
+    let source_canonical = source_path
+        .canonicalize()
         .map_err(|_| AppError::InvalidPath("Cannot resolve source path".to_string()))?;
-    let target_canonical = target_folder_path.canonicalize()
+    let target_canonical = target_folder_path
+        .canonicalize()
         .map_err(|_| AppError::InvalidPath("Cannot resolve target path".to_string()))?;
-    
+
     if target_canonical.starts_with(&source_canonical) {
-        return Err(AppError::InvalidPath("Cannot move folder into itself or its subdirectory".to_string()));
+        return Err(AppError::InvalidPath(
+            "Cannot move folder into itself or its subdirectory".to_string(),
+        ));
     }
-    
+
     // Check if target already exists
     if new_path.exists() {
         return Err(AppError::FileExists(new_path.display().to_string()));
     }
-    
+
     // Move the folder
     fs::rename(source_path, &new_path).map_err(AppError::from)?;
-    
+
     Ok(new_path.to_string_lossy().to_string())
 }
 

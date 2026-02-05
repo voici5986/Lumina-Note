@@ -1,7 +1,7 @@
 //! LLM 客户端封装
-//! 
+//!
 //! 封装 LLM API 调用，支持多种提供商
-//! 
+//!
 //! ## SSE 稳定性增强
 //! - 心跳机制：定期发送心跳事件，检测连接状态
 //! - 指数退避重试：网络错误时自动重试
@@ -9,12 +9,12 @@
 
 use crate::agent::types::*;
 use crate::mobile_gateway::emit_agent_event;
+use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::AppHandle;
-use futures_util::StreamExt;
 use tokio::time::interval;
 
 /// OpenAI 格式的请求
@@ -58,7 +58,7 @@ struct FunctionDefinition {
 #[derive(Debug, Clone)]
 pub struct LlmResponse {
     pub content: String,
-    pub tool_calls: Option<Vec<ToolCall>>,  // FC 模式下直接返回解析后的工具调用
+    pub tool_calls: Option<Vec<ToolCall>>, // FC 模式下直接返回解析后的工具调用
     pub prompt_tokens: usize,
     pub completion_tokens: usize,
     pub total_tokens: usize,
@@ -83,18 +83,21 @@ impl LlmClient {
             .timeout(std::time::Duration::from_secs(300))
             .build()
             .expect("Failed to create HTTP client");
-        
+
         Self { config, client }
     }
 
     /// 获取 API URL
     fn get_api_url(&self) -> String {
-        let base = self.config.base_url.clone()
+        let base = self
+            .config
+            .base_url
+            .clone()
             .unwrap_or_else(|| self.get_default_base_url());
-        
+
         // 移除尾部斜杠
         let base = base.trim_end_matches('/');
-        
+
         match self.config.provider.as_str() {
             "anthropic" => format!("{}/messages", base),
             _ => format!("{}/chat/completions", base),
@@ -115,9 +118,11 @@ impl LlmClient {
     /// 判断当前 provider 是否支持 Function Calling
     pub fn supports_fc(&self) -> bool {
         match self.config.provider.as_str() {
-            "openai" | "anthropic" | "deepseek" | "moonshot" | "gemini" | "groq" | "openrouter" => true,
-            "ollama" => false,  // 本地模型 FC 支持不稳定，使用 XML 模式
-            _ => false,  // 未知 provider 默认不支持
+            "openai" | "anthropic" | "deepseek" | "moonshot" | "gemini" | "groq" | "openrouter" => {
+                true
+            }
+            "ollama" => false, // 本地模型 FC 支持不稳定，使用 XML 模式
+            _ => false,        // 未知 provider 默认不支持
         }
     }
 
@@ -125,7 +130,7 @@ impl LlmClient {
     fn build_headers(&self) -> HashMap<String, String> {
         let mut headers = HashMap::new();
         headers.insert("Content-Type".to_string(), "application/json".to_string());
-        
+
         match self.config.provider.as_str() {
             "anthropic" => {
                 headers.insert("x-api-key".to_string(), self.config.api_key.clone());
@@ -133,28 +138,31 @@ impl LlmClient {
             }
             _ => {
                 headers.insert(
-                    "Authorization".to_string(), 
-                    format!("Bearer {}", self.config.api_key)
+                    "Authorization".to_string(),
+                    format!("Bearer {}", self.config.api_key),
                 );
             }
         }
-        
+
         headers
     }
 
     /// 转换消息格式
     fn convert_messages(&self, messages: &[Message]) -> Vec<ChatMessage> {
-        messages.iter().map(|m| ChatMessage {
-            role: match m.role {
-                MessageRole::System => "system".to_string(),
-                MessageRole::User => "user".to_string(),
-                MessageRole::Assistant => "assistant".to_string(),
-                MessageRole::Tool => "tool".to_string(),
-            },
-            content: m.content.clone(),
-            name: m.name.clone(),
-            tool_call_id: m.tool_call_id.clone(),
-        }).collect()
+        messages
+            .iter()
+            .map(|m| ChatMessage {
+                role: match m.role {
+                    MessageRole::System => "system".to_string(),
+                    MessageRole::User => "user".to_string(),
+                    MessageRole::Assistant => "assistant".to_string(),
+                    MessageRole::Tool => "tool".to_string(),
+                },
+                content: m.content.clone(),
+                name: m.name.clone(),
+                tool_call_id: m.tool_call_id.clone(),
+            })
+            .collect()
     }
 
     /// 非流式调用（带重试机制）
@@ -165,9 +173,9 @@ impl LlmClient {
     ) -> Result<LlmResponse, String> {
         let url = self.get_api_url();
         let headers = self.build_headers();
-        
+
         let chat_messages = self.convert_messages(messages);
-        
+
         let mut body = json!({
             "model": self.config.model,
             "messages": chat_messages,
@@ -175,53 +183,60 @@ impl LlmClient {
             "max_tokens": self.config.max_tokens,
             "stream": false,
         });
-        
+
         let has_tools = tools.is_some();
         if let Some(tools) = tools {
             body["tools"] = json!(tools);
         }
-        
+
         println!("[LlmClient] 📤 发送请求到: {}", url);
-        println!("[LlmClient] 📤 模型: {}, 消息数: {}, 工具: {}", 
-            self.config.model, chat_messages.len(), has_tools);
-        
+        println!(
+            "[LlmClient] 📤 模型: {}, 消息数: {}, 工具: {}",
+            self.config.model,
+            chat_messages.len(),
+            has_tools
+        );
+
         // 重试机制
         let max_retries = 2;
         let mut last_error = String::new();
-        
+
         for attempt in 0..=max_retries {
             if attempt > 0 {
                 // 重试前等待，指数退避
                 let wait_secs = 1u64 << (attempt - 1); // 1s, 2s
-                println!("[LlmClient] ⏳ 重试 {} (等待 {}s)，上次错误: {}", attempt, wait_secs, last_error);
+                println!(
+                    "[LlmClient] ⏳ 重试 {} (等待 {}s)，上次错误: {}",
+                    attempt, wait_secs, last_error
+                );
                 tokio::time::sleep(std::time::Duration::from_secs(wait_secs)).await;
             }
-            
+
             let start_time = std::time::Instant::now();
-            
+
             // 每次重试都重新构建请求（避免连接复用问题）
             let mut req = self.client.post(&url);
             for (key, value) in &headers {
                 req = req.header(key, value);
             }
             req = req.json(&body);
-            
+
             match req.send().await {
                 Ok(response) => {
                     println!("[LlmClient] ✅ 收到响应，耗时: {:?}", start_time.elapsed());
-                    
+
                     if !response.status().is_success() {
                         let status = response.status();
                         let text = response.text().await.unwrap_or_default();
                         last_error = format!("HTTP {}: {}", status, text);
-                        
+
                         // 5xx 错误可以重试，4xx 错误不重试
                         if status.is_server_error() {
                             continue;
                         }
                         return Err(last_error);
                     }
-                    
+
                     let json: Value = match response.json().await {
                         Ok(j) => j,
                         Err(e) => {
@@ -229,7 +244,7 @@ impl LlmClient {
                             continue;
                         }
                     };
-                    
+
                     // 成功，解析响应
                     return self.parse_llm_response(json);
                 }
@@ -240,21 +255,24 @@ impl LlmClient {
                 }
             }
         }
-        
+
         // 所有重试都失败
         Err(last_error)
     }
-    
+
     /// 解析 LLM 响应
     fn parse_llm_response(&self, json: Value) -> Result<LlmResponse, String> {
         // 提取 token 使用量
         let usage = &json["usage"];
         let prompt_tokens = usage["prompt_tokens"].as_u64().unwrap_or(0) as usize;
         let completion_tokens = usage["completion_tokens"].as_u64().unwrap_or(0) as usize;
-        let total_tokens = usage["total_tokens"].as_u64().map(|t| t as usize).unwrap_or(prompt_tokens + completion_tokens);
-        
+        let total_tokens = usage["total_tokens"]
+            .as_u64()
+            .map(|t| t as usize)
+            .unwrap_or(prompt_tokens + completion_tokens);
+
         let message = &json["choices"][0]["message"];
-        
+
         // 检查是否有 tool_calls（Function Call）
         if let Some(fc_tool_calls) = message.get("tool_calls").and_then(|v| v.as_array()) {
             if self.supports_fc() {
@@ -263,21 +281,21 @@ impl LlmClient {
                 for (idx, tc) in fc_tool_calls.iter().enumerate() {
                     let name = tc["function"]["name"].as_str().unwrap_or("").to_string();
                     let args_str = tc["function"]["arguments"].as_str().unwrap_or("{}");
-                    
+
                     // 解析参数 JSON
-                    let params: HashMap<String, Value> = serde_json::from_str(args_str)
-                        .unwrap_or_default();
-                    
+                    let params: HashMap<String, Value> =
+                        serde_json::from_str(args_str).unwrap_or_default();
+
                     parsed_calls.push(ToolCall {
                         id: format!("call_{}", idx),
                         name,
                         params,
                     });
                 }
-                
+
                 // 文本内容（如果有）
                 let content = message["content"].as_str().unwrap_or("").to_string();
-                
+
                 return Ok(LlmResponse {
                     content,
                     tool_calls: Some(parsed_calls),
@@ -291,7 +309,7 @@ impl LlmClient {
                 for tc in fc_tool_calls {
                     let name = tc["function"]["name"].as_str().unwrap_or("");
                     let args_str = tc["function"]["arguments"].as_str().unwrap_or("{}");
-                    
+
                     if let Ok(args) = serde_json::from_str::<Value>(args_str) {
                         xml_output.push_str(&format!("<{}>\n", name));
                         if let Some(obj) = args.as_object() {
@@ -315,13 +333,10 @@ impl LlmClient {
                 });
             }
         }
-        
+
         // 提取文本内容
-        let content = message["content"]
-            .as_str()
-            .unwrap_or("")
-            .to_string();
-        
+        let content = message["content"].as_str().unwrap_or("").to_string();
+
         Ok(LlmResponse {
             content,
             tool_calls: None,
@@ -604,7 +619,11 @@ impl LlmClient {
 
         LlmResponse {
             content: full_content,
-            tool_calls: if parsed_calls.is_empty() { None } else { Some(parsed_calls) },
+            tool_calls: if parsed_calls.is_empty() {
+                None
+            } else {
+                Some(parsed_calls)
+            },
             prompt_tokens,
             completion_tokens,
             total_tokens,
@@ -619,8 +638,8 @@ impl LlmClient {
                 if call.name.is_empty() {
                     return None;
                 }
-                let params = serde_json::from_str::<HashMap<String, Value>>(&call.args)
-                    .unwrap_or_default();
+                let params =
+                    serde_json::from_str::<HashMap<String, Value>>(&call.args).unwrap_or_default();
                 let id = call.id.unwrap_or_else(|| format!("call_{}", idx));
                 Some(ToolCall {
                     id,
@@ -645,7 +664,7 @@ impl LlmClient {
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_millis() as u64;
-        
+
         emit_agent_event(
             app,
             AgentEvent::LlmRequestStart {
@@ -653,10 +672,12 @@ impl LlmClient {
                 timestamp: start_timestamp,
             },
         );
-        
+
         // 使用带重试的流式调用
-        let result = self.call_stream_with_retry(app, request_id, messages, tools, current_agent).await;
-        
+        let result = self
+            .call_stream_with_retry(app, request_id, messages, tools, current_agent)
+            .await;
+
         // 发送 LLM 请求结束事件
         emit_agent_event(
             app,
@@ -664,10 +685,10 @@ impl LlmClient {
                 request_id: request_id.to_string(),
             },
         );
-        
+
         result
     }
-    
+
     /// 流式调用（带指数退避重试）
     async fn call_stream_with_retry(
         &self,
@@ -680,20 +701,25 @@ impl LlmClient {
         let max_retries = 3;
         let base_delay = Duration::from_secs(1);
         let mut last_error = String::new();
-        
+
         for attempt in 0..max_retries {
             if attempt > 0 {
                 // 指数退避 + 随机抖动
                 let delay_secs = base_delay.as_secs() * 2u64.pow(attempt as u32);
                 let jitter_ms = rand::random::<u64>() % 500;
                 let delay = Duration::from_secs(delay_secs) + Duration::from_millis(jitter_ms);
-                
-                println!("[LlmClient] ⏳ 流式调用重试 {} (等待 {:?})，上次错误: {}", 
-                    attempt, delay, last_error);
+
+                println!(
+                    "[LlmClient] ⏳ 流式调用重试 {} (等待 {:?})，上次错误: {}",
+                    attempt, delay, last_error
+                );
                 tokio::time::sleep(delay).await;
             }
-            
-            match self.call_stream_inner(app, request_id, messages, tools, current_agent.clone()).await {
+
+            match self
+                .call_stream_inner(app, request_id, messages, tools, current_agent.clone())
+                .await
+            {
                 Ok(content) => return Ok(content),
                 Err(e) => {
                     last_error = e.clone();
@@ -701,26 +727,33 @@ impl LlmClient {
                     if !Self::is_retryable_error(&e) {
                         return Err(e);
                     }
-                    println!("[LlmClient] ❌ 流式调用失败 (attempt {}): {}", attempt + 1, e);
+                    println!(
+                        "[LlmClient] ❌ 流式调用失败 (attempt {}): {}",
+                        attempt + 1,
+                        e
+                    );
                 }
             }
         }
-        
-        Err(format!("流式调用失败，已重试 {} 次: {}", max_retries, last_error))
+
+        Err(format!(
+            "流式调用失败，已重试 {} 次: {}",
+            max_retries, last_error
+        ))
     }
-    
+
     /// 判断错误是否可重试
     fn is_retryable_error(error: &str) -> bool {
         let error_lower = error.to_lowercase();
-        error_lower.contains("timeout") ||
-        error_lower.contains("connection") ||
-        error_lower.contains("reset") ||
-        error_lower.contains("broken pipe") ||
-        error_lower.contains("stream error") ||
-        error_lower.contains("no data") ||
-        error.contains("5") && error.contains("HTTP")  // 5xx 错误
+        error_lower.contains("timeout")
+            || error_lower.contains("connection")
+            || error_lower.contains("reset")
+            || error_lower.contains("broken pipe")
+            || error_lower.contains("stream error")
+            || error_lower.contains("no data")
+            || error.contains("5") && error.contains("HTTP") // 5xx 错误
     }
-    
+
     /// 流式调用内部实现（带心跳）
     async fn call_stream_inner(
         &self,
@@ -732,9 +765,9 @@ impl LlmClient {
     ) -> Result<String, String> {
         let url = self.get_api_url();
         let headers = self.build_headers();
-        
+
         let chat_messages = self.convert_messages(messages);
-        
+
         let mut body = json!({
             "model": self.config.model,
             "messages": chat_messages,
@@ -742,40 +775,42 @@ impl LlmClient {
             "max_tokens": self.config.max_tokens,
             "stream": true,
         });
-        
+
         if let Some(tools) = tools {
             body["tools"] = json!(tools);
         }
-        
+
         let mut req = self.client.post(&url);
         for (key, value) in headers {
             req = req.header(&key, &value);
         }
         req = req.json(&body);
-        
-        let response = req.send().await
+
+        let response = req
+            .send()
+            .await
             .map_err(|e| format!("Request failed: {}", e))?;
-        
+
         if !response.status().is_success() {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
             return Err(format!("HTTP {}: {}", status, text));
         }
-        
+
         // 流式读取（带心跳和超时检测）
         let mut stream = response.bytes_stream();
         let mut buffer = String::new();
         let mut full_content = String::new();
-        
+
         // 用于累积 tool_calls
         let mut tool_calls: Vec<(String, String)> = Vec::new(); // (name, arguments)
-        
+
         // 心跳和超时配置
         let heartbeat_interval = Duration::from_secs(15);
         let stream_timeout = Duration::from_secs(60);
         let mut last_data_time = Instant::now();
         let mut heartbeat_timer = interval(heartbeat_interval);
-        
+
         loop {
             tokio::select! {
                 // 处理流数据
@@ -785,58 +820,58 @@ impl LlmClient {
                             last_data_time = Instant::now();
                             let text = String::from_utf8_lossy(&bytes);
                             buffer.push_str(&text);
-                            
+
                             // 按行处理 SSE
                             while let Some(newline_pos) = buffer.find('\n') {
                                 let line = buffer[..newline_pos].trim().to_string();
                                 buffer = buffer[newline_pos + 1..].to_string();
-                                
+
                                 if line.is_empty() || line.starts_with(": ") {
                                     continue;
                                 }
-                                
+
                                 if line.starts_with("data: ") {
                                     let data = &line[6..];
-                                    
+
                                     if data == "[DONE]" {
                                         // 流正常结束
                                         return self.finalize_stream_result(full_content, tool_calls);
                                     }
-                                    
+
                                     if let Ok(json) = serde_json::from_str::<Value>(data) {
                                         let delta = &json["choices"][0]["delta"];
-                                        
+
                                         // 处理 tool_calls（Function Call 流式响应）
                                         if let Some(tc_array) = delta.get("tool_calls").and_then(|v| v.as_array()) {
                                             for tc in tc_array {
                                                 let idx = tc["index"].as_u64().unwrap_or(0) as usize;
-                                                
+
                                                 // 确保 tool_calls 数组足够大
                                                 while tool_calls.len() <= idx {
                                                     tool_calls.push((String::new(), String::new()));
                                                 }
-                                                
+
                                                 // 累积函数名
                                                 if let Some(name) = tc["function"]["name"].as_str() {
                                                     tool_calls[idx].0.push_str(name);
                                                 }
-                                                
+
                                                 // 累积参数
                                                 if let Some(args) = tc["function"]["arguments"].as_str() {
                                                     tool_calls[idx].1.push_str(args);
                                                 }
                                             }
                                         }
-                                        
+
                                         // 处理普通文本内容
                                         if let Some(content) = delta["content"].as_str() {
                                             // 跳过空内容
                                             if content.is_empty() {
                                                 continue;
                                             }
-                                            
+
                                             full_content.push_str(content);
-                                            
+
                                             // 发送事件到前端
                                             emit_agent_event(
                                                 app,
@@ -859,16 +894,16 @@ impl LlmClient {
                         }
                     }
                 }
-                
+
                 // 定期发送心跳
                 _ = heartbeat_timer.tick() => {
                     let timestamp = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .unwrap_or_default()
                         .as_millis() as u64;
-                    
+
                     emit_agent_event(app, AgentEvent::Heartbeat { timestamp });
-                    
+
                     // 检测假死（超时无数据）
                     if last_data_time.elapsed() > stream_timeout {
                         return Err(format!("Stream timeout: no data for {} seconds", stream_timeout.as_secs()));
@@ -877,7 +912,7 @@ impl LlmClient {
             }
         }
     }
-    
+
     /// 处理流式结果
     fn finalize_stream_result(
         &self,
@@ -891,7 +926,7 @@ impl LlmClient {
                 if name.is_empty() {
                     continue;
                 }
-                
+
                 // 解析参数 JSON
                 if let Ok(args) = serde_json::from_str::<Value>(args_str) {
                     xml_output.push_str(&format!("<{}>\n", name));
@@ -909,17 +944,21 @@ impl LlmClient {
             }
             return Ok(xml_output);
         }
-        
+
         // 调试日志 - 检查最终内容
         #[cfg(debug_assertions)]
         {
             let newline_count = full_content.matches('\n').count();
-            println!("[LLM Stream] final content length: {}, newlines: {}", full_content.len(), newline_count);
+            println!(
+                "[LLM Stream] final content length: {}, newlines: {}",
+                full_content.len(),
+                newline_count
+            );
             if newline_count == 0 && full_content.len() > 100 {
                 println!("[LLM Stream] WARNING: No newlines in long content!");
             }
         }
-        
+
         Ok(full_content)
     }
 
@@ -939,12 +978,12 @@ impl LlmClient {
             name: None,
             tool_call_id: None,
         }];
-        
+
         self.call(&messages, None).await
     }
 
     /// 简单的流式调用（只传入 prompt，通过 channel 返回）
-    /// 
+    ///
     /// 包含超时处理和错误日志
     pub async fn call_stream_simple(
         &self,
@@ -952,13 +991,16 @@ impl LlmClient {
     ) -> Result<tokio::sync::mpsc::Receiver<String>, String> {
         let url = self.get_api_url();
         let headers = self.build_headers();
-        
+
         // 限制 prompt 长度，避免超过模型限制
         let prompt_chars: String = prompt.chars().take(50000).collect();
-        
+
         #[cfg(debug_assertions)]
-        println!("[LLM] 流式调用开始，prompt 长度: {} 字符", prompt_chars.chars().count());
-        
+        println!(
+            "[LLM] 流式调用开始，prompt 长度: {} 字符",
+            prompt_chars.chars().count()
+        );
+
         let body = json!({
             "model": self.config.model,
             "messages": [{
@@ -969,21 +1011,19 @@ impl LlmClient {
             "max_tokens": self.config.max_tokens,
             "stream": true,
         });
-        
+
         let mut req = self.client.post(&url);
         for (key, value) in headers {
             req = req.header(&key, &value);
         }
         req = req.json(&body);
-        
+
         // 添加请求超时（大请求需要更长时间）
-        let response = tokio::time::timeout(
-            tokio::time::Duration::from_secs(120),
-            req.send()
-        ).await
+        let response = tokio::time::timeout(tokio::time::Duration::from_secs(120), req.send())
+            .await
             .map_err(|_| "请求超时（120秒）".to_string())?
             .map_err(|e| format!("Request failed: {}", e))?;
-        
+
         if !response.status().is_success() {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
@@ -992,13 +1032,13 @@ impl LlmClient {
             eprintln!("[LLM] 流式调用失败: {}", error_msg);
             return Err(error_msg);
         }
-        
+
         #[cfg(debug_assertions)]
         println!("[LLM] 流式响应开始接收...");
-        
+
         // 创建 channel 用于流式输出
         let (tx, rx) = tokio::sync::mpsc::channel::<String>(100);
-        
+
         // 在后台任务中处理流
         let mut stream = response.bytes_stream();
         tokio::spawn(async move {
@@ -1009,13 +1049,13 @@ impl LlmClient {
             let mut total_chars = 0usize;
             #[cfg(debug_assertions)]
             let start_time = std::time::Instant::now();
-            
+
             // 流式读取超时：如果 60 秒没有新数据，认为流结束
             let stream_timeout = tokio::time::Duration::from_secs(60);
-            
+
             loop {
                 let chunk_result = tokio::time::timeout(stream_timeout, stream.next()).await;
-                
+
                 let chunk = match chunk_result {
                     Ok(Some(Ok(bytes))) => bytes,
                     Ok(Some(Err(err))) => {
@@ -1028,8 +1068,12 @@ impl LlmClient {
                     Ok(None) => {
                         // 流正常结束
                         #[cfg(debug_assertions)]
-                        println!("[LLM] 流式响应结束，共 {} 个 chunk，{} 字符，耗时 {:?}", 
-                            chunk_count, total_chars, start_time.elapsed());
+                        println!(
+                            "[LLM] 流式响应结束，共 {} 个 chunk，{} 字符，耗时 {:?}",
+                            chunk_count,
+                            total_chars,
+                            start_time.elapsed()
+                        );
                         break;
                     }
                     Err(_) => {
@@ -1039,28 +1083,28 @@ impl LlmClient {
                         break;
                     }
                 };
-                
+
                 let text = String::from_utf8_lossy(&chunk);
                 buffer.push_str(&text);
-                
+
                 // 按行处理 SSE
                 while let Some(newline_pos) = buffer.find('\n') {
                     let line = buffer[..newline_pos].trim().to_string();
                     buffer = buffer[newline_pos + 1..].to_string();
-                    
+
                     if line.is_empty() || line.starts_with(": ") {
                         continue;
                     }
-                    
+
                     if line.starts_with("data: ") {
                         let data = &line[6..];
-                        
+
                         if data == "[DONE]" {
                             #[cfg(debug_assertions)]
                             println!("[LLM] 收到 [DONE] 信号");
-                            return;  // 使用 return 而不是 break，确保退出整个 spawn
+                            return; // 使用 return 而不是 break，确保退出整个 spawn
                         }
-                        
+
                         if let Ok(json) = serde_json::from_str::<Value>(data) {
                             // 检查是否有错误
                             if json.get("error").is_some() {
@@ -1070,7 +1114,7 @@ impl LlmClient {
                                 }
                                 return;
                             }
-                            
+
                             if let Some(content) = json["choices"][0]["delta"]["content"].as_str() {
                                 #[cfg(debug_assertions)]
                                 {
@@ -1089,7 +1133,7 @@ impl LlmClient {
                 }
             }
         });
-        
+
         Ok(rx)
     }
 }

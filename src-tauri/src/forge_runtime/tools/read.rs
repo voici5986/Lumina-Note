@@ -1,4 +1,4 @@
-﻿use crate::forge_runtime::permissions::request_permission;
+use crate::forge_runtime::permissions::request_permission;
 use crate::forge_runtime::tools::shared::{
     ensure_external_directory_permission, parse_tool_input, permission_path, resolve_path,
 };
@@ -48,7 +48,13 @@ async fn handle(call: ToolCall, ctx: ToolContext, env: ToolEnvironment) -> Graph
     let input: ReadInput = parse_tool_input(&call)?;
     let target = resolve_path(&env.workspace_root, &input.file_path);
 
-    ensure_external_directory_permission(&ctx, &env.permissions, &env.workspace_root, &target, "file")?;
+    ensure_external_directory_permission(
+        &ctx,
+        &env.permissions,
+        &env.workspace_root,
+        &target,
+        "file",
+    )?;
 
     let pattern = permission_path(&env.workspace_root, &target);
     let mut metadata = Map::new();
@@ -80,10 +86,12 @@ async fn handle(call: ToolCall, ctx: ToolContext, env: ToolEnvironment) -> Graph
     };
 
     if bytes.is_empty() {
-        return Ok(ToolOutput::text("[system reminder] file exists but is empty")
-            .with_mime_type("text/plain")
-            .with_schema("tool.read.v1")
-            .with_attribute("truncated", json!(false)));
+        return Ok(
+            ToolOutput::text("[system reminder] file exists but is empty")
+                .with_mime_type("text/plain")
+                .with_schema("tool.read.v1")
+                .with_attribute("truncated", json!(false)),
+        );
     }
 
     let content = String::from_utf8(bytes).map_err(|_| GraphError::ExecutionError {

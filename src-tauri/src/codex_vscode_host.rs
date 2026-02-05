@@ -2,10 +2,10 @@ use crate::error::AppError;
 use serde::{Deserialize, Serialize};
 use std::process::Stdio;
 use std::time::Duration;
+use tauri::webview::NewWindowResponse;
 use tauri::{
     AppHandle, LogicalPosition, LogicalSize, Manager, Position, Size, WebviewBuilder, WebviewUrl,
 };
-use tauri::webview::NewWindowResponse;
 use tauri_plugin_shell::ShellExt;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
@@ -103,7 +103,6 @@ fn host_script_path(app: &AppHandle) -> Result<std::path::PathBuf, AppError> {
     Ok(script_path)
 }
 
-
 fn apply_no_window_flag(cmd: &mut Command) -> bool {
     #[cfg(windows)]
     {
@@ -148,20 +147,19 @@ pub async fn codex_vscode_host_start(
     let resource_dir = app.path().resource_dir().ok();
     let app_data_dir = app.path().app_data_dir().ok();
     let platform = current_platform();
-    let mut cmd = match resolve_node_path(resource_dir.as_deref(), app_data_dir.as_deref(), platform)
-    {
-        Some(path) => Command::new(path),
-        None => {
-            let app_data_dir = app
-                .path()
-                .app_data_dir()
-                .map_err(|e| AppError::InvalidPath(format!("Failed to get app_data_dir: {}", e)))?;
-            let downloaded = download_node_runtime(&app_data_dir)
-                .await
-                .map_err(AppError::InvalidPath)?;
-            Command::new(downloaded)
-        }
-    };
+    let mut cmd =
+        match resolve_node_path(resource_dir.as_deref(), app_data_dir.as_deref(), platform) {
+            Some(path) => Command::new(path),
+            None => {
+                let app_data_dir = app.path().app_data_dir().map_err(|e| {
+                    AppError::InvalidPath(format!("Failed to get app_data_dir: {}", e))
+                })?;
+                let downloaded = download_node_runtime(&app_data_dir)
+                    .await
+                    .map_err(AppError::InvalidPath)?;
+                Command::new(downloaded)
+            }
+        };
     apply_no_window_flag(&mut cmd);
     cmd.arg(script_path)
         .arg("--extensionPath")
@@ -202,10 +200,9 @@ pub async fn codex_vscode_host_start(
 
     let ready = tokio::time::timeout(Duration::from_secs(15), async {
         loop {
-            let line = stdout_lines
-                .next_line()
-                .await?
-                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "stdout closed"))?;
+            let line = stdout_lines.next_line().await?.ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "stdout closed")
+            })?;
             if let Ok(msg) = serde_json::from_str::<ReadyMsg>(&line) {
                 if msg.msg_type == "READY" {
                     return Ok::<ReadyMsg, std::io::Error>(msg);
@@ -247,9 +244,7 @@ mod tests {
         assert!(candidates.contains(&resource_dir.join(binary)));
         assert!(candidates.contains(&resource_dir.join("node").join(binary)));
         assert!(candidates.contains(&resource_dir.join("node").join("bin").join(binary)));
-        assert!(
-            candidates.contains(&app_data_dir.join("codex").join("node").join(binary))
-        );
+        assert!(candidates.contains(&app_data_dir.join("codex").join("node").join(binary)));
     }
 
     #[test]
@@ -314,17 +309,15 @@ pub async fn create_codex_webview(
         .map_err(|_| AppError::InvalidPath("Invalid URL".into()))?;
 
     let app_for_open = app.clone();
-    let webview_builder =
-        WebviewBuilder::new(CODEX_WEBVIEW_ID, WebviewUrl::External(parsed_url)).on_new_window(
-            move |new_url, _features| {
-                if new_url.scheme() == "http" || new_url.scheme() == "https" {
-                    #[allow(deprecated)]
-                    let _ = app_for_open.shell().open(new_url.to_string(), None);
-                    return NewWindowResponse::Deny;
-                }
-                NewWindowResponse::Allow
-            },
-        );
+    let webview_builder = WebviewBuilder::new(CODEX_WEBVIEW_ID, WebviewUrl::External(parsed_url))
+        .on_new_window(move |new_url, _features| {
+            if new_url.scheme() == "http" || new_url.scheme() == "https" {
+                #[allow(deprecated)]
+                let _ = app_for_open.shell().open(new_url.to_string(), None);
+                return NewWindowResponse::Deny;
+            }
+            NewWindowResponse::Allow
+        });
 
     main_window
         .add_child(

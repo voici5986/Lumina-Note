@@ -6,17 +6,19 @@ fn main() {
     // In some environments (e.g. running `cargo test` directly), it may be missing.
     // Fall back to Cargo's `PROFILE` so builds don't panic during the build script.
     if std::env::var_os("DEP_TAURI_DEV").is_none() {
-        let is_dev = std::env::var("PROFILE").map(|p| p == "debug").unwrap_or(true);
+        let is_dev = std::env::var("PROFILE")
+            .map(|p| p == "debug")
+            .unwrap_or(true);
         std::env::set_var("DEP_TAURI_DEV", if is_dev { "true" } else { "false" });
     }
 
     // Create a minimal valid ICO file if it doesn't exist
     let icons_dir = Path::new("icons");
     let icon_path = icons_dir.join("icon.ico");
-    
+
     if !icon_path.exists() {
         fs::create_dir_all(icons_dir).ok();
-        
+
         // Minimal 16x16 ICO file (purple square)
         let ico_data: Vec<u8> = vec![
             // ICO header
@@ -45,7 +47,7 @@ fn main() {
             0x00, 0x00, 0x00, 0x00, // Colors used
             0x00, 0x00, 0x00, 0x00, // Important colors
         ];
-        
+
         // Add 16x16 pixels (BGRA format) - purple color
         let mut full_ico = ico_data;
         for _ in 0..256 {
@@ -55,9 +57,9 @@ fn main() {
         for _ in 0..64 {
             full_ico.push(0x00);
         }
-        
+
         fs::write(&icon_path, full_ico).ok();
     }
-    
+
     tauri_build::build();
 }

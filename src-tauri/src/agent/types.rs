@@ -1,9 +1,9 @@
 //! Agent 类型定义
 
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use crate::langgraph::state::GraphState as LangGraphState;
 use forge::runtime::state::GraphState as ForgeGraphState;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Agent 状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -27,14 +27,14 @@ impl Default for AgentStatus {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum AgentType {
-    Coordinator,  // 协调器：理解任务意图
-    Planner,      // 规划器：分解复杂任务
-    Executor,     // 执行器：执行计划步骤
-    Editor,       // 编辑器：编辑笔记
-    Researcher,   // 研究员：搜索信息
-    Writer,       // 写作者：创建内容
-    Organizer,    // 整理者：文件组织
-    Reporter,     // 报告者：汇总结果
+    Coordinator, // 协调器：理解任务意图
+    Planner,     // 规划器：分解复杂任务
+    Executor,    // 执行器：执行计划步骤
+    Editor,      // 编辑器：编辑笔记
+    Researcher,  // 研究员：搜索信息
+    Writer,      // 写作者：创建内容
+    Organizer,   // 整理者：文件组织
+    Reporter,    // 报告者：汇总结果
 }
 
 impl Default for AgentType {
@@ -47,12 +47,12 @@ impl Default for AgentType {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskIntent {
-    Chat,      // 简单聊天
-    Edit,      // 编辑笔记
-    Create,    // 创建内容
-    Organize,  // 整理文件
-    Search,    // 搜索研究
-    Complex,   // 复杂任务（需要规划）
+    Chat,     // 简单聊天
+    Edit,     // 编辑笔记
+    Create,   // 创建内容
+    Organize, // 整理文件
+    Search,   // 搜索研究
+    Complex,  // 复杂任务（需要规划）
 }
 
 impl Default for TaskIntent {
@@ -236,12 +236,22 @@ pub struct AgentConfig {
     pub locale: String,
 }
 
-fn default_temperature() -> f32 { 0.7 }
-fn default_max_tokens() -> usize { 4096 }
+fn default_temperature() -> f32 {
+    0.7
+}
+fn default_max_tokens() -> usize {
+    4096
+}
 // 0 means unlimited (no iteration cap)
-fn default_max_plan_iterations() -> usize { 0 }
-fn default_max_steps() -> usize { 0 }
-fn default_locale() -> String { "zh-CN".to_string() }
+fn default_max_plan_iterations() -> usize {
+    0
+}
+fn default_max_steps() -> usize {
+    0
+}
+fn default_locale() -> String {
+    "zh-CN".to_string()
+}
 
 impl Default for AgentConfig {
     fn default() -> Self {
@@ -270,7 +280,11 @@ pub enum AgentEvent {
     /// 消息块（流式输出）
     MessageChunk { content: String, agent: AgentType },
     /// 意图分析结果
-    IntentAnalysis { intent: String, route: String, message: String },
+    IntentAnalysis {
+        intent: String,
+        route: String,
+        message: String,
+    },
     /// 工具调用
     ToolCall { tool: ToolCall },
     /// 工具结果
@@ -278,29 +292,23 @@ pub enum AgentEvent {
     /// 计划更新（Windsurf 风格：每次发送完整计划）
     PlanUpdated { plan: Plan },
     /// Token 使用量
-    TokenUsage { prompt_tokens: usize, completion_tokens: usize, total_tokens: usize },
+    TokenUsage {
+        prompt_tokens: usize,
+        completion_tokens: usize,
+        total_tokens: usize,
+    },
     /// 任务完成
     Complete { result: String },
     /// 错误
     Error { message: String },
     /// 等待工具审批
-    WaitingApproval { 
-        tool: ToolCall,
-        request_id: String,
-    },
+    WaitingApproval { tool: ToolCall, request_id: String },
     /// LLM 请求开始（用于超时检测）
-    LlmRequestStart {
-        request_id: String,
-        timestamp: u64,
-    },
+    LlmRequestStart { request_id: String, timestamp: u64 },
     /// LLM 请求结束
-    LlmRequestEnd {
-        request_id: String,
-    },
+    LlmRequestEnd { request_id: String },
     /// 心跳（用于连接状态监控）
-    Heartbeat {
-        timestamp: u64,
-    },
+    Heartbeat { timestamp: u64 },
 }
 
 /// Skill context injected from frontend
@@ -350,15 +358,15 @@ impl LangGraphState for GraphState {
             Some(&self.goto)
         }
     }
-    
+
     fn set_next(&mut self, next: Option<String>) {
         self.goto = next.unwrap_or_default();
     }
-    
+
     fn is_complete(&self) -> bool {
         self.status == AgentStatus::Completed || self.status == AgentStatus::Error
     }
-    
+
     fn mark_complete(&mut self) {
         self.status = AgentStatus::Completed;
     }

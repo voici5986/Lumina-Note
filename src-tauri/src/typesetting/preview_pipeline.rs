@@ -43,7 +43,10 @@ pub fn build_preview_pages(
 
         for line_index in slice.start..slice.end {
             let y_offset = lines[line_index].y_offset.saturating_sub(base_y);
-            page_lines.push(PreviewLine { line_index, y_offset });
+            page_lines.push(PreviewLine {
+                line_index,
+                y_offset,
+            });
         }
 
         pages.push(PreviewPage {
@@ -58,10 +61,7 @@ pub fn build_preview_pages(
     pages
 }
 
-pub fn preview_page_metrics(
-    page_style: PageStyle,
-    dpi: f32,
-) -> PreviewPageMetrics {
+pub fn preview_page_metrics(page_style: PageStyle, dpi: f32) -> PreviewPageMetrics {
     let dpi = normalize_dpi(dpi);
     let page_box = page_style.page_box();
     let body_box = page_style.body_box();
@@ -84,8 +84,7 @@ pub fn build_preview_pages_for_style(
     dpi: f32,
 ) -> (PreviewPageMetrics, Vec<PreviewPage>) {
     let metrics = preview_page_metrics(page_style, dpi);
-    let pages =
-        build_preview_pages(lines, line_height, metrics.body_height_px);
+    let pages = build_preview_pages(lines, line_height, metrics.body_height_px);
     (metrics, pages)
 }
 
@@ -208,10 +207,7 @@ mod tests {
             metrics.page_size_px.height_px,
             mm_to_px(page_box.height_mm, 96.0)
         );
-        assert_eq!(
-            metrics.body_height_px,
-            mm_to_px(body_box.height_mm, 96.0)
-        );
+        assert_eq!(metrics.body_height_px, mm_to_px(body_box.height_mm, 96.0));
     }
 
     #[test]
@@ -254,13 +250,9 @@ mod tests {
             footer_height_mm: 10.0,
         };
 
-        let lines = vec![
-            line(0, 1, 0, 0, 0),
-            line(1, 2, 20, 0, 0),
-        ];
+        let lines = vec![line(0, 1, 0, 0, 0), line(1, 2, 20, 0, 0)];
 
-        let (_metrics, pages) =
-            build_preview_pages_for_style(&lines, 20, style, 96.0);
+        let (_metrics, pages) = build_preview_pages_for_style(&lines, 20, style, 96.0);
 
         assert_eq!(pages.len(), 2);
         assert_eq!(pages[0].start, 0);

@@ -1,13 +1,13 @@
 //! WebDAV HTTP 客户端
-//! 
+//!
 //! 封装 WebDAV 协议的 HTTP 请求，提供高层 API
 
-use reqwest::{Client, Method, StatusCode};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use reqwest::header::{HeaderValue, AUTHORIZATION, CONTENT_TYPE};
-use base64::{Engine as _, engine::general_purpose::STANDARD};
+use reqwest::{Client, Method, StatusCode};
 use std::time::Duration;
 
-use super::types::{WebDAVConfig, RemoteEntry};
+use super::types::{RemoteEntry, WebDAVConfig};
 use crate::error::AppError;
 
 /// WebDAV 客户端
@@ -24,7 +24,7 @@ impl WebDAVClient {
             .connect_timeout(Duration::from_secs(10))
             .build()
             .map_err(|e| AppError::WebDAV(format!("Failed to create HTTP client: {}", e)))?;
-        
+
         Ok(Self { client, config })
     }
 
@@ -40,7 +40,7 @@ impl WebDAVClient {
         let base = self.config.server_url.trim_end_matches('/');
         let remote_base = self.config.remote_base_path.trim_matches('/');
         let path = path.trim_start_matches('/');
-        
+
         if remote_base.is_empty() {
             format!("{}/{}", base, path)
         } else {
@@ -51,8 +51,9 @@ impl WebDAVClient {
     /// 测试连接
     pub async fn test_connection(&self) -> Result<bool, AppError> {
         let url = self.build_url("");
-        
-        let response = self.client
+
+        let response = self
+            .client
             .request(Method::from_bytes(b"PROPFIND").unwrap(), &url)
             .header(AUTHORIZATION, self.auth_header())
             .header("Depth", "0")
@@ -70,7 +71,7 @@ impl WebDAVClient {
     /// 列出目录内容 (PROPFIND)
     pub async fn list_dir(&self, path: &str) -> Result<Vec<RemoteEntry>, AppError> {
         let url = self.build_url(path);
-        
+
         // PROPFIND 请求体
         let body = r#"<?xml version="1.0" encoding="utf-8"?>
 <D:propfind xmlns:D="DAV:">
@@ -83,7 +84,8 @@ impl WebDAVClient {
   </D:prop>
 </D:propfind>"#;
 
-        let response = self.client
+        let response = self
+            .client
             .request(Method::from_bytes(b"PROPFIND").unwrap(), &url)
             .header(AUTHORIZATION, self.auth_header())
             .header(CONTENT_TYPE, "application/xml")
@@ -100,7 +102,9 @@ impl WebDAVClient {
             )));
         }
 
-        let body = response.text().await
+        let body = response
+            .text()
+            .await
             .map_err(|e| AppError::WebDAV(format!("Failed to read response: {}", e)))?;
 
         self.parse_propfind_response(&body, path)
@@ -113,7 +117,7 @@ impl WebDAVClient {
 
         while let Some(dir) = dirs_to_scan.pop() {
             let entries = self.list_dir(&dir).await?;
-            
+
             for entry in entries {
                 if entry.is_dir {
                     dirs_to_scan.push(entry.path.clone());
@@ -126,52 +130,61 @@ impl WebDAVClient {
     }
 
     /// 解析 PROPFIND 响应
-    fn parse_propfind_response(&self, xml: &str, base_path: &str) -> Result<Vec<RemoteEntry>, AppError> {
+    fn parse_propfind_response(
+        &self,
+        xml: &str,
+        base_path: &str,
+    ) -> Result<Vec<RemoteEntry>, AppError> {
         let mut entries = Vec::new();
-        
+
         // 简单的 XML 解析 (生产环境建议使用 quick-xml)
         // 这里使用字符串解析来避免额外依赖
-        
+
         let base_path_normalized = base_path.trim_matches('/');
-        
+
         // 按 <D:response> 分割
         for response_block in xml.split("<D:response>").skip(1) {
-            let href = self.extract_xml_value(response_block, "D:href")
+            let href = self
+                .extract_xml_value(response_block, "D:href")
                 .or_else(|| self.extract_xml_value(response_block, "d:href"));
-            
+
             if let Some(href) = href {
                 // URL 解码
                 let decoded_href = urlencoding_decode(&href);
                 let path = self.extract_relative_path(&decoded_href);
-                
+
                 // 跳过根目录本身
                 if path.trim_matches('/') == base_path_normalized {
                     continue;
                 }
-                
+
                 let is_dir = response_block.contains("<D:collection")
                     || response_block.contains("<d:collection")
                     || response_block.contains("resourcetype><D:collection")
                     || response_block.contains("resourcetype><d:collection");
-                
-                let size = self.extract_xml_value(response_block, "D:getcontentlength")
+
+                let size = self
+                    .extract_xml_value(response_block, "D:getcontentlength")
                     .or_else(|| self.extract_xml_value(response_block, "d:getcontentlength"))
                     .and_then(|s| s.parse::<u64>().ok())
                     .unwrap_or(0);
-                
-                let modified = self.extract_xml_value(response_block, "D:getlastmodified")
+
+                let modified = self
+                    .extract_xml_value(response_block, "D:getlastmodified")
                     .or_else(|| self.extract_xml_value(response_block, "d:getlastmodified"))
                     .and_then(|s| parse_http_date(&s))
                     .unwrap_or(0);
-                
-                let etag = self.extract_xml_value(response_block, "D:getetag")
+
+                let etag = self
+                    .extract_xml_value(response_block, "D:getetag")
                     .or_else(|| self.extract_xml_value(response_block, "d:getetag"));
-                
-                let content_type = self.extract_xml_value(response_block, "D:getcontenttype")
+
+                let content_type = self
+                    .extract_xml_value(response_block, "D:getcontenttype")
                     .or_else(|| self.extract_xml_value(response_block, "d:getcontenttype"));
-                
+
                 let name = path.split('/').last().unwrap_or("").to_string();
-                
+
                 if !name.is_empty() {
                     entries.push(RemoteEntry {
                         path,
@@ -193,7 +206,7 @@ impl WebDAVClient {
     fn extract_xml_value(&self, xml: &str, tag: &str) -> Option<String> {
         let open_tag = format!("<{}>", tag);
         let close_tag = format!("</{}>", tag);
-        
+
         if let Some(start) = xml.find(&open_tag) {
             let value_start = start + open_tag.len();
             if let Some(end) = xml[value_start..].find(&close_tag) {
@@ -224,7 +237,7 @@ impl WebDAVClient {
         // 移除 remote_base_path 前缀
         let base = self.config.remote_base_path.trim_matches('/');
         let path = path.trim_start_matches('/');
-        
+
         if !base.is_empty() && path.starts_with(base) {
             path[base.len()..].trim_start_matches('/').to_string()
         } else {
@@ -235,8 +248,9 @@ impl WebDAVClient {
     /// 下载文件 (GET)
     pub async fn download(&self, path: &str) -> Result<Vec<u8>, AppError> {
         let url = self.build_url(path);
-        
-        let response = self.client
+
+        let response = self
+            .client
             .get(&url)
             .header(AUTHORIZATION, self.auth_header())
             .send()
@@ -250,7 +264,9 @@ impl WebDAVClient {
             )));
         }
 
-        response.bytes().await
+        response
+            .bytes()
+            .await
             .map(|b| b.to_vec())
             .map_err(|e| AppError::WebDAV(format!("Failed to read download: {}", e)))
     }
@@ -258,15 +274,15 @@ impl WebDAVClient {
     /// 下载文件为文本
     pub async fn download_text(&self, path: &str) -> Result<String, AppError> {
         let bytes = self.download(path).await?;
-        String::from_utf8(bytes)
-            .map_err(|e| AppError::WebDAV(format!("Invalid UTF-8: {}", e)))
+        String::from_utf8(bytes).map_err(|e| AppError::WebDAV(format!("Invalid UTF-8: {}", e)))
     }
 
     /// 上传文件 (PUT)
     pub async fn upload(&self, path: &str, content: &[u8]) -> Result<(), AppError> {
         let url = self.build_url(path);
-        
-        let response = self.client
+
+        let response = self
+            .client
             .put(&url)
             .header(AUTHORIZATION, self.auth_header())
             .body(content.to_vec())
@@ -276,7 +292,10 @@ impl WebDAVClient {
 
         match response.status() {
             StatusCode::OK | StatusCode::CREATED | StatusCode::NO_CONTENT => Ok(()),
-            status => Err(AppError::WebDAV(format!("Upload failed with status: {}", status))),
+            status => Err(AppError::WebDAV(format!(
+                "Upload failed with status: {}",
+                status
+            ))),
         }
     }
 
@@ -288,8 +307,9 @@ impl WebDAVClient {
     /// 创建目录 (MKCOL)
     pub async fn create_dir(&self, path: &str) -> Result<(), AppError> {
         let url = self.build_url(path);
-        
-        let response = self.client
+
+        let response = self
+            .client
             .request(Method::from_bytes(b"MKCOL").unwrap(), &url)
             .header(AUTHORIZATION, self.auth_header())
             .send()
@@ -301,15 +321,19 @@ impl WebDAVClient {
                 // METHOD_NOT_ALLOWED 通常表示目录已存在
                 Ok(())
             }
-            status => Err(AppError::WebDAV(format!("MKCOL failed with status: {}", status))),
+            status => Err(AppError::WebDAV(format!(
+                "MKCOL failed with status: {}",
+                status
+            ))),
         }
     }
 
     /// 删除文件或目录 (DELETE)
     pub async fn delete(&self, path: &str) -> Result<(), AppError> {
         let url = self.build_url(path);
-        
-        let response = self.client
+
+        let response = self
+            .client
             .delete(&url)
             .header(AUTHORIZATION, self.auth_header())
             .send()
@@ -318,7 +342,10 @@ impl WebDAVClient {
 
         match response.status() {
             StatusCode::OK | StatusCode::NO_CONTENT | StatusCode::NOT_FOUND => Ok(()),
-            status => Err(AppError::WebDAV(format!("DELETE failed with status: {}", status))),
+            status => Err(AppError::WebDAV(format!(
+                "DELETE failed with status: {}",
+                status
+            ))),
         }
     }
 
@@ -343,7 +370,7 @@ impl WebDAVClient {
 fn urlencoding_decode(s: &str) -> String {
     let mut result = String::new();
     let mut chars = s.chars().peekable();
-    
+
     while let Some(c) = chars.next() {
         if c == '%' {
             let hex: String = chars.by_ref().take(2).collect();
@@ -359,7 +386,7 @@ fn urlencoding_decode(s: &str) -> String {
             result.push(c);
         }
     }
-    
+
     result
 }
 
@@ -367,7 +394,7 @@ fn urlencoding_decode(s: &str) -> String {
 fn parse_http_date(s: &str) -> Option<u64> {
     // 支持格式: "Tue, 03 Dec 2024 10:30:00 GMT"
     use chrono::DateTime;
-    
+
     // 尝试多种常见格式
     let formats = [
         "%a, %d %b %Y %H:%M:%S GMT",

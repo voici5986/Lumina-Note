@@ -1,6 +1,6 @@
 use crate::typesetting::{
-    break_glyph_run, layout_paragraph, shape_mixed_text, FontData, Glyph, GlyphRun,
-    ParagraphAlign, PositionedLine, ShapingError,
+    break_glyph_run, layout_paragraph, shape_mixed_text, FontData, Glyph, GlyphRun, ParagraphAlign,
+    PositionedLine, ShapingError,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -26,8 +26,7 @@ pub fn layout_text_paragraph(
 
     let glyphs = scale_glyphs_for_font_size(&glyph_run, options.font_size);
     let break_after = break_after_for_text(text, &glyphs);
-    let lines =
-        break_glyph_run(&glyphs, options.max_width, &break_after);
+    let lines = break_glyph_run(&glyphs, options.max_width, &break_after);
 
     Ok(layout_paragraph(
         &lines,
@@ -149,8 +148,7 @@ mod tests {
             space_after: 0,
         };
 
-        let lines =
-            layout_text_paragraph(&font, "", options).expect("layout should work");
+        let lines = layout_text_paragraph(&font, "", options).expect("layout should work");
 
         assert!(lines.is_empty());
     }
@@ -173,10 +171,8 @@ mod tests {
             space_after: 0,
         };
 
-        let lines =
-            layout_text_paragraph(&font, text, options).expect("layout should work");
-        let glyph_run =
-            shape_mixed_text(&font, text).expect("expected shaping to succeed");
+        let lines = layout_text_paragraph(&font, text, options).expect("layout should work");
+        let glyph_run = shape_mixed_text(&font, text).expect("expected shaping to succeed");
 
         assert_eq!(lines.len(), 1);
         assert_eq!(lines[0].start, 0);

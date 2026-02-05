@@ -4,12 +4,12 @@
 
 #![allow(dead_code)]
 
+use chrono::Local;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
-use chrono::Local;
 
 /// 是否启用调试模式
 static DEBUG_ENABLED: AtomicBool = AtomicBool::new(false);
@@ -33,50 +33,54 @@ pub fn enable_debug(workspace_path: &str) -> Result<PathBuf, String> {
     let timestamp = Local::now().format("%Y-%m-%d_%H-%M-%S");
     let filename = format!("agent-debug-{}.md", timestamp);
     let path = PathBuf::from(workspace_path).join(&filename);
-    
+
     let file = OpenOptions::new()
         .create(true)
         .write(true)
         .truncate(true)
         .open(&path)
         .map_err(|e| format!("Failed to create debug log: {}", e))?;
-    
+
     // 写入文件头
     {
         let mut file_guard = get_debug_file().lock().unwrap();
         *file_guard = Some(file);
     }
-    
+
     {
         let mut path_guard = get_debug_file_path_lock().lock().unwrap();
         *path_guard = Some(path.clone());
     }
-    
+
     DEBUG_ENABLED.store(true, Ordering::SeqCst);
-    
+
     // 写入标题
-    log_raw(&format!(r#"# Agent 调试日志
+    log_raw(&format!(
+        r#"# Agent 调试日志
 
 **生成时间**: {}
 **工作区**: {}
 
 ---
 
-"#, Local::now().format("%Y-%m-%d %H:%M:%S"), workspace_path));
-    
+"#,
+        Local::now().format("%Y-%m-%d %H:%M:%S"),
+        workspace_path
+    ));
+
     Ok(path)
 }
 
 /// 禁用调试模式
 pub fn disable_debug() {
     DEBUG_ENABLED.store(false, Ordering::SeqCst);
-    
+
     // 写入结束标记
     log_raw("\n\n---\n\n# 调试日志结束\n");
-    
+
     let mut file_guard = get_debug_file().lock().unwrap();
     *file_guard = None;
-    
+
     let mut path_guard = get_debug_file_path_lock().lock().unwrap();
     *path_guard = None;
 }
@@ -96,7 +100,7 @@ fn log_raw(content: &str) {
     if !is_debug_enabled() {
         return;
     }
-    
+
     if let Ok(mut guard) = get_debug_file().lock() {
         if let Some(ref mut file) = *guard {
             let _ = Write::write_all(file, content.as_bytes());
@@ -131,8 +135,11 @@ pub fn log_code(lang: &str, content: &str) {
 
 /// 记录 JSON
 pub fn log_json(label: &str, value: &serde_json::Value) {
-    log_raw(&format!("**{}**:\n```json\n{}\n```\n\n", label, 
-        serde_json::to_string_pretty(value).unwrap_or_else(|_| value.to_string())));
+    log_raw(&format!(
+        "**{}**:\n```json\n{}\n```\n\n",
+        label,
+        serde_json::to_string_pretty(value).unwrap_or_else(|_| value.to_string())
+    ));
 }
 
 /// 记录配置信息
@@ -181,23 +188,31 @@ fn safe_truncate(s: &str, max_chars: usize) -> String {
 }
 
 /// 记录发送给 LLM 的消息
-pub fn log_llm_request(messages: &[crate::agent::types::Message], tools: Option<&[serde_json::Value]>) {
+pub fn log_llm_request(
+    messages: &[crate::agent::types::Message],
+    tools: Option<&[serde_json::Value]>,
+) {
     log_subsection("LLM 请求");
-    
+
     log_raw("**消息列表**:\n\n");
     for (i, msg) in messages.iter().enumerate() {
-        log_raw(&format!("#### 消息 {} - {}\n\n", i + 1, format!("{:?}", msg.role)));
-        
+        log_raw(&format!(
+            "#### 消息 {} - {}\n\n",
+            i + 1,
+            format!("{:?}", msg.role)
+        ));
+
         // 安全截断过长的内容（处理中文等多字节字符）
         let content = safe_truncate(&msg.content, 2000);
-        
+
         log_code("", &content);
     }
-    
+
     if let Some(tools) = tools {
         log_raw(&format!("**工具数量**: {}\n\n", tools.len()));
         // 只记录工具名称，不记录完整定义
-        let tool_names: Vec<String> = tools.iter()
+        let tool_names: Vec<String> = tools
+            .iter()
             .filter_map(|t| t["function"]["name"].as_str().map(|s| s.to_string()))
             .collect();
         log_kv("可用工具", &tool_names.join(", "));
@@ -205,22 +220,35 @@ pub fn log_llm_request(messages: &[crate::agent::types::Message], tools: Option<
 }
 
 /// 记录 LLM 响应
-pub fn log_llm_response(content: &str, tool_calls: Option<&[crate::agent::types::ToolCall]>, tokens: (usize, usize, usize)) {
+pub fn log_llm_response(
+    content: &str,
+    tool_calls: Option<&[crate::agent::types::ToolCall]>,
+    tokens: (usize, usize, usize),
+) {
     log_subsection("LLM 响应");
-    
-    log_kv("Token 使用", &format!("prompt={}, completion={}, total={}", tokens.0, tokens.1, tokens.2));
-    
+
+    log_kv(
+        "Token 使用",
+        &format!(
+            "prompt={}, completion={}, total={}",
+            tokens.0, tokens.1, tokens.2
+        ),
+    );
+
     if !content.is_empty() {
         log_raw("**思考/内容**:\n");
         log_code("", content);
     }
-    
+
     if let Some(calls) = tool_calls {
         log_raw(&format!("**工具调用数量**: {}\n\n", calls.len()));
         for (i, call) in calls.iter().enumerate() {
             log_raw(&format!("#### 工具调用 {}: `{}`\n\n", i + 1, call.name));
             log_raw("**参数**:\n");
-            log_code("json", &serde_json::to_string_pretty(&call.params).unwrap_or_default());
+            log_code(
+                "json",
+                &serde_json::to_string_pretty(&call.params).unwrap_or_default(),
+            );
         }
     }
 }
@@ -228,9 +256,9 @@ pub fn log_llm_response(content: &str, tool_calls: Option<&[crate::agent::types:
 /// 记录工具执行结果
 pub fn log_tool_result(tool_name: &str, success: bool, content: &str, error: Option<&str>) {
     log_subsection(&format!("工具结果: `{}`", tool_name));
-    
+
     log_kv("状态", if success { "✅ 成功" } else { "❌ 失败" });
-    
+
     if success {
         // 安全截断过长的内容（处理中文等多字节字符）
         let display = safe_truncate(content, 3000);
@@ -268,16 +296,16 @@ mod tests {
     fn test_debug_log() {
         let dir = tempdir().unwrap();
         let path = enable_debug(dir.path().to_str().unwrap()).unwrap();
-        
+
         assert!(is_debug_enabled());
-        
+
         log_task("测试任务");
         log_intent("Create", "writer", "用户想创建笔记");
-        
+
         disable_debug();
-        
+
         assert!(!is_debug_enabled());
-        
+
         let content = fs::read_to_string(&path).unwrap();
         assert!(content.contains("测试任务"));
         assert!(content.contains("Create"));

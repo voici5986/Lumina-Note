@@ -48,16 +48,8 @@ pub fn layout_paragraph(
         let available_width = (max_width - indent).max(0);
         let (x_offset, justify_gap, justify_remainder) = match align {
             ParagraphAlign::Left => (indent, 0, 0),
-            ParagraphAlign::Right => (
-                indent + (available_width - line.width).max(0),
-                0,
-                0,
-            ),
-            ParagraphAlign::Center => (
-                indent + ((available_width - line.width) / 2).max(0),
-                0,
-                0,
-            ),
+            ParagraphAlign::Right => (indent + (available_width - line.width).max(0), 0, 0),
+            ParagraphAlign::Center => (indent + ((available_width - line.width) / 2).max(0), 0, 0),
             ParagraphAlign::Justify => {
                 if is_last_line || line.width >= available_width {
                     (indent, 0, 0)
@@ -75,8 +67,7 @@ pub fn layout_paragraph(
             }
         };
 
-        let y_offset = space_before
-            .saturating_add((index as i32).saturating_mul(line_height));
+        let y_offset = space_before.saturating_add((index as i32).saturating_mul(line_height));
         positioned.push(PositionedLine {
             start: line.start,
             end: line.end,
@@ -119,8 +110,7 @@ mod tests {
 
     #[test]
     fn returns_empty_for_no_lines() {
-        let placed =
-            layout_paragraph(&[], 400, 20, ParagraphAlign::Left, &[], 0, 0, 0);
+        let placed = layout_paragraph(&[], 400, 20, ParagraphAlign::Left, &[], 0, 0, 0);
         assert!(placed.is_empty());
     }
 
@@ -128,8 +118,7 @@ mod tests {
     fn clamps_offsets_for_overflowing_lines_and_negative_heights() {
         let lines = vec![line(0, 1, 120), line(1, 2, 80)];
 
-        let placed =
-            layout_paragraph(&lines, 100, -10, ParagraphAlign::Right, &[], 0, 0, 0);
+        let placed = layout_paragraph(&lines, 100, -10, ParagraphAlign::Right, &[], 0, 0, 0);
 
         assert_eq!(placed[0].x_offset, 0);
         assert_eq!(placed[1].y_offset, 0);
@@ -139,15 +128,13 @@ mod tests {
     fn centers_and_right_aligns_lines() {
         let lines = vec![line(0, 2, 80), line(2, 4, 60)];
 
-        let centered =
-            layout_paragraph(&lines, 100, 20, ParagraphAlign::Center, &[], 0, 0, 0);
+        let centered = layout_paragraph(&lines, 100, 20, ParagraphAlign::Center, &[], 0, 0, 0);
 
         assert_eq!(centered[0].x_offset, 10);
         assert_eq!(centered[1].x_offset, 20);
         assert_eq!(centered[1].y_offset, 20);
 
-        let right =
-            layout_paragraph(&lines, 100, 20, ParagraphAlign::Right, &[], 0, 0, 0);
+        let right = layout_paragraph(&lines, 100, 20, ParagraphAlign::Right, &[], 0, 0, 0);
 
         assert_eq!(right[0].x_offset, 20);
         assert_eq!(right[1].x_offset, 40);
@@ -198,8 +185,7 @@ mod tests {
     fn applies_first_line_indent_and_space_before() {
         let lines = vec![line(0, 2, 80), line(2, 4, 60)];
 
-        let placed =
-            layout_paragraph(&lines, 100, 20, ParagraphAlign::Left, &[], 12, 8, 0);
+        let placed = layout_paragraph(&lines, 100, 20, ParagraphAlign::Left, &[], 12, 8, 0);
 
         assert_eq!(placed[0].x_offset, 12);
         assert_eq!(placed[1].x_offset, 0);
@@ -213,8 +199,7 @@ mod tests {
     fn assigns_space_after_to_last_line() {
         let lines = vec![line(0, 1, 50), line(1, 2, 50)];
 
-        let placed =
-            layout_paragraph(&lines, 100, 10, ParagraphAlign::Left, &[], 0, 0, 16);
+        let placed = layout_paragraph(&lines, 100, 10, ParagraphAlign::Left, &[], 0, 0, 16);
 
         assert_eq!(placed[0].space_after, 0);
         assert_eq!(placed[1].space_after, 16);

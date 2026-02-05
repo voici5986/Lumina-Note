@@ -1,8 +1,10 @@
 use crate::error::AppError;
-use crate::node_runtime::{arch_tag, current_arch, current_platform, platform_tag, NodeArch, NodePlatform};
+use crate::node_runtime::{
+    arch_tag, current_arch, current_platform, platform_tag, NodeArch, NodePlatform,
+};
 use futures_util::StreamExt;
-use serde::Serialize;
 use serde::Deserialize;
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::env;
@@ -90,7 +92,10 @@ fn write_current_version(base: &Path, version: &str) -> Result<(), AppError> {
     let payload = CurrentVersionFile {
         version: version.to_string(),
     };
-    std::fs::write(p, serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()))?;
+    std::fs::write(
+        p,
+        serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()),
+    )?;
     Ok(())
 }
 
@@ -190,7 +195,8 @@ fn normalize_arch_tag(tag: &str) -> Option<NodeArch> {
 }
 
 fn manifest_url() -> String {
-    env::var(DOC_TOOLS_ENV_MANIFEST_URL).unwrap_or_else(|_| DEFAULT_DOC_TOOLS_MANIFEST_URL.to_string())
+    env::var(DOC_TOOLS_ENV_MANIFEST_URL)
+        .unwrap_or_else(|_| DEFAULT_DOC_TOOLS_MANIFEST_URL.to_string())
 }
 
 fn url_filename(url: &str) -> String {
@@ -213,9 +219,8 @@ async fn fetch_manifest() -> Result<DocToolsManifest, AppError> {
         )));
     }
     let bytes = response.bytes().await?;
-    serde_json::from_slice(&bytes).map_err(|e| {
-        AppError::InvalidPath(format!("Doc tools manifest invalid: {e}"))
-    })
+    serde_json::from_slice(&bytes)
+        .map_err(|e| AppError::InvalidPath(format!("Doc tools manifest invalid: {e}")))
 }
 
 fn select_asset<'a>(
@@ -346,7 +351,11 @@ pub async fn doc_tools_get_status(app: AppHandle) -> Result<DocToolsStatus, AppE
     let version = read_current_version(&base);
 
     let root_dir = if let Ok(dir) = env::var(DOC_TOOLS_ENV_DIR) {
-        if !dir.is_empty() { Some(PathBuf::from(dir)) } else { None }
+        if !dir.is_empty() {
+            Some(PathBuf::from(dir))
+        } else {
+            None
+        }
     } else {
         version
             .as_deref()
@@ -395,7 +404,9 @@ pub async fn doc_tools_install_latest(app: AppHandle) -> Result<DocToolsStatus, 
     let version_fallback = doc_tools_version().to_string();
     let platform = current_platform();
     let arch = current_arch();
-    let direct_url = env::var(DOC_TOOLS_ENV_URL).ok().filter(|v| !v.trim().is_empty());
+    let direct_url = env::var(DOC_TOOLS_ENV_URL)
+        .ok()
+        .filter(|v| !v.trim().is_empty());
     let manifest = if direct_url.is_none() {
         Some(fetch_manifest().await?)
     } else {
@@ -410,12 +421,7 @@ pub async fn doc_tools_install_latest(app: AppHandle) -> Result<DocToolsStatus, 
             asset.bin_dir.clone(),
         )
     } else {
-        (
-            version_fallback.clone(),
-            direct_url.unwrap(),
-            None,
-            None,
-        )
+        (version_fallback.clone(), direct_url.unwrap(), None, None)
     };
 
     let base = doc_tools_base_dir(&app_data_dir);
@@ -436,7 +442,8 @@ pub async fn doc_tools_install_latest(app: AppHandle) -> Result<DocToolsStatus, 
     let mut file = tokio::fs::File::create(&archive_path).await?;
     let mut stream = response.bytes_stream();
     while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| AppError::Network(format!("Doc tools stream failed: {e}")))?;
+        let chunk =
+            chunk.map_err(|e| AppError::Network(format!("Doc tools stream failed: {e}")))?;
         file.write_all(&chunk).await?;
     }
     file.flush().await?;

@@ -1,5 +1,5 @@
 //! Constants for LangGraph
-//! 
+//!
 //! Defines special node markers and other constants.
 
 /// The first (virtual) node in the graph - entry point marker

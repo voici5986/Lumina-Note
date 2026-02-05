@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use chrono::Utc;
-use sqlx::{SqlitePool, Row};
+use sqlx::{Row, SqlitePool};
 use uuid::Uuid;
 
 pub async fn init_db(pool: &SqlitePool) -> Result<(), AppError> {
@@ -50,7 +50,11 @@ pub async fn init_db(pool: &SqlitePool) -> Result<(), AppError> {
     Ok(())
 }
 
-pub async fn create_user(pool: &SqlitePool, email: &str, password_hash: &str) -> Result<String, AppError> {
+pub async fn create_user(
+    pool: &SqlitePool,
+    email: &str,
+    password_hash: &str,
+) -> Result<String, AppError> {
     let user_id = Uuid::new_v4().to_string();
     let now = Utc::now().timestamp();
     let result = sqlx::query(
@@ -93,7 +97,12 @@ pub async fn find_user_by_email(
     .await
     .map_err(|e| AppError::Internal(format!("query user: {}", e)))?;
 
-    Ok(row.map(|row| (row.get::<String, _>("id"), row.get::<String, _>("password_hash"))))
+    Ok(row.map(|row| {
+        (
+            row.get::<String, _>("id"),
+            row.get::<String, _>("password_hash"),
+        )
+    }))
 }
 
 #[allow(dead_code)]

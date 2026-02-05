@@ -6,12 +6,12 @@ use axum::extract::{Path as AxumPath, State};
 use axum::http::{HeaderMap, Request, Response, StatusCode};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use httpdate::fmt_http_date;
-use mime_guess::MimeGuess;
 use hyper::body::HttpBody;
+use mime_guess::MimeGuess;
 use tokio::io::AsyncWriteExt;
 use tokio_util::io::ReaderStream;
-use uuid::Uuid;
 use urlencoding::encode;
+use uuid::Uuid;
 
 use crate::auth::{decode_token, verify_password};
 use crate::db;
@@ -111,10 +111,7 @@ async fn handle_dav_request(
 fn respond_options() -> Result<Response<Body>, AppError> {
     Response::builder()
         .status(StatusCode::NO_CONTENT)
-        .header(
-            "Allow",
-            "OPTIONS, PROPFIND, GET, HEAD, PUT, MKCOL, DELETE",
-        )
+        .header("Allow", "OPTIONS, PROPFIND, GET, HEAD, PUT, MKCOL, DELETE")
         .body(Body::empty())
         .map_err(|e| AppError::Internal(format!("build response: {}", e)))
 }
@@ -144,7 +141,11 @@ async fn respond_propfind(
         let mut dir = tokio::fs::read_dir(absolute)
             .await
             .map_err(|e| AppError::Internal(format!("read dir: {}", e)))?;
-        while let Some(entry) = dir.next_entry().await.map_err(|e| AppError::Internal(format!("read dir: {}", e)))? {
+        while let Some(entry) = dir
+            .next_entry()
+            .await
+            .map_err(|e| AppError::Internal(format!("read dir: {}", e)))?
+        {
             let name = entry.file_name();
             let name = name.to_string_lossy().to_string();
             let child_relative = relative.join(name);
@@ -170,7 +171,11 @@ async fn build_prop_entry(
     metadata: &std::fs::Metadata,
 ) -> Result<PropEntry, AppError> {
     let modified = metadata.modified().unwrap_or(SystemTime::now());
-    let size = if metadata.is_file() { metadata.len() } else { 0 };
+    let size = if metadata.is_file() {
+        metadata.len()
+    } else {
+        0
+    };
     let modified_secs = modified
         .duration_since(SystemTime::UNIX_EPOCH)
         .map(|d| d.as_secs())

@@ -65,16 +65,15 @@ pub fn paginate_lines_with_widows_orphans(
             continue;
         }
 
-        let (para_start, para_end) =
-            find_paragraph_bounds(break_index, line_count, paragraph_end);
+        let (para_start, para_end) = find_paragraph_bounds(break_index, line_count, paragraph_end);
         if break_index == para_start || break_index == para_end + 1 {
             continue;
         }
 
         let lines_before = break_index.saturating_sub(para_start);
         let lines_after = para_end.saturating_add(1).saturating_sub(break_index);
-        let needs_adjust = (orphans > 0 && lines_before < orphans)
-            || (widows > 0 && lines_after < widows);
+        let needs_adjust =
+            (orphans > 0 && lines_before < orphans) || (widows > 0 && lines_after < widows);
         if !needs_adjust {
             continue;
         }
@@ -87,8 +86,7 @@ pub fn paginate_lines_with_widows_orphans(
         let (page_para_start, page_para_end) =
             find_paragraph_bounds(page_start, line_count, paragraph_end);
         if page_start > page_para_start {
-            let lines_on_page =
-                page_para_end.saturating_add(1).saturating_sub(page_start);
+            let lines_on_page = page_para_end.saturating_add(1).saturating_sub(page_start);
             if widows > 0 && lines_on_page < widows {
                 continue;
             }
@@ -264,13 +262,7 @@ mod tests {
         let line_heights = vec![10, 10, 10, 10];
         let paragraph_end = vec![true, false, false, true];
 
-        let pages = paginate_lines_with_widows_orphans(
-            &line_heights,
-            30,
-            &paragraph_end,
-            2,
-            2,
-        );
+        let pages = paginate_lines_with_widows_orphans(&line_heights, 30, &paragraph_end, 2, 2);
 
         assert_eq!(
             pages,
@@ -294,13 +286,7 @@ mod tests {
         let line_heights = vec![10, 10, 10, 10, 10, 10, 10];
         let paragraph_end = vec![true, false, false, true, false, false, true];
 
-        let pages = paginate_lines_with_widows_orphans(
-            &line_heights,
-            30,
-            &paragraph_end,
-            2,
-            2,
-        );
+        let pages = paginate_lines_with_widows_orphans(&line_heights, 30, &paragraph_end, 2, 2);
 
         assert_eq!(
             pages,

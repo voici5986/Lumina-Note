@@ -1,5 +1,5 @@
 //! WebDAV 类型定义
-//! 
+//!
 //! 提供 WebDAV 操作所需的所有数据结构，与具体实现解耦
 
 use serde::{Deserialize, Serialize};

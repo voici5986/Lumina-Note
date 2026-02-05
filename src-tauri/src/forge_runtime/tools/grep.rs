@@ -1,4 +1,4 @@
-﻿use crate::forge_runtime::permissions::request_permission;
+use crate::forge_runtime::permissions::request_permission;
 use crate::forge_runtime::tools::shared::{
     ensure_external_directory_permission, parse_tool_input, resolve_path,
 };
@@ -93,10 +93,12 @@ async fn handle(call: ToolCall, ctx: ToolContext, env: ToolEnvironment) -> Graph
 
     let include_matcher = if let Some(pattern) = input.include {
         let mut builder = GlobSetBuilder::new();
-        builder.add(Glob::new(&pattern).map_err(|err| GraphError::ExecutionError {
-            node: format!("tool:{}", call.tool),
-            message: format!("Invalid include pattern: {}", err),
-        })?);
+        builder.add(
+            Glob::new(&pattern).map_err(|err| GraphError::ExecutionError {
+                node: format!("tool:{}", call.tool),
+                message: format!("Invalid include pattern: {}", err),
+            })?,
+        );
         Some(builder.build().map_err(|err| GraphError::ExecutionError {
             node: format!("tool:{}", call.tool),
             message: format!("Invalid include pattern: {}", err),
@@ -118,7 +120,10 @@ async fn handle(call: ToolCall, ctx: ToolContext, env: ToolEnvironment) -> Graph
         }
 
         if let Some(ref matcher) = include_matcher {
-            let rel = entry.path().strip_prefix(&search_root).unwrap_or(entry.path());
+            let rel = entry
+                .path()
+                .strip_prefix(&search_root)
+                .unwrap_or(entry.path());
             if !matcher.is_match(rel) {
                 continue;
             }
@@ -195,7 +200,9 @@ async fn handle(call: ToolCall, ctx: ToolContext, env: ToolEnvironment) -> Graph
 
     if truncated {
         output.push(String::new());
-        output.push("(Results are truncated. Consider using a more specific path or pattern.)".to_string());
+        output.push(
+            "(Results are truncated. Consider using a more specific path or pattern.)".to_string(),
+        );
     }
 
     Ok(ToolOutput::text(output.join("\n"))

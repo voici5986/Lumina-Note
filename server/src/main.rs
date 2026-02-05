@@ -8,16 +8,16 @@ mod relay;
 mod routes;
 mod state;
 
-use axum::routing::{any, get, post};
 use axum::http::{HeaderName, Request};
+use axum::routing::{any, get, post};
 use axum::Router;
 use config::Config;
 use sqlx::sqlite::SqlitePoolOptions;
 use state::AppState;
+use std::sync::Arc;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
-use std::sync::Arc;
 
 const REQUEST_ID_HEADER: HeaderName = HeaderName::from_static("x-request-id");
 
@@ -27,7 +27,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_env();
     if config.jwt_secret == "dev-secret-change-me" {
         if cfg!(debug_assertions) {
-            tracing::warn!("LUMINA_JWT_SECRET is using the default value; do not use this in production.");
+            tracing::warn!(
+                "LUMINA_JWT_SECRET is using the default value; do not use this in production."
+            );
         } else {
             return Err("LUMINA_JWT_SECRET must be set for production".into());
         }
@@ -45,10 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     db::init_db(&pool).await?;
 
-    let bind_addr = config
-        .bind
-        .parse()
-        .map_err(|_| "invalid LUMINA_BIND")?;
+    let bind_addr = config.bind.parse().map_err(|_| "invalid LUMINA_BIND")?;
 
     let state = AppState {
         pool,
@@ -77,7 +76,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/auth/register", post(routes::register))
         .route("/auth/login", post(routes::login))
         .route("/auth/refresh", post(routes::refresh))
-        .route("/workspaces", get(routes::list_workspaces).post(routes::create_workspace))
+        .route(
+            "/workspaces",
+            get(routes::list_workspaces).post(routes::create_workspace),
+        )
         .route("/relay", get(relay::relay_handler))
         .route("/dav/:workspace_id", any(dav::handle_dav_root))
         .route("/dav/:workspace_id/*path", any(dav::handle_dav_path))

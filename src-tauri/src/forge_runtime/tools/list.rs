@@ -1,4 +1,4 @@
-﻿use crate::forge_runtime::permissions::request_permission;
+use crate::forge_runtime::permissions::request_permission;
 use crate::forge_runtime::tools::shared::{
     ensure_external_directory_permission, parse_tool_input, resolve_path,
 };
@@ -114,7 +114,10 @@ async fn handle(call: ToolCall, ctx: ToolContext, env: ToolEnvironment) -> Graph
             continue;
         }
 
-        let rel = entry.path().strip_prefix(&search_root).unwrap_or(entry.path());
+        let rel = entry
+            .path()
+            .strip_prefix(&search_root)
+            .unwrap_or(entry.path());
         let rel_str = rel.to_string_lossy().replace('\\', "/");
         if should_ignore(&rel_str, &ignore_set) {
             continue;
@@ -139,19 +142,30 @@ async fn handle(call: ToolCall, ctx: ToolContext, env: ToolEnvironment) -> Graph
             dir = ".".to_string();
         }
 
-        let parts: Vec<&str> = if dir == "." { Vec::new() } else { dir.split('/').collect() };
+        let parts: Vec<&str> = if dir == "." {
+            Vec::new()
+        } else {
+            dir.split('/').collect()
+        };
         for i in 0..=parts.len() {
-            let mut dir_path = if i == 0 { ".".to_string() } else { parts[..i].join("/") };
+            let mut dir_path = if i == 0 {
+                ".".to_string()
+            } else {
+                parts[..i].join("/")
+            };
             if dir_path.is_empty() {
                 dir_path = ".".to_string();
             }
             dirs.insert(dir_path);
         }
 
-        files_by_dir
-            .entry(dir)
-            .or_default()
-            .push(Path::new(file).file_name().unwrap_or_default().to_string_lossy().to_string());
+        files_by_dir.entry(dir).or_default().push(
+            Path::new(file)
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string(),
+        );
     }
 
     let mut depth_truncated = false;
@@ -169,20 +183,26 @@ async fn handle(call: ToolCall, ctx: ToolContext, env: ToolEnvironment) -> Graph
 }
 
 fn build_ignore_set(ignore: Option<Vec<String>>) -> GraphResult<Option<globset::GlobSet>> {
-    let Some(ignore) = ignore else { return Ok(None); };
+    let Some(ignore) = ignore else {
+        return Ok(None);
+    };
     if ignore.is_empty() {
         return Ok(None);
     }
     let mut builder = GlobSetBuilder::new();
     for pattern in ignore {
-        builder.add(Glob::new(&pattern).map_err(|err| GraphError::ExecutionError {
+        builder.add(
+            Glob::new(&pattern).map_err(|err| GraphError::ExecutionError {
+                node: "tool:list".to_string(),
+                message: format!("Invalid ignore pattern: {}", err),
+            })?,
+        );
+    }
+    Ok(Some(builder.build().map_err(|err| {
+        GraphError::ExecutionError {
             node: "tool:list".to_string(),
             message: format!("Invalid ignore pattern: {}", err),
-        })?);
-    }
-    Ok(Some(builder.build().map_err(|err| GraphError::ExecutionError {
-        node: "tool:list".to_string(),
-        message: format!("Invalid ignore pattern: {}", err),
+        }
     })?))
 }
 

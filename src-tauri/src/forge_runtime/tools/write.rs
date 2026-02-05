@@ -1,4 +1,4 @@
-﻿use crate::forge_runtime::permissions::request_permission;
+use crate::forge_runtime::permissions::request_permission;
 use crate::forge_runtime::tools::shared::{
     ensure_external_directory_permission, parse_tool_input, permission_path, resolve_path,
 };
@@ -40,7 +40,13 @@ async fn handle(call: ToolCall, ctx: ToolContext, env: ToolEnvironment) -> Graph
     let input: WriteInput = parse_tool_input(&call)?;
     let target = resolve_path(&env.workspace_root, &input.file_path);
 
-    ensure_external_directory_permission(&ctx, &env.permissions, &env.workspace_root, &target, "file")?;
+    ensure_external_directory_permission(
+        &ctx,
+        &env.permissions,
+        &env.workspace_root,
+        &target,
+        "file",
+    )?;
 
     let pattern = permission_path(&env.workspace_root, &target);
     let mut metadata = Map::new();
@@ -57,10 +63,12 @@ async fn handle(call: ToolCall, ctx: ToolContext, env: ToolEnvironment) -> Graph
 
     let exists = tokio::fs::metadata(&target).await.is_ok();
     if let Some(parent) = target.parent() {
-        tokio::fs::create_dir_all(parent).await.map_err(|err| GraphError::ExecutionError {
-            node: format!("tool:{}", call.tool),
-            message: format!("Failed to create directory: {}", err),
-        })?;
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|err| GraphError::ExecutionError {
+                node: format!("tool:{}", call.tool),
+                message: format!("Failed to create directory: {}", err),
+            })?;
     }
     tokio::fs::write(&target, input.content)
         .await

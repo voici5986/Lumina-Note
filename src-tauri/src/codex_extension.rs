@@ -61,9 +61,7 @@ fn parse_extension_manifest(contents: &str) -> Result<ExtensionManifest, AppErro
 
 fn validate_openai_chatgpt_manifest(manifest: &ExtensionManifest) -> Result<(), AppError> {
     if manifest.publisher != "openai" || manifest.name != "chatgpt" {
-        return Err(AppError::InvalidPath(
-            "VSIX is not openai.chatgpt".into(),
-        ));
+        return Err(AppError::InvalidPath("VSIX is not openai.chatgpt".into()));
     }
     Ok(())
 }
@@ -80,7 +78,10 @@ fn write_current_version(base: &Path, version: &str) -> Result<(), AppError> {
     let payload = CurrentVersionFile {
         version: version.to_string(),
     };
-    std::fs::write(p, serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()))?;
+    std::fs::write(
+        p,
+        serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()),
+    )?;
     Ok(())
 }
 
@@ -108,7 +109,9 @@ async fn marketplace_latest_openai_chatgpt() -> Result<(String, String), AppErro
         .and_then(|x| x.get(0))
         .and_then(|x| x.get("extensions"))
         .and_then(|x| x.get(0))
-        .ok_or_else(|| AppError::InvalidPath("Marketplace response missing extensions[0]".into()))?;
+        .ok_or_else(|| {
+            AppError::InvalidPath("Marketplace response missing extensions[0]".into())
+        })?;
 
     let versions = ext
         .get("versions")
@@ -131,13 +134,14 @@ async fn marketplace_latest_openai_chatgpt() -> Result<(String, String), AppErro
     let vsix_url = files
         .iter()
         .find(|f| {
-            f.get("assetType")
-                .and_then(|x| x.as_str())
+            f.get("assetType").and_then(|x| x.as_str())
                 == Some("Microsoft.VisualStudio.Services.VSIXPackage")
         })
         .and_then(|f| f.get("source"))
         .and_then(|x| x.as_str())
-        .ok_or_else(|| AppError::InvalidPath("Marketplace response missing VSIX download url".into()))?
+        .ok_or_else(|| {
+            AppError::InvalidPath("Marketplace response missing VSIX download url".into())
+        })?
         .to_string();
 
     Ok((version, vsix_url))
@@ -228,7 +232,9 @@ pub async fn codex_extension_get_status(app: AppHandle) -> Result<CodexExtension
 }
 
 #[tauri::command]
-pub async fn codex_extension_install_latest(app: AppHandle) -> Result<CodexExtensionStatus, AppError> {
+pub async fn codex_extension_install_latest(
+    app: AppHandle,
+) -> Result<CodexExtensionStatus, AppError> {
     let base = codex_openai_chatgpt_dir(&app)?;
     let (version, vsix_url) = marketplace_latest_openai_chatgpt().await?;
 
@@ -272,7 +278,11 @@ pub async fn codex_extension_install_latest(app: AppHandle) -> Result<CodexExten
     Ok(CodexExtensionStatus {
         installed: true,
         version: Some(version.clone()),
-        extension_path: Some(extension_path_for_version(&base, &version).to_string_lossy().to_string()),
+        extension_path: Some(
+            extension_path_for_version(&base, &version)
+                .to_string_lossy()
+                .to_string(),
+        ),
         latest_version: Some(version),
     })
 }
@@ -298,9 +308,10 @@ pub async fn codex_extension_install_vsix(
 
     let vsix_path_cloned = vsix_path.clone();
     let tmp_dir_cloned = tmp_dir.clone();
-    let extract = tokio::task::spawn_blocking(move || extract_vsix(&vsix_path_cloned, &tmp_dir_cloned))
-        .await
-        .map_err(|e| AppError::InvalidPath(format!("VSIX extract task failed: {}", e)))?;
+    let extract =
+        tokio::task::spawn_blocking(move || extract_vsix(&vsix_path_cloned, &tmp_dir_cloned))
+            .await
+            .map_err(|e| AppError::InvalidPath(format!("VSIX extract task failed: {}", e)))?;
     if let Err(err) = extract {
         let _ = tokio::fs::remove_dir_all(&tmp_dir).await;
         return Err(err);
@@ -327,7 +338,11 @@ pub async fn codex_extension_install_vsix(
     Ok(CodexExtensionStatus {
         installed: true,
         version: Some(version.clone()),
-        extension_path: Some(extension_path_for_version(&base, &version).to_string_lossy().to_string()),
+        extension_path: Some(
+            extension_path_for_version(&base, &version)
+                .to_string_lossy()
+                .to_string(),
+        ),
         latest_version: Some(version),
     })
 }

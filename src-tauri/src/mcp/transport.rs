@@ -145,9 +145,13 @@ impl StdioTransport {
             .write_all(notification_str.as_bytes())
             .await
             .map_err(|e| format!("Failed to write notification: {}", e))?;
-        stdin.write_all(b"\n").await
+        stdin
+            .write_all(b"\n")
+            .await
             .map_err(|e| format!("Failed to write newline: {}", e))?;
-        stdin.flush().await
+        stdin
+            .flush()
+            .await
             .map_err(|e| format!("Failed to flush: {}", e))?;
 
         Ok(())
@@ -164,8 +168,8 @@ impl StdioTransport {
     pub async fn is_alive(&self) -> bool {
         let mut child = self.child.lock().await;
         match child.try_wait() {
-            Ok(None) => true,  // 还在运行
-            _ => false,        // 已退出或出错
+            Ok(None) => true, // 还在运行
+            _ => false,       // 已退出或出错
         }
     }
 }

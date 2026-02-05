@@ -14,8 +14,8 @@ impl Config {
         let db_url =
             env::var("LUMINA_DB_URL").unwrap_or_else(|_| "sqlite://data/lumina.db".to_string());
         let data_dir = env::var("LUMINA_DATA_DIR").unwrap_or_else(|_| "data".to_string());
-        let jwt_secret = env::var("LUMINA_JWT_SECRET")
-            .unwrap_or_else(|_| "dev-secret-change-me".to_string());
+        let jwt_secret =
+            env::var("LUMINA_JWT_SECRET").unwrap_or_else(|_| "dev-secret-change-me".to_string());
 
         Self {
             bind,

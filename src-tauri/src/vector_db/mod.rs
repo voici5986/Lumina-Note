@@ -1,14 +1,14 @@
 //! Vector Database Module
-//! 
+//!
 //! SQLite-based vector storage for RAG system.
 //! Uses bincode for efficient vector serialization.
 
 pub mod commands;
 
-use rusqlite::{Connection, params};
+use crate::error::AppError;
+use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
-use crate::error::AppError;
 
 pub use commands::*;
 
@@ -68,16 +68,20 @@ pub fn init_db(db_path: &str) -> Result<(), AppError> {
             created_at INTEGER DEFAULT (strftime('%s', 'now'))
         )",
         [],
-    ).map_err(|e| AppError::Database(format!("Failed to create vectors table: {}", e)))?;
+    )
+    .map_err(|e| AppError::Database(format!("Failed to create vectors table: {}", e)))?;
 
     // Create index for file_path lookups
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_vectors_file_path ON vectors(file_path)",
         [],
-    ).map_err(|e| AppError::Database(format!("Failed to create index: {}", e)))?;
+    )
+    .map_err(|e| AppError::Database(format!("Failed to create index: {}", e)))?;
 
     // Store connection
-    let mut db = DB_CONNECTION.lock().map_err(|_| AppError::Database("Lock poisoned".into()))?;
+    let mut db = DB_CONNECTION
+        .lock()
+        .map_err(|_| AppError::Database("Lock poisoned".into()))?;
     *db = Some(conn);
 
     Ok(())
@@ -85,8 +89,12 @@ pub fn init_db(db_path: &str) -> Result<(), AppError> {
 
 /// Insert or update vectors
 pub fn upsert_vectors(chunks: Vec<VectorChunk>) -> Result<(), AppError> {
-    let db = DB_CONNECTION.lock().map_err(|_| AppError::Database("Lock poisoned".into()))?;
-    let conn = db.as_ref().ok_or_else(|| AppError::Database("Database not initialized".into()))?;
+    let db = DB_CONNECTION
+        .lock()
+        .map_err(|_| AppError::Database("Lock poisoned".into()))?;
+    let conn = db
+        .as_ref()
+        .ok_or_else(|| AppError::Database("Database not initialized".into()))?;
 
     for chunk in chunks {
         let vector_blob = bincode::serialize(&chunk.vector)
@@ -106,7 +114,8 @@ pub fn upsert_vectors(chunks: Vec<VectorChunk>) -> Result<(), AppError> {
                 chunk.end_line,
                 chunk.file_modified,
             ],
-        ).map_err(|e| AppError::Database(format!("Failed to insert vector: {}", e)))?;
+        )
+        .map_err(|e| AppError::Database(format!("Failed to insert vector: {}", e)))?;
     }
 
     Ok(())
@@ -121,22 +130,24 @@ fn collect_rows(
     sql: &str,
     params: &[&dyn rusqlite::ToSql],
 ) -> Result<Vec<VectorRow>, AppError> {
-    let mut stmt = conn.prepare(sql)
+    let mut stmt = conn
+        .prepare(sql)
         .map_err(|e| AppError::Database(format!("Failed to prepare query: {}", e)))?;
-    
-    let rows = stmt.query_map(params, |row| {
-        Ok((
-            row.get::<_, String>(0)?,
-            row.get::<_, Vec<u8>>(1)?,
-            row.get::<_, String>(2)?,
-            row.get::<_, String>(3)?,
-            row.get::<_, String>(4)?,
-            row.get::<_, i32>(5)?,
-            row.get::<_, i32>(6)?,
-        ))
-    })
-    .map_err(|e| AppError::Database(format!("Failed to execute query: {}", e)))?;
-    
+
+    let rows = stmt
+        .query_map(params, |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Vec<u8>>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, i32>(5)?,
+                row.get::<_, i32>(6)?,
+            ))
+        })
+        .map_err(|e| AppError::Database(format!("Failed to execute query: {}", e)))?;
+
     Ok(rows.filter_map(|r| r.ok()).collect())
 }
 
@@ -147,8 +158,12 @@ pub fn search_vectors(
     min_score: f32,
     directory_filter: Option<String>,
 ) -> Result<Vec<SearchResult>, AppError> {
-    let db = DB_CONNECTION.lock().map_err(|_| AppError::Database("Lock poisoned".into()))?;
-    let conn = db.as_ref().ok_or_else(|| AppError::Database("Database not initialized".into()))?;
+    let db = DB_CONNECTION
+        .lock()
+        .map_err(|_| AppError::Database("Lock poisoned".into()))?;
+    let conn = db
+        .as_ref()
+        .ok_or_else(|| AppError::Database("Database not initialized".into()))?;
 
     // Collect all matching rows
     let all_rows = if let Some(ref dir) = directory_filter {
@@ -156,31 +171,37 @@ pub fn search_vectors(
         let pattern = format!("{}%", dir);
         collect_rows(conn, sql, &[&pattern])?
     } else {
-        let sql = "SELECT id, vector, content, file_path, heading, start_line, end_line FROM vectors";
+        let sql =
+            "SELECT id, vector, content, file_path, heading, start_line, end_line FROM vectors";
         collect_rows(conn, sql, &[])?
     };
 
     // Calculate similarity and filter
     let mut results: Vec<(f32, SearchResult)> = all_rows
         .into_iter()
-        .filter_map(|(id, vector_blob, content, file_path, heading, start_line, end_line)| {
-            let stored_vector: Vec<f32> = bincode::deserialize(&vector_blob).ok()?;
-            let score = cosine_similarity(&query_vector, &stored_vector);
-            
-            if score >= min_score {
-                Some((score, SearchResult {
-                    id,
-                    file_path,
-                    heading,
-                    content,
-                    score,
-                    start_line,
-                    end_line,
-                }))
-            } else {
-                None
-            }
-        })
+        .filter_map(
+            |(id, vector_blob, content, file_path, heading, start_line, end_line)| {
+                let stored_vector: Vec<f32> = bincode::deserialize(&vector_blob).ok()?;
+                let score = cosine_similarity(&query_vector, &stored_vector);
+
+                if score >= min_score {
+                    Some((
+                        score,
+                        SearchResult {
+                            id,
+                            file_path,
+                            heading,
+                            content,
+                            score,
+                            start_line,
+                            end_line,
+                        },
+                    ))
+                } else {
+                    None
+                }
+            },
+        )
         .collect();
 
     // Sort by score descending
@@ -192,13 +213,18 @@ pub fn search_vectors(
 
 /// Delete vectors by file path
 pub fn delete_vectors_by_file(file_path: &str) -> Result<(), AppError> {
-    let db = DB_CONNECTION.lock().map_err(|_| AppError::Database("Lock poisoned".into()))?;
-    let conn = db.as_ref().ok_or_else(|| AppError::Database("Database not initialized".into()))?;
+    let db = DB_CONNECTION
+        .lock()
+        .map_err(|_| AppError::Database("Lock poisoned".into()))?;
+    let conn = db
+        .as_ref()
+        .ok_or_else(|| AppError::Database("Database not initialized".into()))?;
 
     conn.execute(
         "DELETE FROM vectors WHERE file_path = ?1",
         params![file_path],
-    ).map_err(|e| AppError::Database(format!("Failed to delete vectors: {}", e)))?;
+    )
+    .map_err(|e| AppError::Database(format!("Failed to delete vectors: {}", e)))?;
 
     Ok(())
 }
@@ -209,11 +235,22 @@ pub fn delete_vectors_by_ids(ids: Vec<String>) -> Result<(), AppError> {
         return Ok(());
     }
 
-    let db = DB_CONNECTION.lock().map_err(|_| AppError::Database("Lock poisoned".into()))?;
-    let conn = db.as_ref().ok_or_else(|| AppError::Database("Database not initialized".into()))?;
+    let db = DB_CONNECTION
+        .lock()
+        .map_err(|_| AppError::Database("Lock poisoned".into()))?;
+    let conn = db
+        .as_ref()
+        .ok_or_else(|| AppError::Database("Database not initialized".into()))?;
 
-    let placeholders: Vec<String> = ids.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
-    let sql = format!("DELETE FROM vectors WHERE id IN ({})", placeholders.join(", "));
+    let placeholders: Vec<String> = ids
+        .iter()
+        .enumerate()
+        .map(|(i, _)| format!("?{}", i + 1))
+        .collect();
+    let sql = format!(
+        "DELETE FROM vectors WHERE id IN ({})",
+        placeholders.join(", ")
+    );
 
     let params: Vec<&dyn rusqlite::ToSql> = ids.iter().map(|s| s as &dyn rusqlite::ToSql).collect();
     conn.execute(&sql, params.as_slice())
@@ -224,8 +261,10 @@ pub fn delete_vectors_by_ids(ids: Vec<String>) -> Result<(), AppError> {
 
 /// Get index status
 pub fn get_index_status() -> Result<IndexStatus, AppError> {
-    let db = DB_CONNECTION.lock().map_err(|_| AppError::Database("Lock poisoned".into()))?;
-    
+    let db = DB_CONNECTION
+        .lock()
+        .map_err(|_| AppError::Database("Lock poisoned".into()))?;
+
     if db.is_none() {
         return Ok(IndexStatus {
             initialized: false,
@@ -237,23 +276,19 @@ pub fn get_index_status() -> Result<IndexStatus, AppError> {
 
     let conn = db.as_ref().unwrap();
 
-    let total_chunks: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM vectors",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let total_chunks: i64 = conn
+        .query_row("SELECT COUNT(*) FROM vectors", [], |row| row.get(0))
+        .unwrap_or(0);
 
-    let total_files: i64 = conn.query_row(
-        "SELECT COUNT(DISTINCT file_path) FROM vectors",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let total_files: i64 = conn
+        .query_row("SELECT COUNT(DISTINCT file_path) FROM vectors", [], |row| {
+            row.get(0)
+        })
+        .unwrap_or(0);
 
-    let last_indexed: Option<i64> = conn.query_row(
-        "SELECT MAX(created_at) FROM vectors",
-        [],
-        |row| row.get(0),
-    ).ok();
+    let last_indexed: Option<i64> = conn
+        .query_row("SELECT MAX(created_at) FROM vectors", [], |row| row.get(0))
+        .ok();
 
     Ok(IndexStatus {
         initialized: true,
@@ -265,8 +300,12 @@ pub fn get_index_status() -> Result<IndexStatus, AppError> {
 
 /// Check if file needs reindexing based on modification time
 pub fn file_needs_reindex(file_path: &str, current_modified: i64) -> Result<bool, AppError> {
-    let db = DB_CONNECTION.lock().map_err(|_| AppError::Database("Lock poisoned".into()))?;
-    let conn = db.as_ref().ok_or_else(|| AppError::Database("Database not initialized".into()))?;
+    let db = DB_CONNECTION
+        .lock()
+        .map_err(|_| AppError::Database("Lock poisoned".into()))?;
+    let conn = db
+        .as_ref()
+        .ok_or_else(|| AppError::Database("Database not initialized".into()))?;
 
     let stored_modified: Result<Option<i64>, _> = conn.query_row(
         "SELECT file_modified FROM vectors WHERE file_path = ?1 LIMIT 1",
@@ -277,14 +316,18 @@ pub fn file_needs_reindex(file_path: &str, current_modified: i64) -> Result<bool
     match stored_modified {
         Ok(Some(stored)) => Ok(current_modified > stored),
         Ok(None) => Ok(true), // No record, needs indexing
-        Err(_) => Ok(true), // Not found, needs indexing
+        Err(_) => Ok(true),   // Not found, needs indexing
     }
 }
 
 /// Clear all vectors (for full reindex)
 pub fn clear_all_vectors() -> Result<(), AppError> {
-    let db = DB_CONNECTION.lock().map_err(|_| AppError::Database("Lock poisoned".into()))?;
-    let conn = db.as_ref().ok_or_else(|| AppError::Database("Database not initialized".into()))?;
+    let db = DB_CONNECTION
+        .lock()
+        .map_err(|_| AppError::Database("Lock poisoned".into()))?;
+    let conn = db
+        .as_ref()
+        .ok_or_else(|| AppError::Database("Database not initialized".into()))?;
 
     conn.execute("DELETE FROM vectors", [])
         .map_err(|e| AppError::Database(format!("Failed to clear vectors: {}", e)))?;

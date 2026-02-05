@@ -1,7 +1,7 @@
 //! Error types for LangGraph
 
+use serde::{Deserialize, Serialize};
 use std::fmt;
-use serde::{Serialize, Deserialize};
 
 // ============ Interrupt Types ============
 
@@ -19,10 +19,10 @@ pub struct Interrupt {
 impl Interrupt {
     /// 创建新的中断
     pub fn new(value: impl Serialize, node: impl Into<String>) -> Self {
-        use std::time::{SystemTime, UNIX_EPOCH};
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
-        
+        use std::time::{SystemTime, UNIX_EPOCH};
+
         // 生成唯一 ID：时间戳 + 随机哈希
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -32,14 +32,14 @@ impl Interrupt {
         timestamp.hash(&mut hasher);
         std::thread::current().id().hash(&mut hasher);
         let id = format!("{:016x}", hasher.finish());
-        
+
         Self {
             value: serde_json::to_value(value).unwrap_or(serde_json::Value::Null),
             id,
             node: node.into(),
         }
     }
-    
+
     /// 使用指定 ID 创建中断
     pub fn with_id(value: impl Serialize, node: impl Into<String>, id: impl Into<String>) -> Self {
         Self {
@@ -66,7 +66,7 @@ impl ResumeCommand {
             interrupt_id: None,
         }
     }
-    
+
     pub fn with_id(value: impl Serialize, interrupt_id: impl Into<String>) -> Self {
         Self {
             value: serde_json::to_value(value).unwrap_or(serde_json::Value::Null),
@@ -87,7 +87,11 @@ pub enum GraphError {
     /// Invalid node name (reserved or contains invalid characters)
     InvalidNodeName(String),
     /// Edge validation error
-    InvalidEdge { from: String, to: String, reason: String },
+    InvalidEdge {
+        from: String,
+        to: String,
+        reason: String,
+    },
     /// Graph has no entry point
     NoEntryPoint,
     /// Graph validation failed
@@ -129,7 +133,11 @@ impl fmt::Display for GraphError {
             Self::NotCompiled => write!(f, "Graph has not been compiled"),
             Self::CompilationError(msg) => write!(f, "Compilation error: {}", msg),
             Self::Interrupted(interrupts) => {
-                write!(f, "Graph interrupted with {} pending interrupt(s)", interrupts.len())
+                write!(
+                    f,
+                    "Graph interrupted with {} pending interrupt(s)",
+                    interrupts.len()
+                )
             }
             Self::Other(msg) => write!(f, "{}", msg),
         }
@@ -144,19 +152,19 @@ pub type GraphResult<T> = Result<T, GraphError>;
 // ============ Interrupt Helper ============
 
 /// 在节点中触发中断，等待人类输入
-/// 
+///
 /// # Example
 /// ```rust,no_run
 /// use lumina_note_lib::langgraph::error::{interrupt, GraphResult};
 /// use lumina_note_lib::langgraph::state::GraphState;
-/// 
+///
 /// #[derive(Clone, Default)]
 /// struct MyState {
 ///     needs_clarification: bool,
 /// }
-/// 
+///
 /// impl GraphState for MyState {}
-/// 
+///
 /// async fn clarify_node(state: MyState) -> GraphResult<MyState> {
 ///     // Need user clarification
 ///     if state.needs_clarification {

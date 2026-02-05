@@ -1,14 +1,14 @@
 //! Deep Research 节点实现
 
-use std::sync::Arc;
 use std::path::Path;
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use walkdir::WalkDir;
 
-use crate::agent::llm_client::LlmClient;
-use crate::agent::deep_research::types::*;
-use crate::agent::deep_research::tavily::TavilyClient;
 use crate::agent::deep_research::crawler::JinaClient;
+use crate::agent::deep_research::tavily::TavilyClient;
+use crate::agent::deep_research::types::*;
+use crate::agent::llm_client::LlmClient;
 use crate::langgraph::error::Interrupt;
 
 /// 节点执行结果
@@ -23,16 +23,24 @@ fn emit_event(app: &AppHandle, event: DeepResearchEvent) {
 }
 
 /// 发送 Token 使用量事件
-fn emit_token_usage(app: &AppHandle, prompt_tokens: usize, completion_tokens: usize, total_tokens: usize) {
-    emit_event(app, DeepResearchEvent::TokenUsage {
-        prompt_tokens,
-        completion_tokens,
-        total_tokens,
-    });
+fn emit_token_usage(
+    app: &AppHandle,
+    prompt_tokens: usize,
+    completion_tokens: usize,
+    total_tokens: usize,
+) {
+    emit_event(
+        app,
+        DeepResearchEvent::TokenUsage {
+            prompt_tokens,
+            completion_tokens,
+            total_tokens,
+        },
+    );
 }
 
 /// 从 LLM 响应中提取 JSON
-/// 
+///
 /// 处理多种常见格式：
 /// - 纯 JSON
 /// - ```json ... ``` 代码块
@@ -40,12 +48,12 @@ fn emit_token_usage(app: &AppHandle, prompt_tokens: usize, completion_tokens: us
 /// - 带有前缀/后缀文字的 JSON
 fn extract_json(text: &str) -> Result<String, String> {
     let text = text.trim();
-    
+
     // 空响应
     if text.is_empty() {
         return Err("LLM 返回了空响应".to_string());
     }
-    
+
     // 1. 尝试处理 ```json ... ``` 格式
     if let Some(start_idx) = text.find("```json") {
         let json_start = start_idx + 7; // 跳过 "```json"
@@ -56,7 +64,7 @@ fn extract_json(text: &str) -> Result<String, String> {
             }
         }
     }
-    
+
     // 2. 尝试处理 ``` ... ``` 格式（无语言标识）
     if text.starts_with("```") && !text.starts_with("```json") {
         let json_start = text.find('\n').map(|i| i + 1).unwrap_or(3);
@@ -67,14 +75,14 @@ fn extract_json(text: &str) -> Result<String, String> {
             }
         }
     }
-    
+
     // 3. 尝试找到 JSON 对象的边界 { ... }
     if let Some(start_idx) = text.find('{') {
         // 找到匹配的结束括号
         let mut depth = 0;
         let mut end_idx = start_idx;
         let chars: Vec<char> = text.chars().collect();
-        
+
         for (i, &ch) in chars.iter().enumerate().skip(start_idx) {
             match ch {
                 '{' => depth += 1,
@@ -88,19 +96,19 @@ fn extract_json(text: &str) -> Result<String, String> {
                 _ => {}
             }
         }
-        
+
         if depth == 0 && end_idx > start_idx {
             let json_str: String = chars[start_idx..=end_idx].iter().collect();
             return Ok(json_str);
         }
     }
-    
+
     // 4. 尝试找到 JSON 数组的边界 [ ... ]
     if let Some(start_idx) = text.find('[') {
         let mut depth = 0;
         let mut end_idx = start_idx;
         let chars: Vec<char> = text.chars().collect();
-        
+
         for (i, &ch) in chars.iter().enumerate().skip(start_idx) {
             match ch {
                 '[' => depth += 1,
@@ -114,13 +122,13 @@ fn extract_json(text: &str) -> Result<String, String> {
                 _ => {}
             }
         }
-        
+
         if depth == 0 && end_idx > start_idx {
             let json_str: String = chars[start_idx..=end_idx].iter().collect();
             return Ok(json_str);
         }
     }
-    
+
     // 5. 如果都找不到，返回原文（让 JSON 解析器报告具体错误）
     Ok(text.to_string())
 }
@@ -128,23 +136,18 @@ fn extract_json(text: &str) -> Result<String, String> {
 /// 解析 JSON 并提供更好的错误信息
 fn parse_json<T: serde::de::DeserializeOwned>(text: &str, context: &str) -> Result<T, String> {
     let json_str = extract_json(text)?;
-    
+
     serde_json::from_str(&json_str).map_err(|e| {
         // 提供更详细的错误信息
         let preview: String = json_str.chars().take(200).collect();
-        format!(
-            "{}: {} (响应预览: {}...)",
-            context,
-            e,
-            preview
-        )
+        format!("{}: {} (响应预览: {}...)", context, e, preview)
     })
 }
 
 // ============ 节点实现 ============
 
 /// 分析主题节点
-/// 
+///
 /// 分析用户输入的研究主题，提取关键词用于搜索
 /// - 如果是简单问候/闲聊，直接回复
 /// - 如果主题不够明确，触发 interrupt 请求用户澄清
@@ -155,10 +158,13 @@ pub async fn analyze_topic_node(
     mut state: DeepResearchState,
 ) -> Result<NodeResult, String> {
     state.phase = ResearchPhase::AnalyzingTopic;
-    emit_event(app, DeepResearchEvent::PhaseChange {
-        phase: state.phase.clone(),
-        message: "正在分析研究主题...".to_string(),
-    });
+    emit_event(
+        app,
+        DeepResearchEvent::PhaseChange {
+            phase: state.phase.clone(),
+            message: "正在分析研究主题...".to_string(),
+        },
+    );
 
     // 如果有用户澄清，将其合并到主题中
     let effective_topic = if let Some(ref clarification) = state.clarification {
@@ -190,7 +196,9 @@ pub async fn analyze_topic_node(
         effective_topic
     );
 
-    let intent_response = llm.call_simple(&intent_prompt).await
+    let intent_response = llm
+        .call_simple(&intent_prompt)
+        .await
         .unwrap_or_else(|_| r#"{"intent": "RESEARCH"}"#.to_string());
 
     // 解析意图（使用健壮的 JSON 提取）
@@ -198,15 +206,18 @@ pub async fn analyze_topic_node(
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())
         .unwrap_or_else(|| serde_json::json!({"intent": "RESEARCH"}));
-    
-    let intent = intent_json["intent"].as_str().unwrap_or("RESEARCH").to_uppercase();
+
+    let intent = intent_json["intent"]
+        .as_str()
+        .unwrap_or("RESEARCH")
+        .to_uppercase();
 
     // 如果是闲聊，直接回复
     if intent == "CHAT" {
         // 获取工作区上下文（轻量级）
         let recent_notes = get_recent_note_titles(&state.workspace_path, 3);
         let random_tags = get_random_tags(&state.workspace_path, 5);
-        
+
         let context_hint = if !recent_notes.is_empty() || !random_tags.is_empty() {
             let notes_str = if !recent_notes.is_empty() {
                 format!("最近在研究：{}", recent_notes.join("、"))
@@ -218,15 +229,20 @@ pub async fn analyze_topic_node(
             } else {
                 String::new()
             };
-            format!("\n\n用户笔记库概况：\n{}{}{}", 
+            format!(
+                "\n\n用户笔记库概况：\n{}{}{}",
                 notes_str,
-                if !notes_str.is_empty() && !tags_str.is_empty() { "\n" } else { "" },
+                if !notes_str.is_empty() && !tags_str.is_empty() {
+                    "\n"
+                } else {
+                    ""
+                },
                 tags_str
             )
         } else {
             String::new()
         };
-        
+
         let chat_prompt = format!(
             r#"你是 Deep Research 助手。用户发来了一条非研究请求的消息，请友好地回复，并简短引导用户输入研究主题。
 
@@ -236,22 +252,23 @@ pub async fn analyze_topic_node(
 1. 回复要简短友好（2-3句话）
 2. 基于用户笔记库内容，给出 2 个个性化的研究建议
 3. 如果没有笔记库信息，可以给通用建议"#,
-            state.topic,
-            context_hint
+            state.topic, context_hint
         );
 
-        let response = llm.call_simple(&chat_prompt).await
-            .unwrap_or_else(|_| "你好！请输入一个研究主题，我来帮你在笔记库中搜索相关内容。".to_string());
+        let response = llm.call_simple(&chat_prompt).await.unwrap_or_else(|_| {
+            "你好！请输入一个研究主题，我来帮你在笔记库中搜索相关内容。".to_string()
+        });
 
         state.phase = ResearchPhase::Completed;
         state.report = Some(response.clone());
 
-        emit_event(app, DeepResearchEvent::ReportChunk {
-            content: response.clone(),
-        });
-        emit_event(app, DeepResearchEvent::Complete {
-            report: response,
-        });
+        emit_event(
+            app,
+            DeepResearchEvent::ReportChunk {
+                content: response.clone(),
+            },
+        );
+        emit_event(app, DeepResearchEvent::Complete { report: response });
 
         return Ok(NodeResult {
             state,
@@ -265,17 +282,21 @@ pub async fn analyze_topic_node(
             .as_str()
             .unwrap_or("请问您具体想研究什么内容？")
             .to_string();
-        
+
         let suggestions: Vec<String> = intent_json["clarify_suggestions"]
             .as_array()
-            .map(|arr| arr.iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect())
-            .unwrap_or_else(|| vec![
-                "可以说明具体想了解的方面".to_string(),
-                "可以提供一些关键词".to_string(),
-                "可以描述您的使用场景".to_string(),
-            ]);
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_else(|| {
+                vec![
+                    "可以说明具体想了解的方面".to_string(),
+                    "可以提供一些关键词".to_string(),
+                    "可以描述您的使用场景".to_string(),
+                ]
+            });
 
         // 创建中断
         let interrupt = Interrupt::new(
@@ -285,21 +306,27 @@ pub async fn analyze_topic_node(
                 "suggestions": suggestions,
                 "original_topic": state.topic,
             }),
-            "analyze_topic"
+            "analyze_topic",
         );
 
         // 更新状态
         state.phase = ResearchPhase::WaitingForClarification;
-        
+
         // 发送事件到前端
-        emit_event(app, DeepResearchEvent::NeedsClarification {
-            question: question.clone(),
-            suggestions: suggestions.clone(),
-            interrupt_id: interrupt.id.clone(),
-        });
+        emit_event(
+            app,
+            DeepResearchEvent::NeedsClarification {
+                question: question.clone(),
+                suggestions: suggestions.clone(),
+                interrupt_id: interrupt.id.clone(),
+            },
+        );
 
         // 返回中断错误（会被 builder 捕获并转换为 GraphError::Interrupted）
-        return Err(format!("INTERRUPT:{}", serde_json::to_string(&interrupt).unwrap_or_default()));
+        return Err(format!(
+            "INTERRUPT:{}",
+            serde_json::to_string(&interrupt).unwrap_or_default()
+        ));
     }
 
     // 正常研究流程：提取关键词（使用可能包含澄清的有效主题）
@@ -317,10 +344,16 @@ React
     );
 
     let response = llm.call_simple_with_usage(&prompt).await?;
-    emit_token_usage(app, response.prompt_tokens, response.completion_tokens, response.total_tokens);
-    
+    emit_token_usage(
+        app,
+        response.prompt_tokens,
+        response.completion_tokens,
+        response.total_tokens,
+    );
+
     // 解析关键词
-    let keywords: Vec<String> = response.content
+    let keywords: Vec<String> = response
+        .content
         .lines()
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty() && s.len() < 50)
@@ -334,9 +367,12 @@ React
         state.keywords = keywords;
     }
 
-    emit_event(app, DeepResearchEvent::KeywordsExtracted {
-        keywords: state.keywords.clone(),
-    });
+    emit_event(
+        app,
+        DeepResearchEvent::KeywordsExtracted {
+            keywords: state.keywords.clone(),
+        },
+    );
 
     Ok(NodeResult {
         state,
@@ -345,12 +381,12 @@ React
 }
 
 /// 搜索笔记节点
-/// 
+///
 /// 根据搜索模式使用不同策略：
 /// - Semantic: 使用前端传入的 RAG 搜索结果
 /// - Keyword: 使用关键词文件搜索
 /// - Hybrid: 合并两者结果
-/// 
+///
 /// 同时可选支持网络搜索（Tavily）
 pub async fn search_notes_node(
     app: &AppHandle,
@@ -361,22 +397,34 @@ pub async fn search_notes_node(
     max_web_results: usize,
 ) -> Result<NodeResult, String> {
     state.phase = ResearchPhase::SearchingNotes;
-    
+
     let search_mode_msg = match state.search_mode {
         SearchMode::Semantic => "语义搜索",
         SearchMode::Keyword => "关键词搜索",
         SearchMode::Hybrid => "混合搜索",
     };
-    
-    let web_search_msg = if tavily.is_some() { " + 网络搜索" } else { "" };
-    
-    emit_event(app, DeepResearchEvent::PhaseChange {
-        phase: state.phase.clone(),
-        message: format!("正在{}笔记库{}（关键词：{}）...", search_mode_msg, web_search_msg, state.keywords.join(", ")),
-    });
+
+    let web_search_msg = if tavily.is_some() {
+        " + 网络搜索"
+    } else {
+        ""
+    };
+
+    emit_event(
+        app,
+        DeepResearchEvent::PhaseChange {
+            phase: state.phase.clone(),
+            message: format!(
+                "正在{}笔记库{}（关键词：{}）...",
+                search_mode_msg,
+                web_search_msg,
+                state.keywords.join(", ")
+            ),
+        },
+    );
 
     let mut all_results: Vec<NoteReference> = Vec::new();
-    
+
     // 根据搜索模式选择策略
     match state.search_mode {
         SearchMode::Semantic => {
@@ -384,26 +432,44 @@ pub async fn search_notes_node(
             if !state.pre_searched_notes.is_empty() {
                 all_results = state.pre_searched_notes.clone();
                 #[cfg(debug_assertions)]
-                println!("[DeepResearch] 使用语义搜索结果：{} 篇笔记", all_results.len());
+                println!(
+                    "[DeepResearch] 使用语义搜索结果：{} 篇笔记",
+                    all_results.len()
+                );
             } else {
                 // 没有预搜索结果，回退到关键词搜索
                 #[cfg(debug_assertions)]
                 println!("[DeepResearch] 没有预搜索结果，回退到关键词搜索");
-                all_results = keyword_search(&state.workspace_path, &state.search_scope, &state.keywords, max_results);
+                all_results = keyword_search(
+                    &state.workspace_path,
+                    &state.search_scope,
+                    &state.keywords,
+                    max_results,
+                );
             }
         }
         SearchMode::Keyword => {
             // 使用关键词搜索
-            all_results = keyword_search(&state.workspace_path, &state.search_scope, &state.keywords, max_results);
+            all_results = keyword_search(
+                &state.workspace_path,
+                &state.search_scope,
+                &state.keywords,
+                max_results,
+            );
         }
         SearchMode::Hybrid => {
             // 混合搜索：先用语义搜索，再用关键词补充
             if !state.pre_searched_notes.is_empty() {
                 all_results = state.pre_searched_notes.clone();
             }
-            
+
             // 用关键词搜索补充
-            let keyword_results = keyword_search(&state.workspace_path, &state.search_scope, &state.keywords, max_results);
+            let keyword_results = keyword_search(
+                &state.workspace_path,
+                &state.search_scope,
+                &state.keywords,
+                max_results,
+            );
             for note in keyword_results {
                 if !all_results.iter().any(|r| r.path == note.path) {
                     all_results.push(note);
@@ -413,39 +479,52 @@ pub async fn search_notes_node(
     }
 
     // 按分数排序，取前 N 个
-    all_results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    all_results.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     all_results.truncate(max_results);
 
     state.found_notes = all_results;
 
-    emit_event(app, DeepResearchEvent::NotesFound {
-        notes: state.found_notes.clone(),
-    });
+    emit_event(
+        app,
+        DeepResearchEvent::NotesFound {
+            notes: state.found_notes.clone(),
+        },
+    );
 
     // ============ 网络搜索 ============
     if let Some(tavily_client) = tavily {
         // 切换到网络搜索阶段
         state.phase = ResearchPhase::SearchingWeb;
-        emit_event(app, DeepResearchEvent::PhaseChange {
-            phase: state.phase.clone(),
-            message: "正在搜索网络获取相关内容...".to_string(),
-        });
-        
+        emit_event(
+            app,
+            DeepResearchEvent::PhaseChange {
+                phase: state.phase.clone(),
+                message: "正在搜索网络获取相关内容...".to_string(),
+            },
+        );
+
         #[cfg(debug_assertions)]
         println!("[DeepResearch] 执行网络搜索...");
-        
+
         // 使用主题作为搜索查询
         let query = format!("{} {}", state.topic, state.keywords.join(" "));
-        
+
         match tavily_client.search(&query, max_web_results).await {
             Ok(web_results) => {
                 #[cfg(debug_assertions)]
                 println!("[DeepResearch] 网络搜索找到 {} 个结果", web_results.len());
                 state.web_search_results = web_results;
-                
-                emit_event(app, DeepResearchEvent::WebSearchComplete {
-                    results: state.web_search_results.clone(),
-                });
+
+                emit_event(
+                    app,
+                    DeepResearchEvent::WebSearchComplete {
+                        results: state.web_search_results.clone(),
+                    },
+                );
             }
             Err(e) => {
                 // 网络搜索失败不影响主流程，只记录警告
@@ -458,9 +537,12 @@ pub async fn search_notes_node(
     if state.found_notes.is_empty() && state.web_search_results.is_empty() {
         state.phase = ResearchPhase::Error;
         state.error = Some("未找到相关笔记或网络内容".to_string());
-        emit_event(app, DeepResearchEvent::Error {
-            message: "未找到与主题相关的笔记或网络内容".to_string(),
-        });
+        emit_event(
+            app,
+            DeepResearchEvent::Error {
+                message: "未找到与主题相关的笔记或网络内容".to_string(),
+            },
+        );
         return Ok(NodeResult {
             state,
             next_node: None,
@@ -474,7 +556,7 @@ pub async fn search_notes_node(
 }
 
 /// 爬取网页节点
-/// 
+///
 /// 分批爬取：每次爬取 BATCH_SIZE 个，直到达到 max_pages 或内容总长度达到限制
 /// 这样可以更快开始生成报告，同时控制 prompt 长度
 pub async fn crawl_web_node(
@@ -483,9 +565,9 @@ pub async fn crawl_web_node(
     jina: Option<&Arc<JinaClient>>,
     max_pages: usize,
 ) -> Result<NodeResult, String> {
-    const BATCH_SIZE: usize = 2;  // 每批爬取 2 个
-    const MAX_TOTAL_CONTENT_CHARS: usize = 15000;  // 总内容限制 15000 字符
-    const MAX_PER_PAGE_CHARS: usize = 3000;  // 每页内容限制 3000 字符
+    const BATCH_SIZE: usize = 2; // 每批爬取 2 个
+    const MAX_TOTAL_CONTENT_CHARS: usize = 15000; // 总内容限制 15000 字符
+    const MAX_PER_PAGE_CHARS: usize = 3000; // 每页内容限制 3000 字符
 
     // 如果没有网络搜索结果，直接跳到下一步
     if state.web_search_results.is_empty() {
@@ -510,11 +592,14 @@ pub async fn crawl_web_node(
 
     state.phase = ResearchPhase::CrawlingWeb;
     let total_available = state.web_search_results.len().min(max_pages);
-    
-    emit_event(app, DeepResearchEvent::PhaseChange {
-        phase: state.phase.clone(),
-        message: format!("正在爬取网页内容（最多 {} 个）...", total_available),
-    });
+
+    emit_event(
+        app,
+        DeepResearchEvent::PhaseChange {
+            phase: state.phase.clone(),
+            message: format!("正在爬取网页内容（最多 {} 个）...", total_available),
+        },
+    );
 
     let mut total_content_chars = 0usize;
     #[cfg(debug_assertions)]
@@ -525,33 +610,48 @@ pub async fn crawl_web_node(
         // 检查是否达到内容限制
         if total_content_chars >= MAX_TOTAL_CONTENT_CHARS {
             #[cfg(debug_assertions)]
-            println!("[DeepResearch] 已达到内容总长度限制 ({} 字符)，停止爬取", total_content_chars);
+            println!(
+                "[DeepResearch] 已达到内容总长度限制 ({} 字符)，停止爬取",
+                total_content_chars
+            );
             break;
         }
 
-        emit_event(app, DeepResearchEvent::CrawlingPage {
-            url: web_result.url.clone(),
-            title: web_result.title.clone(),
-            index: index + 1,
-            total: total_available,
-        });
+        emit_event(
+            app,
+            DeepResearchEvent::CrawlingPage {
+                url: web_result.url.clone(),
+                title: web_result.title.clone(),
+                index: index + 1,
+                total: total_available,
+            },
+        );
 
         #[cfg(debug_assertions)]
-        println!("[DeepResearch] 爬取网页 {}/{}: {}", index + 1, total_available, web_result.url);
+        println!(
+            "[DeepResearch] 爬取网页 {}/{}: {}",
+            index + 1,
+            total_available,
+            web_result.url
+        );
 
         match jina_client.crawl(&web_result.url).await {
             Ok(crawled) => {
                 // 截断单页内容
-                let truncated_content: String = crawled.content.chars().take(MAX_PER_PAGE_CHARS).collect();
+                let truncated_content: String =
+                    crawled.content.chars().take(MAX_PER_PAGE_CHARS).collect();
                 let content_len = truncated_content.chars().count();
-                
+
                 let content_preview: String = truncated_content.chars().take(200).collect();
-                
-                emit_event(app, DeepResearchEvent::PageCrawled {
-                    url: crawled.url.clone(),
-                    title: crawled.title.clone(),
-                    content_preview: content_preview.clone(),
-                });
+
+                emit_event(
+                    app,
+                    DeepResearchEvent::PageCrawled {
+                        url: crawled.url.clone(),
+                        title: crawled.title.clone(),
+                        content_preview: content_preview.clone(),
+                    },
+                );
 
                 state.crawled_pages.push(CrawledPageContent {
                     url: crawled.url,
@@ -581,7 +681,10 @@ pub async fn crawl_web_node(
     }
 
     #[cfg(debug_assertions)]
-    println!("[DeepResearch] 成功爬取 {} 个网页，总内容 {} 字符", crawled_count, total_content_chars);
+    println!(
+        "[DeepResearch] 成功爬取 {} 个网页，总内容 {} 字符",
+        crawled_count, total_content_chars
+    );
 
     Ok(NodeResult {
         state,
@@ -597,7 +700,7 @@ fn keyword_search(
     max_results: usize,
 ) -> Vec<NoteReference> {
     let mut results: Vec<NoteReference> = Vec::new();
-    
+
     let search_path = match search_scope {
         Some(scope) => Path::new(workspace_path).join(scope),
         None => Path::new(workspace_path).to_path_buf(),
@@ -611,9 +714,9 @@ fn keyword_search(
         if results.len() >= max_results * 3 {
             break;
         }
-        
+
         let path = entry.path();
-        
+
         if !path.extension().map(|e| e == "md").unwrap_or(false) {
             continue;
         }
@@ -626,21 +729,22 @@ fn keyword_search(
         if let Ok(content) = std::fs::read_to_string(path) {
             let title = extract_title(&content, path);
             let title_lower = title.to_lowercase();
-            
+
             // 提取 H2 标题
-            let h2_headings: Vec<String> = content.lines()
+            let h2_headings: Vec<String> = content
+                .lines()
                 .filter(|l| l.trim().starts_with("## "))
                 .map(|l| l.trim()[3..].to_lowercase())
                 .collect();
-            
+
             let mut score = 0.0;
             let mut match_count = 0;
             let mut matched_in: Vec<String> = Vec::new();
-            
+
             for keyword in keywords {
                 let kw = keyword.to_lowercase();
                 let mut matched = false;
-                
+
                 // 标题匹配 (权重 3.0)
                 if title_lower.contains(&kw) {
                     score += 3.0;
@@ -649,7 +753,7 @@ fn keyword_search(
                         matched_in.push(format!("标题: {}", title));
                     }
                 }
-                
+
                 // H2 匹配 (权重 1.5)
                 for h2 in &h2_headings {
                     if h2.contains(&kw) {
@@ -662,18 +766,19 @@ fn keyword_search(
                         break;
                     }
                 }
-                
+
                 if matched {
                     match_count += 1;
                 }
             }
-            
+
             // 要求匹配 >= 2 个关键词
             if match_count >= 2 {
-                let relative_path = path.strip_prefix(workspace_path)
+                let relative_path = path
+                    .strip_prefix(workspace_path)
                     .map(|p| p.to_string_lossy().to_string())
                     .unwrap_or_else(|_| path.to_string_lossy().to_string());
-                
+
                 results.push(NoteReference {
                     path: relative_path,
                     title,
@@ -700,12 +805,16 @@ fn extract_title(content: &str, path: &Path) -> String {
             for line in frontmatter.lines() {
                 let line = line.trim();
                 if line.starts_with("title:") {
-                    return line[6..].trim().trim_matches('"').trim_matches('\'').to_string();
+                    return line[6..]
+                        .trim()
+                        .trim_matches('"')
+                        .trim_matches('\'')
+                        .to_string();
                 }
             }
         }
     }
-    
+
     // 尝试从第一个 # 标题提取
     for line in content.lines() {
         let line = line.trim();
@@ -713,7 +822,7 @@ fn extract_title(content: &str, path: &Path) -> String {
             return line[2..].to_string();
         }
     }
-    
+
     // 使用文件名
     path.file_stem()
         .and_then(|s| s.to_str())
@@ -724,9 +833,9 @@ fn extract_title(content: &str, path: &Path) -> String {
 /// 获取最近修改的笔记标题
 fn get_recent_note_titles(workspace_path: &str, count: usize) -> Vec<String> {
     use std::fs;
-    
+
     let mut notes: Vec<(String, std::time::SystemTime)> = Vec::new();
-    
+
     for entry in WalkDir::new(workspace_path)
         .max_depth(5)
         .into_iter()
@@ -741,7 +850,7 @@ fn get_recent_note_titles(workspace_path: &str, count: usize) -> Vec<String> {
         if path_str.contains("/.") || path_str.contains("\\.") {
             continue;
         }
-        
+
         if let Ok(metadata) = fs::metadata(path) {
             if let Ok(modified) = metadata.modified() {
                 if let Ok(content) = fs::read_to_string(path) {
@@ -751,7 +860,7 @@ fn get_recent_note_titles(workspace_path: &str, count: usize) -> Vec<String> {
             }
         }
     }
-    
+
     // 按修改时间排序，取最近的
     notes.sort_by(|a, b| b.1.cmp(&a.1));
     notes.into_iter().take(count).map(|(t, _)| t).collect()
@@ -759,22 +868,23 @@ fn get_recent_note_titles(workspace_path: &str, count: usize) -> Vec<String> {
 
 /// 获取随机标签
 fn get_random_tags(workspace_path: &str, count: usize) -> Vec<String> {
-    use std::collections::HashSet;
     use rand::seq::SliceRandom;
-    
+    use std::collections::HashSet;
+
     let mut all_tags: HashSet<String> = HashSet::new();
-    
+
     for entry in WalkDir::new(workspace_path)
         .max_depth(5)
         .into_iter()
         .filter_map(|e| e.ok())
-        .take(100)  // 只扫描前 100 个文件以提高效率
+        .take(100)
+    // 只扫描前 100 个文件以提高效率
     {
         let path = entry.path();
         if !path.extension().map(|e| e == "md").unwrap_or(false) {
             continue;
         }
-        
+
         if let Ok(content) = std::fs::read_to_string(path) {
             // 从 frontmatter 提取 tags
             if content.starts_with("---") {
@@ -787,7 +897,11 @@ fn get_random_tags(workspace_path: &str, count: usize) -> Vec<String> {
                             let tags_str = line[5..].trim();
                             let tags_str = tags_str.trim_start_matches('[').trim_end_matches(']');
                             for tag in tags_str.split(',') {
-                                let tag = tag.trim().trim_matches('"').trim_matches('\'').trim_matches('#');
+                                let tag = tag
+                                    .trim()
+                                    .trim_matches('"')
+                                    .trim_matches('\'')
+                                    .trim_matches('#');
                                 if !tag.is_empty() && tag.len() < 20 {
                                     all_tags.insert(tag.to_string());
                                 }
@@ -796,11 +910,12 @@ fn get_random_tags(workspace_path: &str, count: usize) -> Vec<String> {
                     }
                 }
             }
-            
+
             // 从内容中提取 #tag 格式的标签
             for word in content.split_whitespace() {
                 if word.starts_with('#') && word.len() > 1 && word.len() < 20 {
-                    let tag = word[1..].trim_end_matches(|c: char| !c.is_alphanumeric() && c != '_' && c != '-');
+                    let tag = word[1..]
+                        .trim_end_matches(|c: char| !c.is_alphanumeric() && c != '_' && c != '-');
                     if !tag.is_empty() && !tag.chars().all(|c| c.is_numeric()) {
                         all_tags.insert(tag.to_string());
                     }
@@ -808,7 +923,7 @@ fn get_random_tags(workspace_path: &str, count: usize) -> Vec<String> {
             }
         }
     }
-    
+
     // 随机选择
     let mut tags: Vec<String> = all_tags.into_iter().collect();
     let mut rng = rand::thread_rng();
@@ -817,7 +932,7 @@ fn get_random_tags(workspace_path: &str, count: usize) -> Vec<String> {
 }
 
 /// 阅读笔记节点
-/// 
+///
 /// 批量读取找到的笔记内容
 /// 如果没有本地笔记但有网络结果，跳过此阶段直接生成大纲
 pub async fn read_notes_node(
@@ -831,13 +946,19 @@ pub async fn read_notes_node(
         if !state.web_search_results.is_empty() {
             // 有网络结果，跳过阅读笔记阶段，直接生成大纲
             #[cfg(debug_assertions)]
-            println!("[DeepResearch] 无本地笔记，使用 {} 个网络搜索结果生成报告", state.web_search_results.len());
-            
-            emit_event(app, DeepResearchEvent::PhaseChange {
-                phase: ResearchPhase::ReadingNotes,
-                message: "本地无相关笔记，将基于网络搜索结果生成报告...".to_string(),
-            });
-            
+            println!(
+                "[DeepResearch] 无本地笔记，使用 {} 个网络搜索结果生成报告",
+                state.web_search_results.len()
+            );
+
+            emit_event(
+                app,
+                DeepResearchEvent::PhaseChange {
+                    phase: ResearchPhase::ReadingNotes,
+                    message: "本地无相关笔记，将基于网络搜索结果生成报告...".to_string(),
+                },
+            );
+
             return Ok(NodeResult {
                 state,
                 next_node: Some("generate_outline".to_string()),
@@ -854,21 +975,30 @@ pub async fn read_notes_node(
     }
 
     state.phase = ResearchPhase::ReadingNotes;
-    emit_event(app, DeepResearchEvent::PhaseChange {
-        phase: state.phase.clone(),
-        message: format!("正在阅读 {} 篇相关笔记...", state.found_notes.len().min(max_notes)),
-    });
+    emit_event(
+        app,
+        DeepResearchEvent::PhaseChange {
+            phase: state.phase.clone(),
+            message: format!(
+                "正在阅读 {} 篇相关笔记...",
+                state.found_notes.len().min(max_notes)
+            ),
+        },
+    );
 
     let notes_to_read: Vec<_> = state.found_notes.iter().take(max_notes).cloned().collect();
     let total = notes_to_read.len();
 
     for (index, note_ref) in notes_to_read.into_iter().enumerate() {
-        emit_event(app, DeepResearchEvent::ReadingNote {
-            path: note_ref.path.clone(),
-            title: note_ref.title.clone(),
-            index: index + 1,
-            total,
-        });
+        emit_event(
+            app,
+            DeepResearchEvent::ReadingNote {
+                path: note_ref.path.clone(),
+                title: note_ref.title.clone(),
+                index: index + 1,
+                total,
+            },
+        );
 
         // 读取笔记内容
         let full_path = std::path::Path::new(&state.workspace_path).join(&note_ref.path);
@@ -908,11 +1038,14 @@ pub async fn read_notes_node(
             summary: summary.clone(),
         };
 
-        emit_event(app, DeepResearchEvent::NoteRead {
-            path: note_ref.path,
-            title: note_ref.title,
-            summary,
-        });
+        emit_event(
+            app,
+            DeepResearchEvent::NoteRead {
+                path: note_ref.path,
+                title: note_ref.title,
+                summary,
+            },
+        );
 
         state.read_notes.push(note_content);
     }
@@ -934,7 +1067,7 @@ pub async fn read_notes_node(
 }
 
 /// 生成大纲节点
-/// 
+///
 /// 基于阅读的笔记内容和/或网络搜索结果，生成报告大纲
 pub async fn generate_outline_node(
     app: &AppHandle,
@@ -942,19 +1075,27 @@ pub async fn generate_outline_node(
     mut state: DeepResearchState,
 ) -> Result<NodeResult, String> {
     state.phase = ResearchPhase::GeneratingOutline;
-    emit_event(app, DeepResearchEvent::PhaseChange {
-        phase: state.phase.clone(),
-        message: "正在生成报告大纲...".to_string(),
-    });
+    emit_event(
+        app,
+        DeepResearchEvent::PhaseChange {
+            phase: state.phase.clone(),
+            message: "正在生成报告大纲...".to_string(),
+        },
+    );
 
     // 构建笔记摘要
     let notes_summary: String = if state.read_notes.is_empty() {
         "（无本地笔记）".to_string()
     } else {
-        state.read_notes
+        state
+            .read_notes
             .iter()
             .map(|n| {
-                let summary = n.summary.as_ref().map(|s| format!("\n   摘要: {}", s)).unwrap_or_default();
+                let summary = n
+                    .summary
+                    .as_ref()
+                    .map(|s| format!("\n   摘要: {}", s))
+                    .unwrap_or_default();
                 format!("- {} ({}){}", n.title, n.path, summary)
             })
             .collect::<Vec<_>>()
@@ -967,18 +1108,34 @@ pub async fn generate_outline_node(
         if state.web_search_results.is_empty() {
             String::new()
         } else {
-            let web_content = state.web_search_results
+            let web_content = state
+                .web_search_results
                 .iter()
-                .map(|w| format!("- {} ({})\n  {}", w.title, w.url, w.content.chars().take(200).collect::<String>()))
+                .map(|w| {
+                    format!(
+                        "- {} ({})\n  {}",
+                        w.title,
+                        w.url,
+                        w.content.chars().take(200).collect::<String>()
+                    )
+                })
                 .collect::<Vec<_>>()
                 .join("\n");
             format!("\n\n网络搜索结果：\n{}", web_content)
         }
     } else {
         // 使用爬取的完整网页内容
-        let crawled_content = state.crawled_pages
+        let crawled_content = state
+            .crawled_pages
             .iter()
-            .map(|p| format!("## {} ({})\n{}", p.title, p.url, p.content.chars().take(500).collect::<String>()))
+            .map(|p| {
+                format!(
+                    "## {} ({})\n{}",
+                    p.title,
+                    p.url,
+                    p.content.chars().take(500).collect::<String>()
+                )
+            })
             .collect::<Vec<_>>()
             .join("\n\n---\n\n");
         format!("\n\n网络资料：\n{}", crawled_content)
@@ -1006,20 +1163,26 @@ pub async fn generate_outline_node(
 }}
 
 请直接返回 JSON，不要其他内容："#,
-        state.topic,
-        notes_summary,
-        web_summary
+        state.topic, notes_summary, web_summary
     );
 
     let response = llm.call_simple_with_usage(&prompt).await?;
-    emit_token_usage(app, response.prompt_tokens, response.completion_tokens, response.total_tokens);
-    
+    emit_token_usage(
+        app,
+        response.prompt_tokens,
+        response.completion_tokens,
+        response.total_tokens,
+    );
+
     // 解析 JSON（使用健壮的 JSON 提取）
     let outline: ReportOutline = parse_json(&response.content, "解析大纲失败")?;
 
-    emit_event(app, DeepResearchEvent::OutlineGenerated {
-        outline: outline.clone(),
-    });
+    emit_event(
+        app,
+        DeepResearchEvent::OutlineGenerated {
+            outline: outline.clone(),
+        },
+    );
 
     state.outline = Some(outline);
 
@@ -1030,7 +1193,7 @@ pub async fn generate_outline_node(
 }
 
 /// 撰写报告节点
-/// 
+///
 /// 基于大纲和笔记内容/网络搜索结果，生成完整报告
 pub async fn write_report_node(
     app: &AppHandle,
@@ -1039,18 +1202,22 @@ pub async fn write_report_node(
     include_citations: bool,
 ) -> Result<NodeResult, String> {
     state.phase = ResearchPhase::WritingReport;
-    emit_event(app, DeepResearchEvent::PhaseChange {
-        phase: state.phase.clone(),
-        message: "正在撰写研究报告...".to_string(),
-    });
+    emit_event(
+        app,
+        DeepResearchEvent::PhaseChange {
+            phase: state.phase.clone(),
+            message: "正在撰写研究报告...".to_string(),
+        },
+    );
 
     let outline = state.outline.as_ref().ok_or("缺少报告大纲")?;
-    
+
     // 构建笔记内容参考（移除 .md 后缀以便 LLM 正确生成双链）
     let notes_content: String = if state.read_notes.is_empty() {
         "（无本地笔记）".to_string()
     } else {
-        state.read_notes
+        state
+            .read_notes
             .iter()
             .map(|n| {
                 let content_preview = n.content.chars().take(2000).collect::<String>();
@@ -1067,27 +1234,19 @@ pub async fn write_report_node(
 
     // 构建网络内容参考（优先使用爬取的完整内容）
     let web_content: String = if !state.crawled_pages.is_empty() {
-        let crawled_refs: String = state.crawled_pages
+        let crawled_refs: String = state
+            .crawled_pages
             .iter()
-            .map(|p| {
-                format!(
-                    "## {}\n来源: {}\n\n{}\n\n---\n",
-                    p.title, p.url, p.content
-                )
-            })
+            .map(|p| format!("## {}\n来源: {}\n\n{}\n\n---\n", p.title, p.url, p.content))
             .collect::<Vec<_>>()
             .join("\n");
         format!("\n网络资料（已爬取）：\n{}", crawled_refs)
     } else if !state.web_search_results.is_empty() {
         // 回退到搜索结果摘要
-        let web_refs: String = state.web_search_results
+        let web_refs: String = state
+            .web_search_results
             .iter()
-            .map(|w| {
-                format!(
-                    "## {}\n来源: {}\n\n{}\n\n---\n",
-                    w.title, w.url, w.content
-                )
-            })
+            .map(|w| format!("## {}\n来源: {}\n\n{}\n\n---\n", w.title, w.url, w.content))
             .collect::<Vec<_>>()
             .join("\n");
         format!("\n网络搜索结果：\n{}", web_refs)
@@ -1141,22 +1300,18 @@ pub async fn write_report_node(
     // 使用流式输出
     let mut report = String::new();
     let mut receiver = llm.call_stream_simple(&prompt).await?;
-    
+
     while let Some(chunk) = receiver.recv().await {
         report.push_str(&chunk);
         state.report_chunks.push(chunk.clone());
-        
-        emit_event(app, DeepResearchEvent::ReportChunk {
-            content: chunk,
-        });
+
+        emit_event(app, DeepResearchEvent::ReportChunk { content: chunk });
     }
 
     state.report = Some(report.clone());
     state.phase = ResearchPhase::Completed;
 
-    emit_event(app, DeepResearchEvent::Complete {
-        report,
-    });
+    emit_event(app, DeepResearchEvent::Complete { report });
 
     Ok(NodeResult {
         state,

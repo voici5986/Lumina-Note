@@ -309,8 +309,8 @@ fn build_pairing_payload(relay_url: &str, token: &str) -> String {
 }
 
 fn ensure_client_query(relay_url: &str, client: &str) -> Result<String, String> {
-    let mut url = reqwest::Url::parse(relay_url)
-        .map_err(|e| format!("Invalid relay url: {}", e))?;
+    let mut url =
+        reqwest::Url::parse(relay_url).map_err(|e| format!("Invalid relay url: {}", e))?;
     let pairs: Vec<(String, String)> = url
         .query_pairs()
         .filter(|(k, _)| k != "client")
@@ -361,8 +361,7 @@ async fn login_for_token(config: &CloudRelayConfig) -> Result<String, String> {
 }
 
 fn relay_api_base(relay_url: &str) -> Result<String, String> {
-    let url = reqwest::Url::parse(relay_url)
-        .map_err(|e| format!("Invalid relay url: {}", e))?;
+    let url = reqwest::Url::parse(relay_url).map_err(|e| format!("Invalid relay url: {}", e))?;
     let scheme = match url.scheme() {
         "wss" => "https",
         "ws" => "http",

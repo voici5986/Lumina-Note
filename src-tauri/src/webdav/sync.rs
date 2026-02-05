@@ -1,11 +1,11 @@
 //! 同步引擎
-//! 
+//!
 //! 实现本地优先的双向同步逻辑
 
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH, Instant};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use walkdir::WalkDir;
 
 use super::client::WebDAVClient;
@@ -74,13 +74,14 @@ impl SyncEngine {
             .filter_map(|e| e.ok())
         {
             let path = entry.path();
-            
+
             // 跳过 vault 根目录本身
             if path == vault {
                 continue;
             }
 
-            let relative_path = path.strip_prefix(vault)
+            let relative_path = path
+                .strip_prefix(vault)
                 .map(|p| p.to_string_lossy().replace('\\', "/"))
                 .unwrap_or_default();
 
@@ -88,10 +89,12 @@ impl SyncEngine {
                 continue;
             }
 
-            let metadata = entry.metadata()
+            let metadata = entry
+                .metadata()
                 .map_err(|e| AppError::WebDAV(format!("Failed to read metadata: {}", e)))?;
 
-            let modified = metadata.modified()
+            let modified = metadata
+                .modified()
                 .ok()
                 .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
                 .map(|d| d.as_secs())
@@ -101,7 +104,11 @@ impl SyncEngine {
                 relative_path,
                 absolute_path: path.to_string_lossy().to_string(),
                 is_dir: metadata.is_dir(),
-                size: if metadata.is_file() { metadata.len() } else { 0 },
+                size: if metadata.is_file() {
+                    metadata.len()
+                } else {
+                    0
+                },
                 modified,
             });
         }
@@ -126,7 +133,7 @@ impl SyncEngine {
     /// 计算同步计划
     pub async fn compute_sync_plan(&mut self) -> Result<SyncPlan, AppError> {
         self.load_state()?;
-        
+
         let local_files = self.scan_local_files()?;
         let remote_files = self.scan_remote_files().await?;
 
@@ -136,13 +143,12 @@ impl SyncEngine {
             .map(|f| (f.relative_path.clone(), f))
             .collect();
 
-        let remote_map: HashMap<String, &RemoteEntry> = remote_files
-            .iter()
-            .map(|f| (f.path.clone(), f))
-            .collect();
+        let remote_map: HashMap<String, &RemoteEntry> =
+            remote_files.iter().map(|f| (f.path.clone(), f)).collect();
 
         // 获取上次同步记录
-        let last_sync_map: HashMap<String, &FileRecord> = self.state
+        let last_sync_map: HashMap<String, &FileRecord> = self
+            .state
             .as_ref()
             .map(|s| s.file_records.iter().map(|r| (r.path.clone(), r)).collect())
             .unwrap_or_default();
@@ -173,10 +179,13 @@ impl SyncEngine {
             let path = &remote.path;
             if !local_map.contains_key(path) {
                 let last_record = last_sync_map.get(path).copied();
-                
+
                 let (action, reason) = if last_record.is_some() {
                     // 之前同步过，现在本地没有了 -> 本地删除了
-                    (SyncAction::DeleteRemote, "Local file was deleted".to_string())
+                    (
+                        SyncAction::DeleteRemote,
+                        "Local file was deleted".to_string(),
+                    )
                 } else {
                     // 从未同步过，远程新增 -> 下载
                     (SyncAction::Download, "New file on remote".to_string())
@@ -193,9 +202,18 @@ impl SyncEngine {
         }
 
         // 统计
-        let upload_count = items.iter().filter(|i| i.action == SyncAction::Upload).count();
-        let download_count = items.iter().filter(|i| i.action == SyncAction::Download).count();
-        let conflict_count = items.iter().filter(|i| i.action == SyncAction::Conflict).count();
+        let upload_count = items
+            .iter()
+            .filter(|i| i.action == SyncAction::Upload)
+            .count();
+        let download_count = items
+            .iter()
+            .filter(|i| i.action == SyncAction::Download)
+            .count();
+        let conflict_count = items
+            .iter()
+            .filter(|i| i.action == SyncAction::Conflict)
+            .count();
 
         Ok(SyncPlan {
             items,
@@ -221,7 +239,10 @@ impl SyncEngine {
             (Some(_), None, Some(_)) => {
                 // 之前同步过，远程没了 -> 本地优先：重新上传
                 // 不删除本地文件，保护用户数据
-                (SyncAction::Upload, "Remote file missing, re-uploading (local-first)".to_string())
+                (
+                    SyncAction::Upload,
+                    "Remote file missing, re-uploading (local-first)".to_string(),
+                )
             }
 
             // 本地存在，远程也存在
@@ -234,7 +255,7 @@ impl SyncEngine {
                 let local_changed = last_record
                     .map(|lr| l.modified > lr.local_mtime)
                     .unwrap_or(true);
-                
+
                 let remote_changed = last_record
                     .map(|lr| r.modified > lr.remote_mtime)
                     .unwrap_or(true);
@@ -260,14 +281,10 @@ impl SyncEngine {
             }
 
             // 本地不存在（这种情况在 compute_sync_plan 中单独处理）
-            (None, Some(_), _) => {
-                (SyncAction::Download, "Remote only".to_string())
-            }
+            (None, Some(_), _) => (SyncAction::Download, "Remote only".to_string()),
 
             // 都不存在（不应该发生）
-            (None, None, _) => {
-                (SyncAction::Skip, "Neither exists".to_string())
-            }
+            (None, None, _) => (SyncAction::Skip, "Neither exists".to_string()),
         }
     }
 
@@ -283,23 +300,18 @@ impl SyncEngine {
 
         for item in &plan.items {
             let result = match item.action {
-                SyncAction::Upload => {
-                    self.execute_upload(item).await
-                }
-                SyncAction::Download => {
-                    self.execute_download(item).await
-                }
-                SyncAction::DeleteRemote => {
-                    self.execute_delete_remote(item).await
-                }
+                SyncAction::Upload => self.execute_upload(item).await,
+                SyncAction::Download => self.execute_download(item).await,
+                SyncAction::DeleteRemote => self.execute_delete_remote(item).await,
                 SyncAction::DeleteLocal => {
                     // 本地优先：永远不删除本地文件，跳过此操作
-                    eprintln!("[WebDAV] Skipping DeleteLocal for {} - local-first policy", item.path);
+                    eprintln!(
+                        "[WebDAV] Skipping DeleteLocal for {} - local-first policy",
+                        item.path
+                    );
                     continue;
                 }
-                SyncAction::Conflict => {
-                    self.handle_conflict(item).await
-                }
+                SyncAction::Conflict => self.handle_conflict(item).await,
                 SyncAction::Skip => continue,
             };
 
@@ -333,9 +345,15 @@ impl SyncEngine {
             .as_secs();
 
         // 保留之前的记录，只更新/添加本次处理的文件
-        let mut merged_records: HashMap<String, FileRecord> = self.state
+        let mut merged_records: HashMap<String, FileRecord> = self
+            .state
             .as_ref()
-            .map(|s| s.file_records.iter().map(|r| (r.path.clone(), r.clone())).collect())
+            .map(|s| {
+                s.file_records
+                    .iter()
+                    .map(|r| (r.path.clone(), r.clone()))
+                    .collect()
+            })
             .unwrap_or_default();
 
         // 更新/添加新记录
@@ -369,9 +387,10 @@ impl SyncEngine {
 
     /// 执行上传
     async fn execute_upload(&self, item: &SyncPlanItem) -> Result<Option<FileRecord>, AppError> {
-        let local = item.local.as_ref().ok_or_else(|| {
-            AppError::WebDAV("No local file for upload".to_string())
-        })?;
+        let local = item
+            .local
+            .as_ref()
+            .ok_or_else(|| AppError::WebDAV("No local file for upload".to_string()))?;
 
         if local.is_dir {
             self.client.ensure_dir(&item.path).await?;
@@ -390,8 +409,12 @@ impl SyncEngine {
         }
 
         // 重新获取远程信息
-        let remote_mtime = item.remote.as_ref().map(|r| r.modified).unwrap_or(local.modified);
-        
+        let remote_mtime = item
+            .remote
+            .as_ref()
+            .map(|r| r.modified)
+            .unwrap_or(local.modified);
+
         Ok(Some(FileRecord {
             path: item.path.clone(),
             local_mtime: local.modified,
@@ -402,9 +425,10 @@ impl SyncEngine {
 
     /// 执行下载
     async fn execute_download(&self, item: &SyncPlanItem) -> Result<Option<FileRecord>, AppError> {
-        let remote = item.remote.as_ref().ok_or_else(|| {
-            AppError::WebDAV("No remote file for download".to_string())
-        })?;
+        let remote = item
+            .remote
+            .as_ref()
+            .ok_or_else(|| AppError::WebDAV("No remote file for download".to_string()))?;
 
         let local_path = format!("{}/{}", self.vault_path, item.path);
         let local_path = Path::new(&local_path);
@@ -415,8 +439,9 @@ impl SyncEngine {
         } else {
             // 确保父目录存在
             if let Some(parent) = local_path.parent() {
-                fs::create_dir_all(parent)
-                    .map_err(|e| AppError::WebDAV(format!("Failed to create parent directory: {}", e)))?;
+                fs::create_dir_all(parent).map_err(|e| {
+                    AppError::WebDAV(format!("Failed to create parent directory: {}", e))
+                })?;
             }
 
             let content = self.client.download(&item.path).await?;
@@ -424,7 +449,8 @@ impl SyncEngine {
                 .map_err(|e| AppError::WebDAV(format!("Failed to write local file: {}", e)))?;
         }
 
-        let local_mtime = local_path.metadata()
+        let local_mtime = local_path
+            .metadata()
             .ok()
             .and_then(|m| m.modified().ok())
             .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
@@ -440,14 +466,20 @@ impl SyncEngine {
     }
 
     /// 删除远程文件
-    async fn execute_delete_remote(&self, item: &SyncPlanItem) -> Result<Option<FileRecord>, AppError> {
+    async fn execute_delete_remote(
+        &self,
+        item: &SyncPlanItem,
+    ) -> Result<Option<FileRecord>, AppError> {
         self.client.delete(&item.path).await?;
         Ok(None) // 删除后不再跟踪
     }
 
     /// 删除本地文件 - 本地优先策略下禁用
     #[allow(dead_code)]
-    async fn execute_delete_local(&self, _item: &SyncPlanItem) -> Result<Option<FileRecord>, AppError> {
+    async fn execute_delete_local(
+        &self,
+        _item: &SyncPlanItem,
+    ) -> Result<Option<FileRecord>, AppError> {
         // 本地优先：永远不删除本地文件
         // 如果用户想删除，应该手动删除
         eprintln!("[WebDAV] execute_delete_local called but disabled - local-first policy");
@@ -486,9 +518,10 @@ impl SyncEngine {
     /// 快速同步：仅同步非冲突文件
     pub async fn quick_sync(&mut self) -> Result<SyncResult, AppError> {
         let mut plan = self.compute_sync_plan().await?;
-        
+
         // 过滤掉冲突，只处理确定性的操作
-        plan.items.retain(|item| item.action != SyncAction::Conflict);
+        plan.items
+            .retain(|item| item.action != SyncAction::Conflict);
         plan.conflict_count = 0;
 
         self.execute_sync(&plan).await

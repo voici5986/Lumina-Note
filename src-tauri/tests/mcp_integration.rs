@@ -2,9 +2,9 @@
 //!
 //! 从用户角度测试完整的 MCP 工作流程
 
+use lumina_note_lib as lumina_lib;
 use std::collections::HashMap;
 use tempfile::TempDir;
-use lumina_note_lib as lumina_lib;
 
 /// 创建测试用的 MCP 配置
 fn create_test_config(temp_dir: &TempDir) -> String {
@@ -217,17 +217,9 @@ fn test_mcp_tool_naming_convention() {
     // 标准格式: mcp_{server_name}__{tool_name}
     let examples = vec![
         ("mcp_filesystem__read_file", "filesystem", "read_file"),
-        (
-            "mcp_brave-search__web_search",
-            "brave-search",
-            "web_search",
-        ),
+        ("mcp_brave-search__web_search", "brave-search", "web_search"),
         ("mcp_postgres__execute_query", "postgres", "execute_query"),
-        (
-            "mcp_my_server__my_tool_name",
-            "my_server",
-            "my_tool_name",
-        ),
+        ("mcp_my_server__my_tool_name", "my_server", "my_tool_name"),
     ];
 
     for (full_name, expected_server, expected_tool) in examples {
@@ -235,7 +227,11 @@ fn test_mcp_tool_naming_convention() {
         let parts: Vec<&str> = name_without_prefix.splitn(2, "__").collect();
 
         assert_eq!(parts.len(), 2, "Failed for: {}", full_name);
-        assert_eq!(parts[0], expected_server, "Server mismatch for: {}", full_name);
+        assert_eq!(
+            parts[0], expected_server,
+            "Server mismatch for: {}",
+            full_name
+        );
         assert_eq!(parts[1], expected_tool, "Tool mismatch for: {}", full_name);
     }
 }

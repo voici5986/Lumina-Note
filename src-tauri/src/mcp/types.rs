@@ -80,11 +80,13 @@ pub struct McpToolCallResponse {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum McpContentBlock {
-    Text { text: String },
-    Image { 
-        data: String, 
-        #[serde(rename = "mimeType")] 
-        mime_type: String 
+    Text {
+        text: String,
+    },
+    Image {
+        data: String,
+        #[serde(rename = "mimeType")]
+        mime_type: String,
     },
     Resource {
         resource: McpResource,

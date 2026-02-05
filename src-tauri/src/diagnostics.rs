@@ -63,8 +63,7 @@ fn list_log_files(dir: &Path) -> Vec<PathBuf> {
 pub async fn export_diagnostics(app: AppHandle, destination: String) -> Result<(), String> {
     let destination_path = PathBuf::from(destination);
     if let Some(parent) = destination_path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create {:?}: {}", parent, e))?;
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create {:?}: {}", parent, e))?;
     }
 
     let mut out = fs::File::create(&destination_path)
@@ -111,4 +110,3 @@ pub async fn export_diagnostics(app: AppHandle, destination: String) -> Result<(
 
     Ok(())
 }
-

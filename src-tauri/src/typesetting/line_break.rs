@@ -14,11 +14,7 @@ pub struct LineBreak {
     pub kind: BreakKind,
 }
 
-pub fn break_glyph_run(
-    glyphs: &[Glyph],
-    max_width: i32,
-    break_after: &[bool],
-) -> Vec<LineBreak> {
+pub fn break_glyph_run(glyphs: &[Glyph], max_width: i32, break_after: &[bool]) -> Vec<LineBreak> {
     if glyphs.is_empty() {
         return Vec::new();
     }

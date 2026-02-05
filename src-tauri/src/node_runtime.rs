@@ -43,11 +43,7 @@ pub fn node_binary_name(platform: NodePlatform) -> &'static str {
     }
 }
 
-pub fn node_archive_name(
-    version: &str,
-    platform: NodePlatform,
-    arch: NodeArch,
-) -> Option<String> {
+pub fn node_archive_name(version: &str, platform: NodePlatform, arch: NodeArch) -> Option<String> {
     let platform_tag = platform_tag(platform);
     let arch_tag = arch_tag(arch);
     let ext = match platform {
@@ -57,20 +53,12 @@ pub fn node_archive_name(
     Some(format!("node-v{version}-{platform_tag}-{arch_tag}.{ext}"))
 }
 
-pub fn node_archive_url(
-    version: &str,
-    platform: NodePlatform,
-    arch: NodeArch,
-) -> Option<String> {
+pub fn node_archive_url(version: &str, platform: NodePlatform, arch: NodeArch) -> Option<String> {
     let name = node_archive_name(version, platform, arch)?;
     Some(format!("https://nodejs.org/dist/v{version}/{name}"))
 }
 
-pub fn node_extracted_dir(
-    version: &str,
-    platform: NodePlatform,
-    arch: NodeArch,
-) -> String {
+pub fn node_extracted_dir(version: &str, platform: NodePlatform, arch: NodeArch) -> String {
     format!(
         "node-v{version}-{}-{}",
         platform_tag(platform),
@@ -315,11 +303,7 @@ mod tests {
     fn candidate_paths_include_resources_and_appdata() {
         let resource = Path::new("/tmp/resources");
         let app_data = Path::new("/tmp/appdata");
-        let candidates = candidate_node_paths(
-            Some(resource),
-            Some(app_data),
-            NodePlatform::Macos,
-        );
+        let candidates = candidate_node_paths(Some(resource), Some(app_data), NodePlatform::Macos);
         assert!(candidates.contains(&resource.join("node")));
         assert!(candidates.contains(&resource.join("node").join("node")));
         assert!(candidates.contains(&resource.join("node").join("bin").join("node")));

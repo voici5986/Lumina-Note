@@ -9,8 +9,8 @@ use serde_json::{json, Value};
 use std::fs;
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::net::TcpListener;
@@ -50,30 +50,59 @@ pub struct MobileSessionSummary {
 #[serde(tag = "type", content = "data")]
 #[serde(rename_all = "snake_case")]
 pub enum MobileServerMessage {
-    Paired { session_id: String },
-    CommandAck { command_id: String, status: String },
-    AgentEvent { session_id: Option<String>, event: Value },
-    SessionList { sessions: Vec<MobileSessionSummary> },
+    Paired {
+        session_id: String,
+    },
+    CommandAck {
+        command_id: String,
+        status: String,
+    },
+    AgentEvent {
+        session_id: Option<String>,
+        event: Value,
+    },
+    SessionList {
+        sessions: Vec<MobileSessionSummary>,
+    },
     Options {
         workspaces: Vec<MobileWorkspaceOption>,
         agent_profiles: Vec<MobileAgentProfileOption>,
         selected_workspace_id: Option<String>,
         selected_profile_id: Option<String>,
     },
-    Pong { timestamp: u64 },
-    Error { message: String },
+    Pong {
+        timestamp: u64,
+    },
+    Error {
+        message: String,
+    },
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type", content = "data")]
 #[serde(rename_all = "snake_case")]
 pub enum MobileClientMessage {
-    Pair { token: String, device_name: Option<String> },
-    Command { task: String, session_id: Option<String>, context: Option<MobileTaskContext> },
-    Ping { timestamp: Option<u64> },
-    SessionCreate { title: Option<String> },
-    SelectWorkspace { workspace_id: String },
-    SelectAgentProfile { profile_id: String },
+    Pair {
+        token: String,
+        device_name: Option<String>,
+    },
+    Command {
+        task: String,
+        session_id: Option<String>,
+        context: Option<MobileTaskContext>,
+    },
+    Ping {
+        timestamp: Option<u64>,
+    },
+    SessionCreate {
+        title: Option<String>,
+    },
+    SelectWorkspace {
+        workspace_id: String,
+    },
+    SelectAgentProfile {
+        profile_id: String,
+    },
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -136,9 +165,16 @@ const MOBILE_SYNC_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
 #[derive(Debug, Clone)]
 pub enum MobileBroadcast {
-    AgentEvent { session_id: Option<String>, event: Value },
-    SessionList { sessions: Vec<MobileSessionSummary> },
-    Options { options: MobileOptions },
+    AgentEvent {
+        session_id: Option<String>,
+        event: Value,
+    },
+    SessionList {
+        sessions: Vec<MobileSessionSummary>,
+    },
+    Options {
+        options: MobileOptions,
+    },
 }
 
 pub type MobileMessageSender = Arc<dyn Fn(MobileServerMessage) + Send + Sync>;
@@ -207,9 +243,10 @@ impl MobileGatewayState {
     }
 
     fn broadcast_agent_event(&self, session_id: Option<String>, payload: Value) {
-        let _ = self
-            .events
-            .send(MobileBroadcast::AgentEvent { session_id, event: payload });
+        let _ = self.events.send(MobileBroadcast::AgentEvent {
+            session_id,
+            event: payload,
+        });
     }
 
     fn broadcast_session_list(&self, sessions: Vec<MobileSessionSummary>) {
@@ -335,7 +372,9 @@ mod tests {
     #[tokio::test]
     async fn session_snapshot_returns_value_when_unlocked() {
         let state = MobileGatewayState::new();
-        state.set_current_session_id(Some("session-1".to_string())).await;
+        state
+            .set_current_session_id(Some("session-1".to_string()))
+            .await;
         assert_eq!(
             state.get_current_session_id_snapshot(),
             Some("session-1".to_string())
@@ -364,8 +403,8 @@ mod tests {
 }
 
 pub fn emit_agent_event(app: &AppHandle, event: AgentEvent) {
-    let payload = serde_json::to_value(&event)
-        .unwrap_or_else(|_| json!({ "type": "unknown", "data": null }));
+    let payload =
+        serde_json::to_value(&event).unwrap_or_else(|_| json!({ "type": "unknown", "data": null }));
     emit_agent_event_payload(app, payload);
 }
 
@@ -424,7 +463,10 @@ pub async fn handle_mobile_message(
     };
 
     match msg {
-        MobileClientMessage::Pair { token: incoming_token, .. } => {
+        MobileClientMessage::Pair {
+            token: incoming_token,
+            ..
+        } => {
             let token_ok = allow_any_pair
                 || expected_token
                     .map(|token| token == incoming_token)
@@ -468,7 +510,11 @@ pub async fn handle_mobile_message(
             });
             let _ = app.emit("mobile-session-command", payload);
         }
-        MobileClientMessage::Command { task, session_id, context } => {
+        MobileClientMessage::Command {
+            task,
+            session_id,
+            context,
+        } => {
             if !*paired {
                 send(MobileServerMessage::Error {
                     message: "Not paired".to_string(),
@@ -518,13 +564,9 @@ pub async fn handle_mobile_message(
             let missing_agent_config = agent_config.is_none();
             if missing_workspace || missing_agent_config {
                 emit_mobile_sync_request(app, missing_workspace, missing_agent_config);
-                let (synced_workspace, synced_agent_config) = await_sync_requirements(
-                    app,
-                    state,
-                    missing_workspace,
-                    missing_agent_config,
-                )
-                .await;
+                let (synced_workspace, synced_agent_config) =
+                    await_sync_requirements(app, state, missing_workspace, missing_agent_config)
+                        .await;
                 if missing_workspace {
                     workspace_path = synced_workspace;
                 }
@@ -567,14 +609,9 @@ pub async fn handle_mobile_message(
             tokio::spawn(async move {
                 let context = build_task_context(workspace_path, context, Some(session_id));
                 let agent_state = app_handle.state::<AgentState>();
-                let result = agent_start_task(
-                    app_handle.clone(),
-                    agent_state,
-                    agent_config,
-                    task,
-                    context,
-                )
-                .await;
+                let result =
+                    agent_start_task(app_handle.clone(), agent_state, agent_config, task, context)
+                        .await;
                 if let Err(err) = result {
                     (sender_clone)(MobileServerMessage::Error { message: err });
                 }
@@ -682,7 +719,9 @@ pub fn hydrate_state(app: &AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn mobile_get_status(state: State<'_, MobileGatewayState>) -> Result<MobileGatewayStatus, String> {
+pub async fn mobile_get_status(
+    state: State<'_, MobileGatewayState>,
+) -> Result<MobileGatewayStatus, String> {
     Ok(state.status().await)
 }
 
@@ -706,8 +745,8 @@ pub async fn mobile_start_server(
     }
 
     let start_result = async {
-        let bind_addr = std::env::var("LUMINA_MOBILE_BIND")
-            .unwrap_or_else(|_| "0.0.0.0:0".to_string());
+        let bind_addr =
+            std::env::var("LUMINA_MOBILE_BIND").unwrap_or_else(|_| "0.0.0.0:0".to_string());
         let listener = TcpListener::bind(&bind_addr)
             .await
             .map_err(|e| format!("Failed to bind mobile gateway: {}", e))?;
@@ -722,7 +761,15 @@ pub async fn mobile_start_server(
         let token_clone = token.clone();
 
         tokio::spawn(async move {
-            run_server(app_handle, listener, token_clone, events, shutdown, shutdown_rx).await;
+            run_server(
+                app_handle,
+                listener,
+                token_clone,
+                events,
+                shutdown,
+                shutdown_rx,
+            )
+            .await;
         });
 
         {
@@ -778,7 +825,10 @@ pub async fn mobile_set_agent_config(
     state: State<'_, MobileGatewayState>,
     config: AgentConfig,
 ) -> Result<(), String> {
-    eprintln!("[MobileGateway] Update agent config provider: {:?}", config.provider);
+    eprintln!(
+        "[MobileGateway] Update agent config provider: {:?}",
+        config.provider
+    );
     state.set_agent_config(Some(config)).await;
     persist_settings(&app, &state).await?;
     Ok(())

@@ -1,5 +1,5 @@
 //! Node definitions for LangGraph
-//! 
+//!
 //! A node is a function that takes state and returns updated state.
 
 use std::future::Future;
@@ -13,7 +13,7 @@ use crate::langgraph::state::GraphState;
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// Node function signature
-/// 
+///
 /// A node function takes the current state and returns the updated state.
 pub type NodeFn<S> = Arc<dyn Fn(S) -> BoxFuture<'static, GraphResult<S>> + Send + Sync>;
 
@@ -21,7 +21,7 @@ pub type NodeFn<S> = Arc<dyn Fn(S) -> BoxFuture<'static, GraphResult<S>> + Send 
 pub trait Node<S: GraphState>: Send + Sync {
     /// Get the node's name
     fn name(&self) -> &str;
-    
+
     /// Execute the node
     fn execute(&self, state: S) -> BoxFuture<'_, GraphResult<S>>;
 }
@@ -61,20 +61,20 @@ impl<S: GraphState> NodeSpec<S> {
             metadata: None,
         }
     }
-    
+
     /// Add metadata to the node
     pub fn with_metadata(mut self, metadata: NodeMetadata) -> Self {
         self.metadata = Some(metadata);
         self
     }
-    
+
     /// Set retry count
     pub fn with_retry(mut self, count: usize) -> Self {
         let metadata = self.metadata.get_or_insert_with(NodeMetadata::default);
         metadata.retry_count = count;
         self
     }
-    
+
     /// Set timeout
     pub fn with_timeout(mut self, timeout_ms: u64) -> Self {
         let metadata = self.metadata.get_or_insert_with(NodeMetadata::default);
@@ -87,7 +87,7 @@ impl<S: GraphState> Node<S> for NodeSpec<S> {
     fn name(&self) -> &str {
         &self.name
     }
-    
+
     fn execute(&self, state: S) -> BoxFuture<'_, GraphResult<S>> {
         (self.func)(state)
     }

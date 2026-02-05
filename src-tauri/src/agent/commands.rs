@@ -1,17 +1,21 @@
 //! Agent Tauri 命令
-//! 
+//!
 //! 前端调用的 Agent API
-//! 
+//!
 //! 使用 Forge LoopNode 构建和执行 Agent 循环
 
 use crate::agent::deep_research::{
     build_deep_research_graph, DeepResearchConfig, DeepResearchContext, DeepResearchEvent,
     DeepResearchRequest, DeepResearchState, ResearchPhase,
 };
-use crate::agent::forge_loop::{build_runtime, run_forge_loop, ForgeRunResult, ForgeRuntime, TauriEventSink};
+use crate::agent::forge_loop::{
+    build_runtime, run_forge_loop, ForgeRunResult, ForgeRuntime, TauriEventSink,
+};
 use crate::agent::skills::{list_skills, read_skill, SkillDetail, SkillInfo};
 use crate::agent::types::*;
-use crate::forge_runtime::permissions::{default_ruleset, PermissionRule, PermissionSession as LocalPermissionSession};
+use crate::forge_runtime::permissions::{
+    default_ruleset, PermissionRule, PermissionSession as LocalPermissionSession,
+};
 use crate::langgraph::error::ResumeCommand;
 use crate::langgraph::executor::{Checkpoint, ExecutionResult};
 use crate::mobile_gateway::{emit_agent_event, MobileGatewayState};
@@ -99,7 +103,7 @@ pub async fn agent_start_task(
         dbg::log_task(&task);
         dbg::log_skills(&context.skills);
     }
-    
+
     // 构建初始状态（使用前端传入的历史消息）
     let messages = build_initial_messages(&task, &context, &config.provider);
     let initial_state = GraphState {
@@ -171,10 +175,7 @@ pub async fn agent_start_task(
 
 /// 中止 Agent 任务
 #[tauri::command]
-pub async fn agent_abort(
-    app: AppHandle,
-    state: State<'_, AgentState>,
-) -> Result<(), String> {
+pub async fn agent_abort(app: AppHandle, state: State<'_, AgentState>) -> Result<(), String> {
     let runtime = { state.runtime.lock().await.clone() };
     if let Some(runtime) = runtime {
         runtime.cancel.cancel("user aborted");
@@ -215,7 +216,10 @@ pub async fn agent_approve_tool(
     request_id: String,
     approved: bool,
 ) -> Result<(), String> {
-    println!("[Agent] 收到审批响应: request_id={}, approved={}", request_id, approved);
+    println!(
+        "[Agent] 收到审批响应: request_id={}, approved={}",
+        request_id, approved
+    );
 
     let runtime_state = {
         state
@@ -312,9 +316,7 @@ pub async fn agent_approve_tool(
 
 /// 获取 Agent 状态
 #[tauri::command]
-pub async fn agent_get_status(
-    state: State<'_, AgentState>,
-) -> Result<AgentStatus, String> {
+pub async fn agent_get_status(state: State<'_, AgentState>) -> Result<AgentStatus, String> {
     let current_state = state.current_state.lock().await;
     if let Some(current) = current_state.as_ref() {
         return Ok(current.status.clone());
@@ -331,7 +333,7 @@ pub async fn agent_continue_with_answer(
 ) -> Result<(), String> {
     // TODO: 实现用户回答后继续执行
     // 这需要在状态机中支持暂停和恢复
-    
+
     emit_agent_event(
         &app,
         AgentEvent::MessageChunk {
@@ -635,14 +637,17 @@ pub async fn deep_research_start(
         report_chunks: vec![],
         goto: String::new(),
         error: None,
-        clarification: None,  // 澄清字段，interrupt 恢复后填充
+        clarification: None, // 澄清字段，interrupt 恢复后填充
     };
 
     // 发送开始事件
-    let _ = app.emit("deep-research-event", DeepResearchEvent::PhaseChange {
-        phase: ResearchPhase::Init,
-        message: "开始深度研究...".to_string(),
-    });
+    let _ = app.emit(
+        "deep-research-event",
+        DeepResearchEvent::PhaseChange {
+            phase: ResearchPhase::Init,
+            message: "开始深度研究...".to_string(),
+        },
+    );
 
     // 创建配置，合并请求中的选项
     let mut final_config = config;
@@ -659,15 +664,16 @@ pub async fn deep_research_start(
     let app_clone = app.clone();
     let state_is_running = state.is_running.clone();
     let state_checkpoint = state.checkpoint.clone();
-    
+
     tokio::spawn(async move {
         let result = run_deep_research_resumable(
-            app_clone.clone(), 
-            final_config, 
+            app_clone.clone(),
+            final_config,
             initial_state,
             state_checkpoint.clone(),
-        ).await;
-        
+        )
+        .await;
+
         match result {
             Ok(exec_result) => {
                 match exec_result {
@@ -676,7 +682,10 @@ pub async fn deep_research_start(
                         let mut is_running = state_is_running.lock().await;
                         *is_running = false;
                     }
-                    ExecutionResult::Interrupted { checkpoint, interrupts: _ } => {
+                    ExecutionResult::Interrupted {
+                        checkpoint,
+                        interrupts: _,
+                    } => {
                         // 保存检查点，等待用户输入
                         let mut cp_lock = state_checkpoint.lock().await;
                         *cp_lock = Some(checkpoint);
@@ -688,9 +697,10 @@ pub async fn deep_research_start(
                 }
             }
             Err(e) => {
-                let _ = app_clone.emit("deep-research-event", DeepResearchEvent::Error {
-                    message: e,
-                });
+                let _ = app_clone.emit(
+                    "deep-research-event",
+                    DeepResearchEvent::Error { message: e },
+                );
                 let mut is_running = state_is_running.lock().await;
                 *is_running = false;
             }
@@ -709,18 +719,18 @@ async fn run_deep_research_resumable(
 ) -> Result<ExecutionResult<DeepResearchState>, String> {
     // 创建执行上下文
     let ctx = DeepResearchContext::new(app, config.clone());
-    
+
     // 构建图
     let graph = build_deep_research_graph(ctx)
         .map_err(|e| format!("Failed to build deep research graph: {}", e))?;
-    
+
     // 配置并执行
-    let graph = graph
-        .with_max_iterations(20)
-        .with_debug(false);
-    
+    let graph = graph.with_max_iterations(20).with_debug(false);
+
     // 使用可中断执行
-    graph.invoke_resumable(initial_state).await
+    graph
+        .invoke_resumable(initial_state)
+        .await
         .map_err(|e| format!("Deep research execution error: {}", e))
 }
 
@@ -736,65 +746,72 @@ pub async fn deep_research_resume(
         let mut cp_lock = state.checkpoint.lock().await;
         cp_lock.take()
     };
-    
+
     let config = {
         let config_lock = state.current_config.lock().await;
         config_lock.clone()
     };
-    
-    let checkpoint = checkpoint.ok_or("No checkpoint found. Research may not be in clarification state.")?;
+
+    let checkpoint =
+        checkpoint.ok_or("No checkpoint found. Research may not be in clarification state.")?;
     let config = config.ok_or("No config found.")?;
-    
+
     // 设置为运行中
     {
         let mut is_running = state.is_running.lock().await;
         *is_running = true;
     }
-    
+
     // 更新状态，添加用户澄清
     let mut resumed_state = checkpoint.state.clone();
     resumed_state.clarification = Some(clarification.clone());
-    resumed_state.phase = ResearchPhase::AnalyzingTopic;  // 重新进入分析阶段
-    
+    resumed_state.phase = ResearchPhase::AnalyzingTopic; // 重新进入分析阶段
+
     // 创建新的检查点
     let resumed_checkpoint = Checkpoint {
         state: resumed_state,
         next_node: checkpoint.next_node,
-        pending_interrupts: vec![],  // 清空中断
+        pending_interrupts: vec![], // 清空中断
         iterations: checkpoint.iterations,
         resume_values: checkpoint.resume_values,
     };
-    
+
     // 发送恢复事件
-    let _ = app.emit("deep-research-event", DeepResearchEvent::PhaseChange {
-        phase: ResearchPhase::AnalyzingTopic,
-        message: format!("收到用户澄清，继续研究: {}", clarification),
-    });
-    
+    let _ = app.emit(
+        "deep-research-event",
+        DeepResearchEvent::PhaseChange {
+            phase: ResearchPhase::AnalyzingTopic,
+            message: format!("收到用户澄清，继续研究: {}", clarification),
+        },
+    );
+
     // 异步恢复执行
     let app_clone = app.clone();
     let state_is_running = state.is_running.clone();
     let state_checkpoint = state.checkpoint.clone();
-    
+
     tokio::spawn(async move {
         // 创建执行上下文
         let ctx = DeepResearchContext::new(app_clone.clone(), config.clone());
-        
+
         // 构建图
         let graph = match build_deep_research_graph(ctx) {
             Ok(g) => g.with_max_iterations(20).with_debug(false),
             Err(e) => {
-                let _ = app_clone.emit("deep-research-event", DeepResearchEvent::Error {
-                    message: format!("Failed to rebuild graph: {}", e),
-                });
+                let _ = app_clone.emit(
+                    "deep-research-event",
+                    DeepResearchEvent::Error {
+                        message: format!("Failed to rebuild graph: {}", e),
+                    },
+                );
                 return;
             }
         };
-        
+
         // 恢复执行
         let resume_cmd = ResumeCommand::new(clarification);
         let result = graph.resume(resumed_checkpoint, resume_cmd).await;
-        
+
         match result {
             Ok(exec_result) => {
                 match exec_result {
@@ -803,7 +820,10 @@ pub async fn deep_research_resume(
                         let mut is_running = state_is_running.lock().await;
                         *is_running = false;
                     }
-                    ExecutionResult::Interrupted { checkpoint, interrupts: _ } => {
+                    ExecutionResult::Interrupted {
+                        checkpoint,
+                        interrupts: _,
+                    } => {
                         // 又一次中断（可能需要更多澄清）
                         let mut cp_lock = state_checkpoint.lock().await;
                         *cp_lock = Some(checkpoint);
@@ -811,15 +831,18 @@ pub async fn deep_research_resume(
                 }
             }
             Err(e) => {
-                let _ = app_clone.emit("deep-research-event", DeepResearchEvent::Error {
-                    message: format!("Resume error: {}", e),
-                });
+                let _ = app_clone.emit(
+                    "deep-research-event",
+                    DeepResearchEvent::Error {
+                        message: format!("Resume error: {}", e),
+                    },
+                );
                 let mut is_running = state_is_running.lock().await;
                 *is_running = false;
             }
         }
     });
-    
+
     Ok(())
 }
 
@@ -834,7 +857,7 @@ pub async fn deep_research_abort(
         let mut cp_lock = state.checkpoint.lock().await;
         *cp_lock = None;
     }
-    
+
     {
         let mut is_running = state.is_running.lock().await;
         if !*is_running {
@@ -844,9 +867,12 @@ pub async fn deep_research_abort(
     }
 
     // 发送中止事件
-    let _ = app.emit("deep-research-event", DeepResearchEvent::Error {
-        message: "研究已被中止".to_string(),
-    });
+    let _ = app.emit(
+        "deep-research-event",
+        DeepResearchEvent::Error {
+            message: "研究已被中止".to_string(),
+        },
+    );
 
     Ok(())
 }
@@ -866,7 +892,7 @@ pub async fn deep_research_is_running(
 #[tauri::command]
 pub fn agent_enable_debug(workspace_path: String) -> Result<String, String> {
     use crate::agent::debug_log;
-    
+
     let path = debug_log::enable_debug(&workspace_path)?;
     Ok(path.to_string_lossy().to_string())
 }
@@ -875,7 +901,7 @@ pub fn agent_enable_debug(workspace_path: String) -> Result<String, String> {
 #[tauri::command]
 pub fn agent_disable_debug() -> Result<(), String> {
     use crate::agent::debug_log;
-    
+
     debug_log::disable_debug();
     Ok(())
 }
@@ -884,7 +910,7 @@ pub fn agent_disable_debug() -> Result<(), String> {
 #[tauri::command]
 pub fn agent_is_debug_enabled() -> bool {
     use crate::agent::debug_log;
-    
+
     debug_log::is_debug_enabled()
 }
 
@@ -892,6 +918,6 @@ pub fn agent_is_debug_enabled() -> bool {
 #[tauri::command]
 pub fn agent_get_debug_log_path() -> Option<String> {
     use crate::agent::debug_log;
-    
+
     debug_log::get_debug_file_path().map(|p| p.to_string_lossy().to_string())
 }

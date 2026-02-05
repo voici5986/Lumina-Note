@@ -5,18 +5,18 @@
 //! - Node masking for ablation studies
 //! - Metrics collection for performance analysis
 
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use serde::{Serialize, Deserialize};
 
-use crate::langgraph::constants::{START, END, MAX_ITERATIONS};
-use crate::langgraph::error::{GraphError, GraphResult, Interrupt, ResumeCommand};
-use crate::langgraph::state::GraphState;
-use crate::langgraph::graph::{StateGraph, Edge};
-use crate::langgraph::node::{Node, NodeSpec};
-use crate::langgraph::branch::{Branch, BranchSpec};
-use crate::langgraph::metrics::{MetricsCollector, RunMetrics, RunMetricsBuilder};
 use crate::langgraph::ablation::NodeOverride;
+use crate::langgraph::branch::{Branch, BranchSpec};
+use crate::langgraph::constants::{END, MAX_ITERATIONS, START};
+use crate::langgraph::error::{GraphError, GraphResult, Interrupt, ResumeCommand};
+use crate::langgraph::graph::{Edge, StateGraph};
+use crate::langgraph::metrics::{MetricsCollector, RunMetrics, RunMetricsBuilder};
+use crate::langgraph::node::{Node, NodeSpec};
+use crate::langgraph::state::GraphState;
 
 /// Configuration for graph execution
 #[derive(Clone, Debug, Default)]
@@ -195,7 +195,10 @@ impl<S: GraphState> CompiledGraph<S> {
     }
 
     /// Execute and return metrics
-    pub async fn invoke_with_metrics(&self, initial_state: S) -> GraphResult<ExecutionResultWithMetrics<S>> {
+    pub async fn invoke_with_metrics(
+        &self,
+        initial_state: S,
+    ) -> GraphResult<ExecutionResultWithMetrics<S>> {
         let run_id = uuid::Uuid::new_v4().to_string();
         let mut metrics_builder = if self.config.collect_metrics {
             Some(RunMetricsBuilder::new(&run_id, &self.config.config_id))
@@ -233,7 +236,9 @@ impl<S: GraphState> CompiledGraph<S> {
             }
 
             // Execute the node
-            let node = self.nodes.get(&current_node)
+            let node = self
+                .nodes
+                .get(&current_node)
                 .ok_or_else(|| GraphError::NodeNotFound(current_node.clone()))?;
 
             match node.execute(state).await {
@@ -295,7 +300,9 @@ impl<S: GraphState> CompiledGraph<S> {
             }
 
             // Execute the node
-            let node = self.nodes.get(&current_node)
+            let node = self
+                .nodes
+                .get(&current_node)
                 .ok_or_else(|| GraphError::NodeNotFound(current_node.clone()))?;
 
             state = node.execute(state).await?;
@@ -327,21 +334,21 @@ impl<S: GraphState> CompiledGraph<S> {
         match edges {
             None => Ok(END.to_string()),
             Some(edges) if edges.is_empty() => Ok(END.to_string()),
-            Some(edges) => {
-                match &edges[0] {
-                    Edge::Direct(to) => Ok(to.clone()),
-                    Edge::Conditional(branch_name) => {
-                        let branch = self.branches.get(branch_name)
+            Some(edges) => match &edges[0] {
+                Edge::Direct(to) => Ok(to.clone()),
+                Edge::Conditional(branch_name) => {
+                    let branch =
+                        self.branches
+                            .get(branch_name)
                             .ok_or_else(|| GraphError::BranchError {
                                 node: current.to_string(),
                                 message: format!("Branch '{}' not found", branch_name),
                             })?;
 
-                        let result = branch.evaluate(state)?;
-                        branch.resolve(&result)
-                    }
+                    let result = branch.evaluate(state)?;
+                    branch.resolve(&result)
                 }
-            }
+            },
         }
     }
 
@@ -357,11 +364,16 @@ impl<S: GraphState> CompiledGraph<S> {
 
     /// Execute graph with interrupt/resume support
     pub async fn invoke_resumable(&self, initial_state: S) -> GraphResult<ExecutionResult<S>> {
-        self.run_with_checkpoint(initial_state, START.to_string(), 0, HashMap::new()).await
+        self.run_with_checkpoint(initial_state, START.to_string(), 0, HashMap::new())
+            .await
     }
 
     /// Resume from checkpoint
-    pub async fn resume(&self, checkpoint: Checkpoint<S>, command: ResumeCommand) -> GraphResult<ExecutionResult<S>> {
+    pub async fn resume(
+        &self,
+        checkpoint: Checkpoint<S>,
+        command: ResumeCommand,
+    ) -> GraphResult<ExecutionResult<S>> {
         let mut resume_values = checkpoint.resume_values;
 
         // Add new resume value
@@ -376,7 +388,8 @@ impl<S: GraphState> CompiledGraph<S> {
             checkpoint.next_node,
             checkpoint.iterations,
             resume_values,
-        ).await
+        )
+        .await
     }
 
     /// Internal execution with checkpoint support
@@ -399,7 +412,10 @@ impl<S: GraphState> CompiledGraph<S> {
             iterations += 1;
 
             if self.config.debug {
-                println!("[LangGraph] Executing node: {} (iteration {})", current_node, iterations);
+                println!(
+                    "[LangGraph] Executing node: {} (iteration {})",
+                    current_node, iterations
+                );
             }
 
             // Check if masked
@@ -415,7 +431,9 @@ impl<S: GraphState> CompiledGraph<S> {
             let has_resume = resume_values.contains_key(&current_node);
 
             // Execute the node
-            let node = self.nodes.get(&current_node)
+            let node = self
+                .nodes
+                .get(&current_node)
                 .ok_or_else(|| GraphError::NodeNotFound(current_node.clone()))?;
 
             match node.execute(state.clone()).await {
@@ -425,7 +443,10 @@ impl<S: GraphState> CompiledGraph<S> {
                 Err(GraphError::Interrupted(interrupts)) => {
                     if has_resume {
                         if self.config.debug {
-                            println!("[LangGraph] Resuming from interrupt at node: {}", current_node);
+                            println!(
+                                "[LangGraph] Resuming from interrupt at node: {}",
+                                current_node
+                            );
                         }
                     } else {
                         // No resume value, return interrupted state
@@ -473,7 +494,7 @@ impl<S: GraphState> CompiledGraph<S> {
 
         for config in configs {
             let config_id = config.config_id.clone();
-            
+
             for input in &test_inputs {
                 // Create a new graph with this config
                 let graph = CompiledGraph {

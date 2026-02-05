@@ -1,12 +1,12 @@
-﻿pub mod bash;
+pub mod bash;
 pub mod edit;
 pub mod fetch;
 pub mod glob;
 pub mod grep;
 pub mod list;
 pub mod read;
-pub mod write;
 mod shared;
+pub mod write;
 
 use crate::forge_runtime::permissions::PermissionSession;
 use forge::runtime::tool::ToolRegistry;

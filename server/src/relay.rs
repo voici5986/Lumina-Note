@@ -27,7 +27,9 @@ pub async fn relay_handler(
 ) -> Result<Response, AppError> {
     let client = query.client.to_lowercase();
     if client != "mobile" && client != "desktop" {
-        return Err(AppError::BadRequest("client must be mobile or desktop".to_string()));
+        return Err(AppError::BadRequest(
+            "client must be mobile or desktop".to_string(),
+        ));
     }
 
     let user_id = authorize_request(&state, &headers).await?;
@@ -57,14 +59,24 @@ async fn handle_socket(state: AppState, socket: WebSocket, user_id: String, clie
     };
 
     if client == "desktop" {
-        state.relay.desktops.write().await.insert(user_id.clone(), peer);
+        state
+            .relay
+            .desktops
+            .write()
+            .await
+            .insert(user_id.clone(), peer);
         if let Some(mobile) = state.relay.mobiles.read().await.get(&user_id) {
             let _ = mobile.sender.send(Message::Text(
                 json!({ "type": "paired", "data": { "session_id": "" } }).to_string(),
             ));
         }
     } else {
-        state.relay.mobiles.write().await.insert(user_id.clone(), peer);
+        state
+            .relay
+            .mobiles
+            .write()
+            .await
+            .insert(user_id.clone(), peer);
         if state.relay.desktops.read().await.get(&user_id).is_some() {
             let _ = tx.send(Message::Text(
                 json!({ "type": "paired", "data": { "session_id": "" } }).to_string(),
@@ -134,12 +146,20 @@ async fn handle_socket(state: AppState, socket: WebSocket, user_id: String, clie
 
     if client == "desktop" {
         let mut desktops = state.relay.desktops.write().await;
-        if desktops.get(&user_id).map(|p| p.id == peer_id).unwrap_or(false) {
+        if desktops
+            .get(&user_id)
+            .map(|p| p.id == peer_id)
+            .unwrap_or(false)
+        {
             desktops.remove(&user_id);
         }
     } else {
         let mut mobiles = state.relay.mobiles.write().await;
-        if mobiles.get(&user_id).map(|p| p.id == peer_id).unwrap_or(false) {
+        if mobiles
+            .get(&user_id)
+            .map(|p| p.id == peer_id)
+            .unwrap_or(false)
+        {
             mobiles.remove(&user_id);
         }
     }

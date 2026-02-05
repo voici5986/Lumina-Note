@@ -1,4 +1,4 @@
-﻿use forge::runtime::error::{GraphError, GraphResult, Interrupt};
+use forge::runtime::error::{GraphError, GraphResult, Interrupt};
 use forge::runtime::event::PermissionReply;
 use forge::runtime::permission::{PermissionDecision, PermissionRequest};
 use forge::runtime::tool::ToolContext;
@@ -67,15 +67,21 @@ impl PermissionOverrides {
 
     fn apply_reply(&mut self, permission: &str, pattern: &str, reply: PermissionReply) {
         match reply {
-            PermissionReply::Once => self
-                .once
-                .push(PermissionRule::new(permission, pattern, PermissionDecision::Allow)),
-            PermissionReply::Always => self
-                .always
-                .push(PermissionRule::new(permission, pattern, PermissionDecision::Allow)),
-            PermissionReply::Reject => self
-                .reject
-                .push(PermissionRule::new(permission, pattern, PermissionDecision::Deny)),
+            PermissionReply::Once => self.once.push(PermissionRule::new(
+                permission,
+                pattern,
+                PermissionDecision::Allow,
+            )),
+            PermissionReply::Always => self.always.push(PermissionRule::new(
+                permission,
+                pattern,
+                PermissionDecision::Allow,
+            )),
+            PermissionReply::Reject => self.reject.push(PermissionRule::new(
+                permission,
+                pattern,
+                PermissionDecision::Deny,
+            )),
         }
     }
 }
@@ -128,7 +134,10 @@ pub fn request_permission(
         PermissionDecision::Ask => {
             let request_id = Uuid::new_v4().to_string();
             let mut metadata = metadata;
-            metadata.insert("request_id".to_string(), serde_json::Value::String(request_id.clone()));
+            metadata.insert(
+                "request_id".to_string(),
+                serde_json::Value::String(request_id.clone()),
+            );
             let request = PermissionRequest::new(permission.to_string(), vec![pattern.to_string()])
                 .with_metadata(metadata)
                 .with_always(always);

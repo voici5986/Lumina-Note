@@ -14,7 +14,7 @@ impl McpClient {
     /// 连接并初始化 MCP Server
     pub async fn connect(name: &str, config: &McpServerConfig) -> Result<Self, String> {
         println!("[MCP] Connecting to server '{}'...", name);
-        
+
         let transport = StdioTransport::spawn(&config.command, &config.args, &config.env).await?;
 
         // 初始化握手
@@ -30,7 +30,11 @@ impl McpClient {
         });
 
         let init_result = transport.request("initialize", Some(init_params)).await?;
-        println!("[MCP] Server '{}' initialized: {:?}", name, init_result.get("serverInfo"));
+        println!(
+            "[MCP] Server '{}' initialized: {:?}",
+            name,
+            init_result.get("serverInfo")
+        );
 
         // 发送 initialized 通知
         transport.notify("notifications/initialized", None).await?;
@@ -56,7 +60,11 @@ impl McpClient {
             .and_then(|t| serde_json::from_value(t.clone()).ok())
             .unwrap_or_default();
 
-        println!("[MCP] Server '{}' has {} tools", self.server_name, tools.len());
+        println!(
+            "[MCP] Server '{}' has {} tools",
+            self.server_name,
+            tools.len()
+        );
         self.tools = tools;
         Ok(())
     }

@@ -34,7 +34,10 @@ impl PageSize {
         let (width_mm, height_mm) = match self {
             PageSize::A4 => (210.0, 297.0),
             PageSize::Letter => (215.9, 279.4),
-            PageSize::Custom { width_mm, height_mm } => (width_mm, height_mm),
+            PageSize::Custom {
+                width_mm,
+                height_mm,
+            } => (width_mm, height_mm),
         };
 
         PageBox {

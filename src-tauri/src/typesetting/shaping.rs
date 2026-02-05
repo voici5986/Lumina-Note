@@ -211,8 +211,7 @@ mod tests {
             .load_from_path(fixture_font_path())
             .expect("expected valid font load");
 
-        let run = shape_text(&font, "Hello", ScriptKind::En)
-            .expect("expected shaping to succeed");
+        let run = shape_text(&font, "Hello", ScriptKind::En).expect("expected shaping to succeed");
 
         assert!(!run.glyphs.is_empty());
         assert!(run.glyphs.iter().all(|glyph| glyph.id != 0));
@@ -226,8 +225,7 @@ mod tests {
             .load_from_path(fixture_font_path())
             .expect("expected valid font load");
 
-        let run =
-            shape_text(&font, "", ScriptKind::En).expect("expected shaping to succeed");
+        let run = shape_text(&font, "", ScriptKind::En).expect("expected shaping to succeed");
 
         assert!(run.glyphs.is_empty());
     }
@@ -290,10 +288,9 @@ mod tests {
             .load_from_path(fixture_font_path())
             .expect("expected valid font load");
 
-        let mixed = shape_mixed_text(&font, "Hello")
-            .expect("expected shaping to succeed");
-        let baseline = shape_text(&font, "Hello", ScriptKind::En)
-            .expect("expected shaping to succeed");
+        let mixed = shape_mixed_text(&font, "Hello").expect("expected shaping to succeed");
+        let baseline =
+            shape_text(&font, "Hello", ScriptKind::En).expect("expected shaping to succeed");
 
         assert_eq!(mixed, baseline);
     }

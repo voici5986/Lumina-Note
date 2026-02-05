@@ -1,4 +1,4 @@
-﻿use crate::forge_runtime::permissions::request_permission;
+use crate::forge_runtime::permissions::request_permission;
 use crate::forge_runtime::tools::shared::{
     ensure_external_directory_permission, parse_tool_input, resolve_path, truncate_text,
 };
@@ -163,7 +163,11 @@ async fn handle(call: ToolCall, ctx: ToolContext, env: ToolEnvironment) -> Graph
         "bash",
         &command_pattern,
         metadata,
-        if always.is_empty() { vec!["*".to_string()] } else { always },
+        if always.is_empty() {
+            vec!["*".to_string()]
+        } else {
+            always
+        },
     )?;
 
     let shell_env = ShellEnv::current();
@@ -443,7 +447,10 @@ mod tests {
         };
 
         let shell = select_shell_command(&env);
-        assert_eq!(shell.program, PathBuf::from("C:\\Windows\\System32\\cmd.exe"));
+        assert_eq!(
+            shell.program,
+            PathBuf::from("C:\\Windows\\System32\\cmd.exe")
+        );
         assert_eq!(shell.flavor, ShellFlavor::Cmd);
     }
 }
