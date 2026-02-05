@@ -130,10 +130,7 @@ async fn require_user(state: &AppState, headers: &HeaderMap) -> Result<String, A
 fn extract_bearer(headers: &HeaderMap) -> Option<String> {
     let header = headers.get(axum::http::header::AUTHORIZATION)?;
     let value = header.to_str().ok()?;
-    let prefix = "Bearer ";
-    if value.starts_with(prefix) {
-        Some(value[prefix.len()..].trim().to_string())
-    } else {
-        None
-    }
+    value
+        .strip_prefix("Bearer ")
+        .map(|token| token.trim().to_string())
 }

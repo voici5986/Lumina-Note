@@ -128,10 +128,8 @@ async fn handle_socket(state: AppState, socket: WebSocket, user_id: String, clie
                                 .to_string(),
                         ));
                     }
-                } else {
-                    if let Some(peer) = state.relay.mobiles.read().await.get(&user_id) {
-                        let _ = peer.sender.send(Message::Text(text));
-                    }
+                } else if let Some(peer) = state.relay.mobiles.read().await.get(&user_id) {
+                    let _ = peer.sender.send(Message::Text(text));
                 }
             }
             Message::Close(_) => break,

@@ -311,20 +311,20 @@ async fn respond_put(
         bytes = written,
         path = %absolute.display()
     );
-    Ok(Response::builder()
+    Response::builder()
         .status(StatusCode::CREATED)
         .body(Body::empty())
-        .map_err(|e| AppError::Internal(format!("build response: {}", e)))?)
+        .map_err(|e| AppError::Internal(format!("build response: {}", e)))
 }
 
 async fn respond_mkcol(absolute: &Path) -> Result<Response<Body>, AppError> {
     tokio::fs::create_dir_all(absolute)
         .await
         .map_err(|e| AppError::Internal(format!("create dir: {}", e)))?;
-    Ok(Response::builder()
+    Response::builder()
         .status(StatusCode::CREATED)
         .body(Body::empty())
-        .map_err(|e| AppError::Internal(format!("build response: {}", e)))?)
+        .map_err(|e| AppError::Internal(format!("build response: {}", e)))
 }
 
 async fn respond_delete(absolute: &Path) -> Result<Response<Body>, AppError> {
@@ -340,10 +340,10 @@ async fn respond_delete(absolute: &Path) -> Result<Response<Body>, AppError> {
             .await
             .map_err(|e| AppError::Internal(format!("remove file: {}", e)))?;
     }
-    Ok(Response::builder()
+    Response::builder()
         .status(StatusCode::NO_CONTENT)
         .body(Body::empty())
-        .map_err(|e| AppError::Internal(format!("build response: {}", e)))?)
+        .map_err(|e| AppError::Internal(format!("build response: {}", e)))
 }
 
 async fn authorize_request(state: &AppState, headers: &HeaderMap) -> Result<String, AppError> {
