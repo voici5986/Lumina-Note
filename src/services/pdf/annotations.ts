@@ -50,18 +50,36 @@ export function getPdfFileName(pdfPath: string): string {
 export function parseAnnotationsMarkdown(content: string, pdfPath: string): AnnotationFile {
   const pdfName = getPdfFileName(pdfPath);
   const annotations: Annotation[] = [];
-  
-  // 匹配每个批注块（## 第 X 页 开始到下一个 --- 或 ## 或文件结尾）
-  const pageBlockRegex = /## 第 (\d+) 页\s*\n([\s\S]*?)(?=\n---|\n## 第 \d+ 页|$)/g;
-  
-  let match;
-  while ((match = pageBlockRegex.exec(content)) !== null) {
-    const pageIndex = parseInt(match[1], 10);
-    const blockContent = match[2].trim();
-    
-    // 解析块内的批注
-    const annotationsInBlock = parseAnnotationBlock(blockContent, pageIndex, pdfPath);
-    annotations.push(...annotationsInBlock);
+
+  // Locale-agnostic parsing:
+  // - We don't rely on localized "第 X 页"/"Page X" strings.
+  // - We split by markdown `##` headings and extract the first number as a hint,
+  //   but each annotation can also infer pageIndex from link/position metadata.
+  const headingRegex = /^##\s+(.+)$/gm;
+  const headings: Array<{ title: string; index: number; endOfLine: number }> = [];
+
+  let h: RegExpExecArray | null;
+  while ((h = headingRegex.exec(content)) !== null) {
+    headings.push({ title: (h[1] ?? '').trim(), index: h.index, endOfLine: headingRegex.lastIndex });
+  }
+
+  if (headings.length === 0) {
+    // Fallback: parse everything after the title line.
+    const body = content.replace(/^#.*\n/, '').trim();
+    annotations.push(...parseAnnotationBlock(body, undefined, pdfPath));
+  } else {
+    for (let i = 0; i < headings.length; i++) {
+      const current = headings[i];
+      const next = headings[i + 1];
+      const blockStart = current.endOfLine;
+      const blockEnd = next ? next.index : content.length;
+      const blockContent = content.slice(blockStart, blockEnd).trim();
+
+      const headingPageMatch = current.title.match(/(\d+)/);
+      const headingPageIndex = headingPageMatch ? Number.parseInt(headingPageMatch[1], 10) : undefined;
+
+      annotations.push(...parseAnnotationBlock(blockContent, headingPageIndex, pdfPath));
+    }
   }
   
   return {
@@ -76,13 +94,13 @@ export function parseAnnotationsMarkdown(content: string, pdfPath: string): Anno
 /**
  * 解析单个页面块中的批注
  */
-function parseAnnotationBlock(blockContent: string, pageIndex: number, _pdfPath: string): Annotation[] {
+function parseAnnotationBlock(blockContent: string, headingPageIndex: number | undefined, _pdfPath: string): Annotation[] {
   const annotations: Annotation[] = [];
   
   // 匹配引用块（高亮文本）
   const quoteRegex = /^> (.+)$/gm;
-  // 匹配跳转链接获取 ID
-  const linkRegex = /\[📍 跳转\]\(lumina:\/\/pdf\?[^)]*id=([^&)]+)/;
+  // 匹配跳转链接（不依赖本地化文案），并提取 query string
+  const linkRegex = /\[📍[^\]]*\]\(lumina:\/\/pdf\?([^)]+)\)/;
   // 匹配位置数据（隐藏在 HTML 注释中）
   const positionRegex = /<!--\s*position:\s*(\{[\s\S]*?\})\s*-->/;
   // 匹配颜色和类型
@@ -104,12 +122,25 @@ function parseAnnotationBlock(blockContent: string, pageIndex: number, _pdfPath:
     // 提取高亮文本
     const selectedText = quoteMatch.map(q => q.replace(/^> /, '')).join('\n');
     
-    // 提取 ID
-    const id = linkMatch ? linkMatch[1] : generateAnnotationId();
+    // 提取 link 元数据（id/page 等）
+    let pageIndexFromLink: number | undefined;
+    let idFromLink: string | undefined;
+    if (linkMatch?.[1]) {
+      try {
+        const params = new URLSearchParams(linkMatch[1]);
+        const page = params.get('page');
+        const id = params.get('id');
+        if (page) pageIndexFromLink = Number.parseInt(page, 10);
+        if (id) idFromLink = id;
+      } catch {
+        // ignore
+      }
+    }
+    const id = idFromLink ?? generateAnnotationId();
     
     // 提取位置信息
     let position: TextPosition = {
-      pageIndex,
+      pageIndex: headingPageIndex ?? pageIndexFromLink ?? 1,
       rects: [],
     };
     if (positionMatch) {
@@ -119,6 +150,8 @@ function parseAnnotationBlock(blockContent: string, pageIndex: number, _pdfPath:
         // 使用默认位置
       }
     }
+
+    const pageIndex = position.pageIndex ?? pageIndexFromLink ?? headingPageIndex ?? 1;
     
     // 提取元数据
     let type: AnnotationType = 'highlight';
@@ -144,6 +177,7 @@ function parseAnnotationBlock(blockContent: string, pageIndex: number, _pdfPath:
       .filter(line => {
         const trimmed = line.trim();
         return trimmed && 
+               trimmed !== '---' &&
                !trimmed.startsWith('>') && 
                !trimmed.startsWith('[📍') &&
                !trimmed.startsWith('<!--');
