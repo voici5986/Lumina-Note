@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 use axum::extract::ws::Message;
+use serde::Serialize;
 use sqlx::SqlitePool;
 use tokio::sync::{mpsc, RwLock};
 
@@ -51,9 +52,32 @@ pub struct ServerMetrics {
     pub relay_failures: AtomicU64,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct ServerMetricsSnapshot {
+    pub dav_requests: u64,
+    pub dav_failures: u64,
+    pub dav_bytes_in: u64,
+    pub dav_bytes_out: u64,
+    pub relay_connections: u64,
+    pub relay_active: u64,
+    pub relay_failures: u64,
+}
+
 impl ServerMetrics {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn snapshot(&self) -> ServerMetricsSnapshot {
+        ServerMetricsSnapshot {
+            dav_requests: self.dav_requests.load(Ordering::Relaxed),
+            dav_failures: self.dav_failures.load(Ordering::Relaxed),
+            dav_bytes_in: self.dav_bytes_in.load(Ordering::Relaxed),
+            dav_bytes_out: self.dav_bytes_out.load(Ordering::Relaxed),
+            relay_connections: self.relay_connections.load(Ordering::Relaxed),
+            relay_active: self.relay_active.load(Ordering::Relaxed),
+            relay_failures: self.relay_failures.load(Ordering::Relaxed),
+        }
     }
 
     pub fn inc_dav_requests(&self) -> u64 {

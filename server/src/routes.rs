@@ -16,6 +16,10 @@ pub async fn health() -> impl IntoResponse {
     (StatusCode::OK, Json(json!({ "status": "ok" })))
 }
 
+pub async fn metrics(State(state): State<AppState>) -> impl IntoResponse {
+    (StatusCode::OK, Json(state.metrics.snapshot()))
+}
+
 pub async fn register(
     State(state): State<AppState>,
     Json(payload): Json<RegisterRequest>,
