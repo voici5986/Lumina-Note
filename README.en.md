@@ -95,6 +95,13 @@ Go to [Releases](https://github.com/blueberrycongee/Lumina-Note/releases) to dow
 
 ---
 
+## User Flow Guide (Recommended)
+
+- English: `docs/user-flow.md`
+- 简体中文: `docs/user-flow.zh-CN.md`
+
+---
+
 ## Build from Source
 
 Requires Node.js 20+ (recommended 20.11.1) and Rust 1.70+

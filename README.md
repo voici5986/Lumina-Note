@@ -95,6 +95,13 @@ Go to [Releases](https://github.com/blueberrycongee/Lumina-Note/releases) to dow
 
 ---
 
+## User Flow Guide (Recommended)
+
+- English: `docs/user-flow.md`
+- 简体中文: `docs/user-flow.zh-CN.md`
+
+---
+
 ## Self-Hosted Relay
 
 Want cross-network mobile access? You can self-host the relay server with Docker:
