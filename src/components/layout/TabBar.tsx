@@ -3,6 +3,7 @@ import { useFileStore, Tab } from "@/stores/useFileStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 import { X, FileText, Network, Video, Database, Globe, Brain, Pin, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useShallow } from "zustand/react/shallow";
 
 interface TabItemProps {
   tab: Tab;
@@ -105,7 +106,18 @@ interface ContextMenuState {
 export function TabBar() {
   const { t } = useLocaleStore();
   const { tabs, activeTabIndex, switchTab, closeTab, closeOtherTabs, closeAllTabs, reorderTabs, togglePinTab } =
-    useFileStore();
+    useFileStore(
+      useShallow((state) => ({
+        tabs: state.tabs,
+        activeTabIndex: state.activeTabIndex,
+        switchTab: state.switchTab,
+        closeTab: state.closeTab,
+        closeOtherTabs: state.closeOtherTabs,
+        closeAllTabs: state.closeAllTabs,
+        reorderTabs: state.reorderTabs,
+        togglePinTab: state.togglePinTab,
+      })),
+    );
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);

@@ -310,7 +310,15 @@ export function MainAIChatShell() {
     return chatMode === "chat" && chatSessionId === id;
   }, [chatMode, rustSessionId, chatSessionId, researchSelectedId]);
 
-  const { vaultPath, currentFile, currentContent, fileTree, openFile } = useFileStore();
+  const { vaultPath, currentFile, currentContent, fileTree, openFile } = useFileStore(
+    useShallow((state) => ({
+      vaultPath: state.vaultPath,
+      currentFile: state.currentFile,
+      currentContent: state.currentContent,
+      fileTree: state.fileTree,
+      openFile: state.openFile,
+    })),
+  );
 
   // 加载可用 skills（仅 Agent 模式）
   useEffect(() => {

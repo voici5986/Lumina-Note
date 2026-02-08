@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useCallback, useRef, useState } from "react";
 import { useFileStore } from "@/stores/useFileStore";
+import { useShallow } from "zustand/react/shallow";
 import { useUIStore, EditorMode } from "@/stores/useUIStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 import { useAIStore } from "@/stores/useAIStore";
@@ -63,8 +64,29 @@ export function Editor() {
     redo,
     canUndo,
     canRedo,
-  } = useFileStore();
-  const { openVideoNoteFromContent } = useFileStore();
+    openVideoNoteFromContent,
+  } = useFileStore(
+    useShallow((state) => ({
+      tabs: state.tabs,
+      activeTabIndex: state.activeTabIndex,
+      currentFile: state.currentFile,
+      currentContent: state.currentContent,
+      updateContent: state.updateContent,
+      save: state.save,
+      isDirty: state.isDirty,
+      isSaving: state.isSaving,
+      isLoadingFile: state.isLoadingFile,
+      goBack: state.goBack,
+      goForward: state.goForward,
+      canGoBack: state.canGoBack,
+      canGoForward: state.canGoForward,
+      undo: state.undo,
+      redo: state.redo,
+      canUndo: state.canUndo,
+      canRedo: state.canRedo,
+      openVideoNoteFromContent: state.openVideoNoteFromContent,
+    })),
+  );
 
   const {
     toggleLeftSidebar,
