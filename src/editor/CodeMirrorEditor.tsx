@@ -922,7 +922,7 @@ function buildWikiLinkDecorations(state: EditorState): DecorationSet {
 
 const calloutStateField = StateField.define<DecorationSet>({
   create: buildCalloutDecorations,
-  update(deco, tr) { return (tr.docChanged || tr.selection) ? buildCalloutDecorations(tr.state) : deco.map(tr.changes); },
+  update(deco, tr) { return tr.docChanged ? buildCalloutDecorations(tr.state) : deco.map(tr.changes); },
   provide: f => EditorView.decorations.from(f),
 });
 const CALLOUT_COLORS: Record<string, string> = { note: "blue", abstract: "blue", info: "blue", tip: "green", success: "green", question: "yellow", warning: "yellow", danger: "red", failure: "red", bug: "red", example: "purple", quote: "gray", summary: "blue" };
@@ -968,6 +968,19 @@ function buildCalloutDecorations(state: EditorState): DecorationSet {
 
 // 用于跟踪哪些图片应该显示信息
 const setImageShowInfo = StateEffect.define<{ src: string; show: boolean }>();
+let imagePositionsCache: { from: number; to: number }[] = [];
+
+function selectionTouchesCachedRange(
+  selection: { from: number; to: number },
+  ranges: { from: number; to: number }[],
+) {
+  return ranges.some((r) =>
+    (selection.from >= r.from && selection.from <= r.to) ||
+    (selection.to >= r.from && selection.to <= r.to) ||
+    (selection.from <= r.from && selection.to >= r.to),
+  );
+}
+
 const imageInfoField = StateField.define<Set<string>>({
   create: () => new Set(),
   update(val, tr) {
@@ -988,8 +1001,17 @@ function createImageStateField(vaultPath: string) {
   return StateField.define<DecorationSet>({
     create: (state) => buildImageDecorations(state, vaultPath),
     update(deco, tr) {
-      if (tr.docChanged || tr.selection || tr.reconfigured || tr.effects.some(e => e.is(setMouseSelecting) || e.is(setImageShowInfo))) {
+      if (tr.docChanged || tr.reconfigured || tr.effects.some(e => e.is(setMouseSelecting) || e.is(setImageShowInfo))) {
         return buildImageDecorations(tr.state, vaultPath);
+      }
+      if (tr.selection) {
+        const oldSel = tr.startState.selection.main;
+        const newSel = tr.state.selection.main;
+        const oldTouches = selectionTouchesCachedRange(oldSel, imagePositionsCache);
+        const newTouches = selectionTouchesCachedRange(newSel, imagePositionsCache);
+        if (oldTouches !== newTouches || (newTouches && (oldSel.from !== newSel.from || oldSel.to !== newSel.to))) {
+          return buildImageDecorations(tr.state, vaultPath);
+        }
       }
       return deco.map(tr.changes);
     },
@@ -1001,6 +1023,7 @@ function buildImageDecorations(state: EditorState, vaultPath: string): Decoratio
   const decorations: any[] = [];
   const doc = state.doc.toString();
   const showInfoSet = state.field(imageInfoField, false) || new Set<string>();
+  imagePositionsCache = [];
 
   // 匹配 Markdown 图片语法 ![alt](src)
   const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
@@ -1009,6 +1032,7 @@ function buildImageDecorations(state: EditorState, vaultPath: string): Decoratio
     const from = match.index, to = from + match[0].length;
     const alt = match[1];
     const src = match[2];
+    imagePositionsCache.push({ from, to });
 
     if (shouldShowSource(state, from, to)) {
       // 编辑模式：显示源码 + 图片预览
