@@ -6,7 +6,7 @@ import { useUIStore } from "@/stores/useUIStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 import { parseLuminaLink } from "@/services/pdf/annotations";
 import { writeBinaryFile, readBinaryFileBase64 } from "@/lib/tauri";
-import { EditorState, StateField, StateEffect, Compartment, Prec } from "@codemirror/state";
+import { EditorState, StateField, StateEffect, Compartment, Prec, ChangeSet } from "@codemirror/state";
 import { slashCommandExtensions, placeholderExtension } from "./extensions/slashCommand";
 import { SlashMenu } from "./components/SlashMenu";
 import {
@@ -782,6 +782,22 @@ function isViewActive(view: EditorView, target: EventTarget | null) {
   return target instanceof Node && view.dom.contains(target);
 }
 
+function applyChangesToContent(base: string, changes: ChangeSet): string {
+  let next = "";
+  let cursor = 0;
+  changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+    if (fromA > cursor) {
+      next += base.slice(cursor, fromA);
+    }
+    next += inserted.toString();
+    cursor = toA;
+  });
+  if (cursor < base.length) {
+    next += base.slice(cursor);
+  }
+  return next;
+}
+
 function shouldUpgradeSelectAll(view: EditorView, selection: Selection | null) {
   if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return false;
   const anchorNode = selection.anchorNode;
@@ -832,19 +848,28 @@ function buildSelectionBridgeDecorations(state: EditorState): DecorationSet {
   if (!hasSelection) return Decoration.none;
 
   const selectedLines = new Set<number>();
+  let scanFrom = Number.POSITIVE_INFINITY;
+  let scanTo = 0;
   for (const range of state.selection.ranges) {
+    if (range.from === range.to) continue;
+    scanFrom = Math.min(scanFrom, state.doc.lineAt(range.from).from);
+    scanTo = Math.max(scanTo, state.doc.lineAt(range.to).to);
     const start = state.doc.lineAt(range.from).number;
     const end = state.doc.lineAt(range.to).number;
     for (let line = start; line <= end; line++) {
       selectedLines.add(line);
     }
   }
+  if (!Number.isFinite(scanFrom) || scanTo <= scanFrom) return Decoration.none;
 
   const decorations: any[] = [];
+  const seen = new Set<string>();
   const blockTypes = new Set(["HeaderMark", "ListMark", "QuoteMark"]);
   const inlineTypes = new Set(["EmphasisMark", "StrikethroughMark", "CodeMark"]);
 
   syntaxTree(state).iterate({
+    from: scanFrom,
+    to: scanTo,
     enter: (node) => {
       if (!blockTypes.has(node.name) && !inlineTypes.has(node.name)) return;
       if (isInsideSkippedSelectionParent(node)) return;
@@ -852,18 +877,29 @@ function buildSelectionBridgeDecorations(state: EditorState): DecorationSet {
       if (blockTypes.has(node.name)) {
         const lineNum = state.doc.lineAt(node.from).number;
         if (!selectedLines.has(lineNum)) return;
-        decorations.push(Decoration.mark({ class: "cm-selection-bridge" }).range(node.from, node.to));
+        const key = `${node.from}:${node.to}:bridge`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          decorations.push(Decoration.mark({ class: "cm-selection-bridge" }).range(node.from, node.to));
+        }
         const nextChar = state.doc.sliceString(node.to, node.to + 1);
         if (nextChar === " ") {
-          decorations.push(Decoration.mark({ class: "cm-selection-gap" }).range(node.to, node.to + 1));
+          const gapKey = `${node.to}:${node.to + 1}:gap`;
+          if (!seen.has(gapKey)) {
+            seen.add(gapKey);
+            decorations.push(Decoration.mark({ class: "cm-selection-gap" }).range(node.to, node.to + 1));
+          }
         }
         return;
       }
 
       if (node.from >= node.to) return;
       if (!shouldShowSource(state, node.from, node.to)) return;
+      const inlineKey = `${node.from}:${node.to}:bridge`;
+      if (seen.has(inlineKey)) return;
+      seen.add(inlineKey);
       decorations.push(Decoration.mark({ class: "cm-selection-bridge" }).range(node.from, node.to));
-    }
+      }
   });
 
   return Decoration.set(decorations, true);
@@ -1192,7 +1228,13 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
           placeholderExtension(t.editor.slashMenu.placeholder),
           EditorView.updateListener.of((update) => {
             if (update.docChanged && !isExternalChange.current) {
-              const newContent = update.state.doc.toString();
+              const previousContent = lastInternalContent.current;
+              let newContent = previousContent;
+              try {
+                newContent = applyChangesToContent(previousContent, update.changes);
+              } catch {
+                newContent = update.state.doc.toString();
+              }
               lastInternalContent.current = newContent;
               onChange(newContent);
             }
