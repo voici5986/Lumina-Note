@@ -16,6 +16,7 @@ export function ResizeHandle({
 }: ResizeHandleProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
+  const [hoverY, setHoverY] = useState(50);
   const rafRef = useRef<number | null>(null);
   const lastXRef = useRef(0);
 
@@ -81,6 +82,16 @@ export function ResizeHandle({
     };
   }, [isDragging, direction, onResize]);
 
+  const updateHoverY = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (rect.height <= 0) return;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    setHoverY(Math.max(0, Math.min(100, y)));
+  }, []);
+
+  const glowAlpha = isDragging ? 0.2 : 0.12;
+  const edgeAlpha = isDragging ? 0.08 : 0.05;
+
   return (
     <div
       className={cn(
@@ -91,24 +102,41 @@ export function ResizeHandle({
       {/* Soft glow layer */}
       <div
         className={cn(
-          "absolute inset-y-4 left-1/2 -translate-x-1/2 w-4 rounded-full blur-md pointer-events-none",
-          "bg-primary/20 opacity-0 transition-[opacity,transform] duration-200 ease-out",
-          "group-hover:opacity-100 group-hover:scale-x-110",
-          (isDragging || isHovering) && "opacity-100 bg-primary/35"
+          "absolute inset-y-1 left-1/2 -translate-x-1/2 w-8 pointer-events-none",
+          "opacity-0 transition-opacity duration-150 ease-out",
+          (isDragging || isHovering) && "opacity-100"
         )}
+        style={{
+          backgroundImage: `radial-gradient(70% 36% at 50% ${hoverY}%, hsl(var(--primary) / ${glowAlpha}) 0%, hsl(var(--primary) / ${edgeAlpha}) 34%, transparent 78%)`,
+        }}
       />
 
       {/* Visual indicator - hover/drag reveal only */}
       <div
         className={cn(
           "absolute inset-y-3 left-1/2 -translate-x-1/2 w-[2px] rounded-full pointer-events-none",
-          "bg-gradient-to-b from-foreground/45 via-foreground/18 to-transparent",
-          "opacity-35 transition-[opacity,width,background-image,box-shadow,transform] duration-200 ease-out",
-          "shadow-[0_0_0_1px_hsl(var(--foreground)/0.06),0_0_10px_hsl(var(--foreground)/0.08)]",
-          "group-hover:opacity-100 group-hover:w-[3px]",
+          "bg-gradient-to-b from-foreground/28 via-foreground/12 to-transparent",
+          "opacity-30 transition-[opacity,width,background-image,box-shadow] duration-150 ease-out",
+          "shadow-[0_0_0_1px_hsl(var(--foreground)/0.04),0_0_8px_hsl(var(--foreground)/0.05)]",
+          "group-hover:opacity-85 group-hover:w-[2.5px]",
           (isDragging || isHovering) &&
-            "opacity-100 w-[3px] bg-gradient-to-b from-primary/75 via-primary/40 to-primary/5 shadow-[0_0_0_1px_hsl(var(--primary)/0.35),0_0_18px_hsl(var(--primary)/0.35)]"
+            "opacity-85 w-[2.5px] bg-gradient-to-b from-primary/55 via-primary/25 to-primary/5 shadow-[0_0_0_1px_hsl(var(--primary)/0.18),0_0_12px_hsl(var(--primary)/0.16)]"
         )}
+      />
+
+      {/* Focus hotspot - brightest near pointer, fades quickly above/below */}
+      <div
+        className={cn(
+          "absolute left-1/2 -translate-x-1/2 w-[3px] h-10 rounded-full pointer-events-none",
+          "opacity-0 transition-opacity duration-150 ease-out",
+          (isDragging || isHovering) && "opacity-100"
+        )}
+        style={{
+          top: `calc(${hoverY}% - 20px)`,
+          backgroundImage:
+            "linear-gradient(to bottom, transparent 0%, hsl(var(--primary) / 0.42) 50%, transparent 100%)",
+          filter: "blur(0.2px)",
+        }}
       />
       
       {/* Clickable area - 这是实际的点击区域 */}
@@ -116,7 +144,11 @@ export function ResizeHandle({
         className="absolute inset-y-0 -left-4 -right-4 cursor-col-resize z-30"
         onMouseDown={handleMouseDown}
         onDoubleClick={onDoubleClick}
-        onMouseEnter={() => setIsHovering(true)}
+        onMouseEnter={(e) => {
+          setIsHovering(true);
+          updateHoverY(e);
+        }}
+        onMouseMove={updateHoverY}
         onMouseLeave={() => setIsHovering(false)}
       />
     </div>
