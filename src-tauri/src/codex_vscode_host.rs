@@ -232,6 +232,7 @@ pub async fn codex_vscode_host_start(
 mod tests {
     use super::*;
     use crate::node_runtime::{candidate_node_paths, current_platform, node_binary_name};
+    use std::path::Path;
 
     #[test]
     fn candidate_node_paths_include_expected_locations() {

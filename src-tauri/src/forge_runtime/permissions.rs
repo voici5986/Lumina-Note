@@ -141,7 +141,7 @@ pub fn request_permission(
             let request = PermissionRequest::new(permission.to_string(), vec![pattern.to_string()])
                 .with_metadata(metadata)
                 .with_always(always);
-            ctx.emit(request.to_event());
+            ctx.emit(request.to_event())?;
             Err(GraphError::Interrupted(vec![Interrupt::with_id(
                 request,
                 format!("permission:{}", permission),

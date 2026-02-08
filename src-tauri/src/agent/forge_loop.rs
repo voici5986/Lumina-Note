@@ -4,7 +4,7 @@ use crate::forge_runtime::permissions::PermissionSession as LocalPermissionSessi
 use crate::forge_runtime::tools::{build_registry, ToolEnvironment};
 use crate::mobile_gateway::emit_agent_event_payload;
 use forge::runtime::cancel::CancellationToken;
-use forge::runtime::error::{GraphError, Interrupt};
+use forge::runtime::error::{GraphError, GraphResult, Interrupt};
 use forge::runtime::event::{Event, EventSink, TokenUsage};
 use forge::runtime::permission::{PermissionPolicy, PermissionSession};
 use forge::runtime::r#loop::LoopNode;
@@ -44,9 +44,10 @@ impl TauriEventSink {
 }
 
 impl EventSink for TauriEventSink {
-    fn emit(&self, event: Event) {
+    fn emit(&self, event: Event) -> GraphResult<()> {
         let payload = wrap_event(event);
         emit_agent_event_payload(&self.app, payload);
+        Ok(())
     }
 }
 
@@ -147,7 +148,7 @@ pub async fn run_forge_loop(
 
                         ctx.emit(Event::StepStart {
                             session_id: session_id.clone(),
-                        });
+                        })?;
 
                         let tools = if llm.supports_fc() {
                             Some(tool_defs.as_ref().as_slice())
@@ -159,18 +160,27 @@ pub async fn run_forge_loop(
                         let ctx_for_delta = ctx.clone();
                         let delta_session_id = session_id.clone();
                         let delta_message_id = message_id.clone();
+                        let delta_emit_error = Arc::new(Mutex::new(None::<String>));
                         let response = llm
                             .call_stream_with_delta(
                                 Some(app.clone()),
                                 &request_id,
                                 &state.messages,
                                 tools,
-                                move |delta| {
-                                    ctx_for_delta.emit(Event::TextDelta {
-                                        session_id: delta_session_id.clone(),
-                                        message_id: delta_message_id.clone(),
-                                        delta: delta.to_string(),
-                                    });
+                                {
+                                    let delta_emit_error = delta_emit_error.clone();
+                                    move |delta| {
+                                        if let Err(err) = ctx_for_delta.emit(Event::TextDelta {
+                                            session_id: delta_session_id.clone(),
+                                            message_id: delta_message_id.clone(),
+                                            delta: delta.to_string(),
+                                        }) {
+                                            let mut locked = delta_emit_error.lock().unwrap();
+                                            if locked.is_none() {
+                                                *locked = Some(err.to_string());
+                                            }
+                                        }
+                                    }
                                 },
                             )
                             .await
@@ -178,6 +188,12 @@ pub async fn run_forge_loop(
                                 node: "llm".to_string(),
                                 message: err,
                             })?;
+                        if let Some(err) = delta_emit_error.lock().unwrap().take() {
+                            return Err(GraphError::ExecutionError {
+                                node: "event_sink:text_delta".to_string(),
+                                message: err,
+                            });
+                        }
 
                         ctx.emit(Event::StepFinish {
                             session_id: session_id.clone(),
@@ -189,7 +205,7 @@ pub async fn run_forge_loop(
                                 cache_write: 0,
                             },
                             cost: 0.0,
-                        });
+                        })?;
 
                         let tool_calls = response.tool_calls.unwrap_or_default();
                         if tool_calls.is_empty() {
@@ -206,7 +222,7 @@ pub async fn run_forge_loop(
                                 session_id: session_id.clone(),
                                 message_id: message_id.clone(),
                                 text: content.clone(),
-                            });
+                            })?;
                             state.final_result = Some(content);
                             break;
                         }

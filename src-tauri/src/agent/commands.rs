@@ -72,6 +72,12 @@ impl Default for AgentState {
     }
 }
 
+fn emit_agent_event_safe(sink: &TauriEventSink, event: Event) {
+    if let Err(err) = sink.emit(event) {
+        eprintln!("[Agent] Failed to emit forge event: {}", err);
+    }
+}
+
 /// 启动 Agent 任务
 #[tauri::command]
 pub async fn agent_start_task(
@@ -151,10 +157,13 @@ pub async fn agent_start_task(
     }
 
     let sink = TauriEventSink::new(app.clone());
-    sink.emit(Event::RunStarted {
-        run_id: runtime_state.run_id.clone(),
-        status: RunStatus::Running,
-    });
+    emit_agent_event_safe(
+        &sink,
+        Event::RunStarted {
+            run_id: runtime_state.run_id.clone(),
+            status: RunStatus::Running,
+        },
+    );
 
     let result = run_forge_loop(
         app.clone(),
@@ -180,10 +189,13 @@ pub async fn agent_abort(app: AppHandle, state: State<'_, AgentState>) -> Result
     if let Some(runtime) = runtime {
         runtime.cancel.cancel("user aborted");
         let sink = TauriEventSink::new(app.clone());
-        sink.emit(Event::RunAborted {
-            run_id: runtime.run_id.clone(),
-            reason: "user aborted".to_string(),
-        });
+        emit_agent_event_safe(
+            &sink,
+            Event::RunAborted {
+                run_id: runtime.run_id.clone(),
+                reason: "user aborted".to_string(),
+            },
+        );
     }
 
     {
@@ -288,14 +300,20 @@ pub async fn agent_approve_tool(
     }
 
     let sink = TauriEventSink::new(app.clone());
-    sink.emit(Event::PermissionReplied {
-        permission: request.permission.clone(),
-        reply: reply.clone(),
-    });
-    sink.emit(Event::RunResumed {
-        run_id: runtime_state.run_id.clone(),
-        checkpoint_id: checkpoint.checkpoint_id.clone(),
-    });
+    emit_agent_event_safe(
+        &sink,
+        Event::PermissionReplied {
+            permission: request.permission.clone(),
+            reply: reply.clone(),
+        },
+    );
+    emit_agent_event_safe(
+        &sink,
+        Event::RunResumed {
+            run_id: runtime_state.run_id.clone(),
+            checkpoint_id: checkpoint.checkpoint_id.clone(),
+        },
+    );
 
     let result = run_forge_loop(
         app.clone(),
@@ -509,10 +527,13 @@ async fn handle_forge_result(
                     let mut current_state = state.current_state.lock().await;
                     *current_state = Some(final_state);
                 }
-                sink.emit(Event::RunPaused {
-                    run_id: runtime_state.run_id.clone(),
-                    checkpoint_id,
-                });
+                emit_agent_event_safe(
+                    &sink,
+                    Event::RunPaused {
+                        run_id: runtime_state.run_id.clone(),
+                        checkpoint_id,
+                    },
+                );
                 return Ok(());
             }
 
@@ -521,16 +542,22 @@ async fn handle_forge_result(
                 let mut current_state = state.current_state.lock().await;
                 *current_state = Some(final_state);
             }
-            sink.emit(Event::RunCompleted {
-                run_id: runtime_state.run_id.clone(),
-                status: RunStatus::Completed,
-            });
+            emit_agent_event_safe(
+                &sink,
+                Event::RunCompleted {
+                    run_id: runtime_state.run_id.clone(),
+                    status: RunStatus::Completed,
+                },
+            );
         }
         Err(err) => {
-            sink.emit(Event::RunFailed {
-                run_id: runtime_state.run_id.clone(),
-                error: err.clone(),
-            });
+            emit_agent_event_safe(
+                &sink,
+                Event::RunFailed {
+                    run_id: runtime_state.run_id.clone(),
+                    error: err.clone(),
+                },
+            );
             {
                 let mut current_state = state.current_state.lock().await;
                 if let Some(ref mut current) = *current_state {

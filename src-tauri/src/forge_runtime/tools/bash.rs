@@ -366,6 +366,7 @@ mod tests {
             path: Vec::new(),
             lumina_git_bash_path: None,
             opencode_git_bash_path: None,
+            doc_tools_bin_path: None,
         };
 
         let shell = select_shell_command(&env);
@@ -386,6 +387,7 @@ mod tests {
             path: vec![temp.path().to_path_buf()],
             lumina_git_bash_path: None,
             opencode_git_bash_path: None,
+            doc_tools_bin_path: None,
         };
 
         let shell = select_shell_command(&env);
@@ -406,6 +408,7 @@ mod tests {
             path: Vec::new(),
             lumina_git_bash_path: Some(bash.clone()),
             opencode_git_bash_path: None,
+            doc_tools_bin_path: None,
         };
 
         let shell = select_shell_command(&env);
@@ -428,6 +431,7 @@ mod tests {
             path: vec![git_cmd.parent().unwrap().to_path_buf()],
             lumina_git_bash_path: None,
             opencode_git_bash_path: None,
+            doc_tools_bin_path: None,
         };
 
         let shell = select_shell_command(&env);
@@ -444,6 +448,7 @@ mod tests {
             path: Vec::new(),
             lumina_git_bash_path: None,
             opencode_git_bash_path: None,
+            doc_tools_bin_path: None,
         };
 
         let shell = select_shell_command(&env);
