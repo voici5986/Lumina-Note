@@ -39,13 +39,13 @@ describe('createProvider', () => {
 
   describe('Provider creation', () => {
     const providers = [
-      { name: 'anthropic', model: 'claude-3-opus-20240229' },
-      { name: 'openai', model: 'gpt-4o' },
-      { name: 'gemini', model: 'gemini-1.5-pro' },
-      { name: 'moonshot', model: 'moonshot-v1-8k' },
+      { name: 'anthropic', model: 'claude-sonnet-4-5' },
+      { name: 'openai', model: 'gpt-5.2' },
+      { name: 'gemini', model: 'gemini-2.5-pro' },
+      { name: 'moonshot', model: 'kimi-k2.5' },
       { name: 'deepseek', model: 'deepseek-chat' },
-      { name: 'groq', model: 'llama-3.3-70b-versatile' },
-      { name: 'openrouter', model: 'anthropic/claude-sonnet-4' },
+      { name: 'groq', model: 'meta-llama/llama-4-maverick-17b-128e-instruct' },
+      { name: 'openrouter', model: 'openai/gpt-5.2' },
     ] as const;
 
     it.each(providers)('should create $name provider', ({ name, model }) => {
@@ -70,14 +70,14 @@ describe('createProvider', () => {
     it('should use override config over global config', () => {
       setLLMConfig({ 
         provider: 'openai', 
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-5.2-mini',
         apiKey: 'global-key' 
       });
       
       // Override with different provider
       const provider = createProvider({
         provider: 'anthropic',
-        model: 'claude-3-opus-20240229',
+        model: 'claude-opus-4-6',
         apiKey: 'override-key',
       });
       
@@ -93,7 +93,7 @@ describe('createProvider', () => {
       });
       
       // Only override model
-      const provider = createProvider({ model: 'gpt-3.5-turbo' });
+      const provider = createProvider({ model: 'gpt-5-mini' });
       expect(provider).toBeTruthy();
     });
   });

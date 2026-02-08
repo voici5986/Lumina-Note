@@ -8,7 +8,7 @@ import type { LLMConfig } from "./types";
 const DEFAULT_CONFIG: LLMConfig = {
   provider: "moonshot",
   apiKey: "",
-  model: "moonshot-v1-8k",
+  model: "kimi-k2.5",
   temperature: 0.3,
   routing: {
     enabled: false,

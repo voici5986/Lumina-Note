@@ -70,8 +70,8 @@ describe('PROVIDER_REGISTRY', () => {
 
     it('gemini should have large context window models', () => {
       const gemini = PROVIDER_REGISTRY.gemini;
-      const gemini15Pro = gemini.models.find((m) => m.id === 'gemini-1.5-pro');
-      expect(gemini15Pro?.contextWindow).toBe(2000000);
+      const gemini25Pro = gemini.models.find((m) => m.id === 'gemini-2.5-pro');
+      expect(gemini25Pro?.contextWindow).toBe(1000000);
     });
 
     it('deepseek should have thinking model', () => {
