@@ -937,53 +937,53 @@ export function MainAIChatShell() {
       <button
         onClick={() => setChatMode("chat")}
         title={t.ai.chatModeHint}
-        className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${chatMode === "chat"
+        className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 whitespace-nowrap ${chatMode === "chat"
             ? "bg-background text-foreground shadow-sm"
             : "text-muted-foreground hover:text-foreground"
           }`}
       >
         <span className="flex items-center gap-1">
           <Sparkles size={12} />
-          {t.ai.modeChat}
+          <span className="hidden xl:inline">{t.ai.modeChat}</span>
         </span>
       </button>
       <button
         onClick={() => setChatMode("agent")}
         title={t.ai.agentModeHint}
-        className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${chatMode === "agent"
+        className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 whitespace-nowrap ${chatMode === "agent"
             ? "bg-background text-foreground shadow-sm"
             : "text-muted-foreground hover:text-foreground"
           }`}
       >
         <span className="flex items-center gap-1">
           <Bot size={12} />
-          {t.ai.modeAgent}
+          <span className="hidden xl:inline">{t.ai.modeAgent}</span>
         </span>
       </button>
       <button
         onClick={() => setChatMode("research")}
         title={t.deepResearch.modeTitle}
-        className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${chatMode === "research"
+        className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 whitespace-nowrap ${chatMode === "research"
             ? "bg-background text-foreground shadow-sm"
             : "text-muted-foreground hover:text-foreground"
           }`}
       >
         <span className="flex items-center gap-1">
           <Microscope size={12} />
-          {t.deepResearch.modeLabel}
+          <span className="hidden xl:inline">{t.deepResearch.modeLabel}</span>
         </span>
       </button>
       <button
         onClick={() => setChatMode("codex")}
         title="Codex"
-        className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${chatMode === "codex"
+        className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 whitespace-nowrap ${chatMode === "codex"
             ? "bg-background text-foreground shadow-sm"
             : "text-muted-foreground hover:text-foreground"
           }`}
       >
         <span className="flex items-center gap-1">
           <Code2 size={12} />
-          {t.ai.modeCodex}
+          <span className="hidden xl:inline">{t.ai.modeCodex}</span>
         </span>
       </button>
     </div>
@@ -1005,25 +1005,25 @@ export function MainAIChatShell() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowHistory(!showHistory)}
-              className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded-md transition-colors ${showHistory
+              className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded-md transition-colors whitespace-nowrap ${showHistory
                   ? "bg-muted text-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
             >
               <History size={14} />
-              <span>{t.ai.historyChats}</span>
+              <span className="hidden xl:inline">{t.ai.historyChats}</span>
             </button>
-            <span className="ml-3 text-[11px] text-muted-foreground select-none">
+            <span className="hidden 2xl:inline ml-3 text-[11px] text-muted-foreground select-none whitespace-nowrap">
               {t.ai.sessionTokens}: {chatMode === "agent" ? rustTotalTokens : chatTotalTokens}
             </span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={handleNewChat}
-              className="flex items-center gap-1.5 px-2 py-1 text-xs rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              className="flex items-center gap-1.5 px-2 py-1 text-xs rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors whitespace-nowrap"
             >
               <Plus size={14} />
-              <span>{t.ai.newChat}</span>
+              <span className="hidden xl:inline">{t.ai.newChat}</span>
             </button>
           </div>
         </div>

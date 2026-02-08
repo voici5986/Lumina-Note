@@ -515,7 +515,7 @@ export function RightPanel() {
           <button
             onClick={() => setRightPanelTab("chat")}
             onMouseDown={handleAIDragStart}
-            className={`flex-1 py-2.5 text-xs font-medium transition-colors flex items-center justify-center gap-1 select-none hover:bg-accent/50 ${
+            className={`flex-1 py-2.5 text-xs font-medium transition-colors flex items-center justify-center gap-1 select-none whitespace-nowrap hover:bg-accent/50 ${
               rightPanelTab === "chat"
                 ? "text-primary border-b-2 border-primary/80 bg-background/60"
                 : "text-muted-foreground hover:text-foreground"
@@ -529,12 +529,12 @@ export function RightPanel() {
             ) : (
               <BrainCircuit size={12} />
             )}
-            <span className="hidden sm:inline">AI</span>
+            <span className="hidden xl:inline">AI</span>
           </button>
         )}
         <button
           onClick={() => setRightPanelTab("outline")}
-          className={`flex-1 py-2.5 text-xs font-medium transition-colors flex items-center justify-center gap-1 hover:bg-accent/50 ${
+          className={`flex-1 py-2.5 text-xs font-medium transition-colors flex items-center justify-center gap-1 whitespace-nowrap hover:bg-accent/50 ${
             rightPanelTab === "outline"
               ? "text-primary border-b-2 border-primary/80 bg-background/60"
               : "text-muted-foreground hover:text-foreground"
@@ -542,11 +542,11 @@ export function RightPanel() {
           title={t.graph.outline}
         >
           <List size={12} />
-          <span className="hidden sm:inline">{t.graph.outline}</span>
+          <span className="hidden xl:inline">{t.graph.outline}</span>
         </button>
         <button
           onClick={() => setRightPanelTab("backlinks")}
-          className={`flex-1 py-2.5 text-xs font-medium transition-colors flex items-center justify-center gap-1 hover:bg-accent/50 ${
+          className={`flex-1 py-2.5 text-xs font-medium transition-colors flex items-center justify-center gap-1 whitespace-nowrap hover:bg-accent/50 ${
             rightPanelTab === "backlinks"
               ? "text-primary border-b-2 border-primary/80 bg-background/60"
               : "text-muted-foreground hover:text-foreground"
@@ -554,11 +554,11 @@ export function RightPanel() {
           title={t.graph.backlinks}
         >
           <Link2 size={12} />
-          <span className="hidden sm:inline">{t.graph.backlinks}</span>
+          <span className="hidden xl:inline">{t.graph.backlinks}</span>
         </button>
         <button
           onClick={() => setRightPanelTab("tags")}
-          className={`flex-1 py-2.5 text-xs font-medium transition-colors flex items-center justify-center gap-1 hover:bg-accent/50 ${
+          className={`flex-1 py-2.5 text-xs font-medium transition-colors flex items-center justify-center gap-1 whitespace-nowrap hover:bg-accent/50 ${
             rightPanelTab === "tags"
               ? "text-primary border-b-2 border-primary/80 bg-background/60"
               : "text-muted-foreground hover:text-foreground"
@@ -566,7 +566,7 @@ export function RightPanel() {
           title={t.graph.tags}
         >
           <Tag size={12} />
-          <span className="hidden sm:inline">{t.graph.tags}</span>
+          <span className="hidden xl:inline">{t.graph.tags}</span>
         </button>
       </div>
 
@@ -585,7 +585,7 @@ export function RightPanel() {
               <div className="flex bg-background/40 border border-border/60 rounded-ui-md p-0.5">
                 <button
                   onClick={() => setChatMode("agent")}
-                  className={`px-2 py-1 text-xs rounded-ui-sm transition-colors flex items-center gap-1 ${
+                  className={`px-2 py-1 text-xs rounded-ui-sm transition-colors flex items-center gap-1 whitespace-nowrap ${
                     chatMode === "agent"
                       ? "bg-background/65 text-foreground shadow-ui-card border border-border/60"
                       : "text-muted-foreground hover:text-foreground"
@@ -593,11 +593,11 @@ export function RightPanel() {
                   title={t.ai.agentMode}
                 >
                   <Bot size={12} />
-                  Agent
+                  <span className="hidden 2xl:inline">Agent</span>
                 </button>
                 <button
                   onClick={() => setChatMode("chat")}
-                  className={`px-2 py-1 text-xs rounded-ui-sm transition-colors flex items-center gap-1 ${
+                  className={`px-2 py-1 text-xs rounded-ui-sm transition-colors flex items-center gap-1 whitespace-nowrap ${
                     chatMode === "chat"
                       ? "bg-background/65 text-foreground shadow-ui-card border border-border/60"
                       : "text-muted-foreground hover:text-foreground"
@@ -605,11 +605,11 @@ export function RightPanel() {
                   title={t.ai.chatMode}
                 >
                   <BrainCircuit size={12} />
-                  {t.ai.conversation}
+                  <span className="hidden 2xl:inline">{t.ai.conversation}</span>
                 </button>
                 <button
                   onClick={() => setChatMode("codex")}
-                  className={`px-2 py-1 text-xs rounded-ui-sm transition-colors flex items-center gap-1 ${
+                  className={`px-2 py-1 text-xs rounded-ui-sm transition-colors flex items-center gap-1 whitespace-nowrap ${
                     chatMode === "codex"
                       ? "bg-background/65 text-foreground shadow-ui-card border border-border/60"
                       : "text-muted-foreground hover:text-foreground"
@@ -617,11 +617,11 @@ export function RightPanel() {
                   title="Codex"
                 >
                   <Code2 size={12} />
-                  Codex
+                  <span className="hidden 2xl:inline">Codex</span>
                 </button>
               </div>
               {chatMode !== "codex" && (
-                <span className="text-xs text-muted-foreground">
+                <span className="hidden 2xl:inline text-xs text-muted-foreground whitespace-nowrap">
                   {config.apiKey ? "Configured" : t.settingsModal.notConfigured}
                 </span>
               )}
