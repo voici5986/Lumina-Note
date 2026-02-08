@@ -99,6 +99,7 @@ Go to [Releases](https://github.com/blueberrycongee/Lumina-Note/releases) to dow
 
 - English: `docs/user-flow.md`
 - 简体中文: `docs/user-flow.zh-CN.md`
+- 日本語: `docs/user-flow.ja.md`
 
 ---
 

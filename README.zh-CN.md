@@ -99,6 +99,7 @@
 
 - 中文：`docs/user-flow.zh-CN.md`
 - English: `docs/user-flow.md`
+- 日本語: `docs/user-flow.ja.md`
 
 ---
 
