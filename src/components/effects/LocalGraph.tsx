@@ -24,6 +24,8 @@ interface LocalGraphProps {
   className?: string;
 }
 
+const MAX_BACKLINK_CACHE_ENTRIES = 40;
+
 export function LocalGraph({ className = "" }: LocalGraphProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -38,6 +40,29 @@ export function LocalGraph({ className = "" }: LocalGraphProps) {
 
   const [dimensions, setDimensions] = useState({ width: 200, height: 150 });
   const [hoverNode, setHoverNode] = useState<string | null>(null);
+
+  const getCachedBacklinks = useCallback((path: string): LocalNode[] => {
+    const cache = backlinksCache.current;
+    const cached = cache.get(path);
+    if (!cached) return [];
+    // Refresh key order to keep hot entries in cache.
+    cache.delete(path);
+    cache.set(path, cached);
+    return cached;
+  }, []);
+
+  const setCachedBacklinks = useCallback((path: string, nodes: LocalNode[]) => {
+    const cache = backlinksCache.current;
+    if (cache.has(path)) {
+      cache.delete(path);
+    }
+    cache.set(path, nodes);
+    while (cache.size > MAX_BACKLINK_CACHE_ENTRIES) {
+      const oldest = cache.keys().next().value as string | undefined;
+      if (!oldest) break;
+      cache.delete(oldest);
+    }
+  }, []);
 
   // 从文件树中查找文件路径
   const findFilePath = useCallback((name: string): string | null => {
@@ -165,12 +190,12 @@ export function LocalGraph({ className = "" }: LocalGraphProps) {
       };
 
       await scanBacklinks(fileTree);
-      backlinksCache.current.set(currentFile, backlinkNodes);
+      setCachedBacklinks(currentFile, backlinkNodes);
       lastScannedFile.current = currentFile;
     }
 
     // 从缓存中应用反向链接
-    const cachedBacklinks = backlinksCache.current.get(currentFile) || [];
+    const cachedBacklinks = getCachedBacklinks(currentFile);
     for (const backNode of cachedBacklinks) {
       if (!nodeMap.has(backNode.id.toLowerCase())) {
         nodes.push({ ...backNode });
@@ -198,7 +223,7 @@ export function LocalGraph({ className = "" }: LocalGraphProps) {
 
     nodesRef.current = nodes;
     edgesRef.current = edges;
-  }, [currentFile, currentContent, fileTree, findFilePath, getCurrentFileName]);
+  }, [currentFile, currentContent, fileTree, findFilePath, getCachedBacklinks, getCurrentFileName, setCachedBacklinks]);
 
   // 当前文件或内容变化时重建图谱（带防抖）
   useEffect(() => {
