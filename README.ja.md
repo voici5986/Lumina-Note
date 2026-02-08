@@ -6,7 +6,7 @@
 
 **ローカルファーストの AI ノートアプリ**
 
-ノートデータは完全にローカルに保存。AI Agent が自動で整理・検索・編集をサポート。
+ノートはデバイス上に保持しながら、AI で整理・検索・編集・調査を進められる知識ワークスペースです。
 
 [![GitHub Release](https://img.shields.io/github/v/release/blueberrycongee/Lumina-Note?style=flat-square)](https://github.com/blueberrycongee/Lumina-Note/releases)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square)](LICENSE)
@@ -18,13 +18,21 @@
 
 ---
 
+## Lumina Note の特長
+
+- **ローカルファースト**: Vault はローカル管理。モデルに送る範囲を自分で決められます。
+- **知識中心の設計**: エディタ、WikiLinks、グラフが一体で機能します。
+- **実行できる AI**: Chat だけでなく Agent / Deep Research / Codex で実作業まで対応。
+
+---
+
 ## ダウンロード
 
-[Releases](https://github.com/blueberrycongee/Lumina-Note/releases) から最新版をダウンロード：
+最新版は [Releases](https://github.com/blueberrycongee/Lumina-Note/releases) から取得できます。
 
-| プラットフォーム | ダウンロード |
-|------------------|--------------|
-| Windows | `.msi` または `.exe` |
+| プラットフォーム | パッケージ |
+|------------------|------------|
+| Windows | `.msi` / `.exe` |
 | macOS (Intel) | `x64.dmg` |
 | macOS (Apple Silicon) | `aarch64.dmg` |
 
@@ -46,52 +54,67 @@
 
 ---
 
-## 主な機能
+## 機能
 
-### AI アシスタント
-- モード：チャット / Agent / Deep Research / Codex（サイドバーに VS Code 拡張を埋め込み）
-- 意図を理解し、読み取り・編集・検索タスクを自動実行
-- 複数のモデルプロバイダーに対応：OpenAI / Anthropic (Claude) / DeepSeek / Gemini / Moonshot / Groq / OpenRouter / Ollama
-- ローカル RAG セマンティック検索でノート全体から回答
+### AI ワークスペース
+- モード: `Chat` / `Agent` / `Deep Research` / `Codex`（サイドバー埋め込み VS Code 拡張）
+- 対応プロバイダ: OpenAI / Anthropic (Claude) / DeepSeek / Gemini / Moonshot / Groq / OpenRouter / Ollama
+- Vault 全体を対象にしたローカル意味検索（RAG）
 
-### エディタ
-- ソース / ライブプレビュー / 閲覧の3モード
-- 双方向リンク `[[WikiLinks]]` でナレッジネットワークを構築
-- LaTeX 数式、Mermaid 図、コードハイライト
-- 分割編集、画像ペースト
+### エディタとナレッジグラフ
+- Markdown ソース / ライブプレビュー / 閲覧モード
+- `[[WikiLinks]]` による双方向リンク
+- LaTeX、Mermaid、コードハイライト
+- ノート間の関係を可視化するグラフビュー
 
-### ナレッジグラフ
-- ノート間の関連を可視化
-- フォルダ階層と双方向リンクを自動解析
-- 物理エンジン駆動、ドラッグ＆ズーム対応
+### 読書・収集
+- PDF リーダー（ハイライト、下線、注釈）
+- 注釈を Markdown として保存
+- 選択した内容を AI コンテキストへ送信
 
-### PDF リーダー
-- ハイライト、下線、注釈
-- 注釈は Markdown として自動保存
-- 選択したコンテンツを AI に送信
-
-### その他の機能
+### その他
 - Bilibili 動画ノート（弾幕タイムスタンプ同期）
 - 音声入力（リアルタイム文字起こし）
-- データベースビュー（テーブル/カンバン）
+- データベースビュー（テーブル / カンバン）
 - WebDAV 同期
 - フラッシュカード復習
-- 15種類のテーマ
+- 15 テーマ
+
+### プラグインエコシステム（開発者プレビュー）
+- workspace / user / built-in ディレクトリからプラグインを読み込み
+- ランタイム権限モデル
+- Slash Command 拡張 API
+- 開発者向けガイド: `docs/plugin-ecosystem.md`
 
 ---
 
 ## クイックスタート
 
-1. アプリをダウンロードしてインストール
-2. 初回起動時にノート保存用フォルダを選択
-3. 右側の AI パネルでモデルと API Key を設定
-4. 使用開始
+1. Releases からアプリをインストール
+2. 初回起動でローカルフォルダを Vault に指定
+3. 右側 AI パネルでモデルと API Key を設定
+4. 最初のノートを作成し、`[[WikiLinks]]` で関連付け
+
+---
+
+## ガイド
+
+### まず読むガイド
+- 日本語: `docs/user-flow.ja.md`
+- English: `docs/user-flow.md`
+- 简体中文: `docs/user-flow.zh-CN.md`
+
+### セルフホスト中継（クロスネットワークのモバイルアクセス）
+- English: `docs/self-host.md`
+- 简体中文: `docs/self-host.zh-CN.md`
 
 ---
 
 ## ソースからビルド
 
-Node.js 20+（推奨 20.11.1）と Rust 1.70+ が必要
+必要環境:
+- Node.js 20+（推奨 20.11.1）
+- Rust 1.70+
 
 ```bash
 git clone https://github.com/blueberrycongee/Lumina-Note.git
@@ -104,11 +127,18 @@ npm run tauri dev
 
 ## 技術スタック
 
-- **フレームワーク**: Tauri v2 (Rust + WebView)
-- **フロントエンド**: React 18, TypeScript, Tailwind CSS
-- **エディタ**: CodeMirror 6
-- **状態管理**: Zustand
-- **ベクトルDB**: SQLite
+- フレームワーク: Tauri v2 (Rust + WebView)
+- フロントエンド: React 18, TypeScript, Tailwind CSS
+- エディタ: CodeMirror 6
+- 状態管理: Zustand
+- ベクトルストレージ: SQLite
+
+---
+
+## オープンソースコンポーネント
+
+- エディタコア: [codemirror-live-markdown](https://github.com/blueberrycongee/codemirror-live-markdown)
+- Rust オーケストレーションランタイム: [forge](https://github.com/blueberrycongee/forge)
 
 ---
 

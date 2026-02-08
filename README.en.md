@@ -4,9 +4,9 @@
 
 # Lumina Note
 
-**Local-first AI Note-taking App**
+**Local-first AI note-taking app**
 
-Your notes stay on your device. AI Agent helps you organize, search, and edit automatically.
+Your notes stay on your device. Lumina Note helps you write, connect, and evolve knowledge with AI, while keeping data ownership in your hands.
 
 [![GitHub Release](https://img.shields.io/github/v/release/blueberrycongee/Lumina-Note?style=flat-square)](https://github.com/blueberrycongee/Lumina-Note/releases)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square)](LICENSE)
@@ -18,13 +18,21 @@ Your notes stay on your device. AI Agent helps you organize, search, and edit au
 
 ---
 
+## Why Lumina Note
+
+- **Local-first by design**: your vault is local, and you decide what to send to model providers.
+- **Knowledge-centered workflow**: Markdown editor, WikiLinks, and graph view work together naturally.
+- **AI that can actually act**: Chat, Agent, Deep Research, and Codex mode support real editing and retrieval tasks.
+
+---
+
 ## Download
 
-Go to [Releases](https://github.com/blueberrycongee/Lumina-Note/releases) to download the latest version:
+Get the latest build from [Releases](https://github.com/blueberrycongee/Lumina-Note/releases):
 
-| Platform | Download |
-|----------|----------|
-| Windows | `.msi` or `.exe` |
+| Platform | Package |
+|----------|---------|
+| Windows | `.msi` / `.exe` |
 | macOS (Intel) | `x64.dmg` |
 | macOS (Apple Silicon) | `aarch64.dmg` |
 
@@ -48,64 +56,65 @@ Go to [Releases](https://github.com/blueberrycongee/Lumina-Note/releases) to dow
 
 ## Features
 
-### AI Assistant
-- Modes: Chat / Agent / Deep Research / Codex (embedded VS Code extension in the sidebar)
-- Understands your intent and automatically executes read, edit, search tasks
-- Supports multiple providers: OpenAI / Anthropic (Claude) / DeepSeek / Gemini / Moonshot / Groq / OpenRouter / Ollama
-- Built-in local RAG semantic search based on your note vault
+### AI workspace
+- Modes: `Chat` / `Agent` / `Deep Research` / `Codex` (embedded VS Code extension in sidebar)
+- Multi-provider support: OpenAI / Anthropic (Claude) / DeepSeek / Gemini / Moonshot / Groq / OpenRouter / Ollama
+- Local semantic retrieval (RAG) from your vault
 
-### Editor
-- Source / Live Preview / Reading modes
-- Bidirectional links `[[WikiLinks]]` to build knowledge networks
-- LaTeX formulas, Mermaid diagrams, code highlighting
-- Split pane editing, image paste
+### Editor and knowledge graph
+- Markdown source / live preview / reading modes
+- Bidirectional links with `[[WikiLinks]]`
+- LaTeX, Mermaid, code highlighting
+- Graph visualization for relationships across notes
 
-### Knowledge Graph
-- Visualize connections between notes
-- Auto-parse folder hierarchy and bidirectional links
-- Physics engine driven, supports drag and zoom
+### Reading and capture
+- Built-in PDF reader with highlight, underline, and annotations
+- Save annotation results as Markdown
+- Send selected content directly to AI context
 
-### PDF Reader
-- Highlight, underline, and annotate
-- Annotations auto-saved as Markdown
-- Send selected content to AI chat
-
-### More Features
+### Extra capabilities
 - Bilibili video notes (danmaku timestamp sync)
-- Voice input (real-time transcription)
-- Database views (table/kanban)
+- Real-time voice input
+- Database views (table / kanban)
 - WebDAV sync
 - Flashcard review
 - 15 themes
 
-### Plugin Ecosystem (Developer Preview)
-- Supports loading plugins from workspace / user / built-in directories
+### Plugin ecosystem (Developer Preview)
+- Load plugins from workspace / user / built-in directories
 - Runtime permission model for plugin capabilities
-- Slash command extension API for plugin developers
+- Slash command extension API
 - Developer guide: `docs/plugin-ecosystem.md`
 
 ---
 
 ## Quick Start
 
-1. Download and install the app
-2. Select a folder as your note vault on first launch
-3. Configure your model and API key in the right-side AI panel
-4. Start using
+1. Install Lumina Note from Releases.
+2. Choose a local folder as your vault on first launch.
+3. Configure model provider + API key in the right AI panel.
+4. Create your first note and start linking with `[[WikiLinks]]`.
 
 ---
 
-## User Flow Guide (Recommended)
+## Guides
 
+### Recommended user guides
 - English: `docs/user-flow.md`
 - 简体中文: `docs/user-flow.zh-CN.md`
 - 日本語: `docs/user-flow.ja.md`
+
+### Self-hosted relay (cross-network mobile access)
+- English: `docs/self-host.md`
+- 简体中文: `docs/self-host.zh-CN.md`
 
 ---
 
 ## Build from Source
 
-Requires Node.js 20+ (recommended 20.11.1) and Rust 1.70+
+Requirements:
+- Node.js 20+ (recommended 20.11.1)
+- Rust 1.70+
 
 ```bash
 git clone https://github.com/blueberrycongee/Lumina-Note.git
@@ -118,18 +127,18 @@ npm run tauri dev
 
 ## Tech Stack
 
-- **Framework**: Tauri v2 (Rust + WebView)
-- **Frontend**: React 18, TypeScript, Tailwind CSS
-- **Editor**: CodeMirror 6
-- **State Management**: Zustand
-- **Vector Database**: SQLite
+- Framework: Tauri v2 (Rust + WebView)
+- Frontend: React 18, TypeScript, Tailwind CSS
+- Editor: CodeMirror 6
+- State: Zustand
+- Vector storage: SQLite
 
 ---
 
 ## Open Source Components
 
-- Editor core component is open-sourced: [codemirror-live-markdown](https://github.com/blueberrycongee/codemirror-live-markdown)
-- Rust orchestration framework is open-sourced: [forge](https://github.com/blueberrycongee/forge)
+- Editor core: [codemirror-live-markdown](https://github.com/blueberrycongee/codemirror-live-markdown)
+- Rust orchestration runtime: [forge](https://github.com/blueberrycongee/forge)
 
 ---
 

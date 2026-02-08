@@ -6,7 +6,7 @@
 
 **本地优先的 AI 笔记应用**
 
-你的笔记数据完全存储在本地，AI Agent 帮你自动整理、搜索、编辑。
+笔记数据默认存储在你的设备上。Lumina Note 用 AI 帮你写作、整理、检索与沉淀知识，同时保持数据控制权。
 
 [![GitHub Release](https://img.shields.io/github/v/release/blueberrycongee/Lumina-Note?style=flat-square)](https://github.com/blueberrycongee/Lumina-Note/releases)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square)](LICENSE)
@@ -18,13 +18,21 @@
 
 ---
 
-## 下载安装
+## 为什么选择 Lumina Note
 
-前往 [Releases](https://github.com/blueberrycongee/Lumina-Note/releases) 下载最新版本：
+- **本地优先**：笔记库在本地，是否把内容发送给模型由你决定。
+- **知识工作流完整**：编辑器、双链、图谱是连在一起的，不是拼凑功能。
+- **AI 可执行任务**：不仅能聊天，还能完成检索、编辑、研究等实际工作。
 
-| 平台 | 下载 |
-|------|------|
-| Windows | `.msi` 或 `.exe` |
+---
+
+## 下载
+
+前往 [Releases](https://github.com/blueberrycongee/Lumina-Note/releases) 获取最新版：
+
+| 平台 | 安装包 |
+|------|--------|
+| Windows | `.msi` / `.exe` |
 | macOS (Intel) | `x64.dmg` |
 | macOS (Apple Silicon) | `aarch64.dmg` |
 
@@ -46,75 +54,67 @@
 
 ---
 
-## 核心特性
+## 功能概览
 
-### AI 助手
-- 多模式：对话 / Agent / Deep Research / Codex（侧边栏内嵌 VS Code 扩展）
-- 理解你的意图，自动执行读取、编辑、搜索等任务
-- 支持多家模型提供商：OpenAI / Anthropic (Claude) / DeepSeek / Gemini / Moonshot / Groq / OpenRouter / Ollama
-- 内置本地 RAG 语义搜索，基于你的笔记库回答问题
+### AI 工作区
+- 模式：`Chat` / `Agent` / `Deep Research` / `Codex`（侧边栏内嵌 VS Code 扩展）
+- 支持多模型提供商：OpenAI / Anthropic (Claude) / DeepSeek / Gemini / Moonshot / Groq / OpenRouter / Ollama
+- 基于本地笔记库的语义检索（RAG）
 
-### 编辑器
-- 源码 / 实时预览 / 阅读三种模式
-- 双向链接 `[[WikiLinks]]`，构建知识网络
-- LaTeX 公式、Mermaid 图表、代码高亮
-- 分栏编辑，图片粘贴
+### 编辑器与知识图谱
+- Markdown 源码 / 实时预览 / 阅读模式
+- `[[WikiLinks]]` 双向链接
+- LaTeX、Mermaid、代码高亮
+- 图谱可视化笔记关系
 
-### 知识图谱
-- 可视化笔记间的关联关系
-- 文件夹层级、双向链接自动解析
-- 物理引擎驱动，支持拖拽和缩放
+### 阅读与采集
+- 内置 PDF 阅读器：高亮、下划线、批注
+- 批注可保存为 Markdown
+- 选中内容可直接发送到 AI 上下文
 
-### PDF 阅读器
-- 高亮、下划线、笔记批注
-- 批注自动保存为 Markdown
-- 选中内容发送给 AI 对话
-
-### 更多功能
-- B 站视频笔记（弹幕同步时间戳）
+### 扩展能力
+- B 站视频笔记（弹幕时间戳同步）
 - 语音输入（实时转文字）
-- 数据库视图（表格/看板）
+- 数据库视图（表格 / 看板）
 - WebDAV 同步
 - 闪卡复习
 - 15 套主题
 
 ### 插件生态（开发者预览）
-- 支持从工作区 / 用户目录 / 内置目录加载插件
-- 运行时权限模型，按能力暴露接口
-- 为开发者提供 Slash Command 扩展 API
+- 从工作区 / 用户目录 / 内置目录加载插件
+- 插件能力运行时权限模型
+- Slash Command 扩展 API
 - 开发文档：`docs/plugin-ecosystem.md`
 
 ---
 
 ## 快速开始
 
-1. 下载并安装应用
-2. 首次启动时选择一个文件夹作为笔记库
-3. 在右侧 AI 面板配置模型与 API Key
-4. 开始使用
+1. 从 Releases 安装应用。
+2. 首次启动选择本地文件夹作为笔记库。
+3. 在右侧 AI 面板配置模型与 API Key。
+4. 创建第一条笔记，并用 `[[双链]]` 建立关联。
 
 ---
 
-## 使用流程说明（推荐先读）
+## 使用指南
 
+### 推荐先读
 - 中文：`docs/user-flow.zh-CN.md`
 - English: `docs/user-flow.md`
 - 日本語: `docs/user-flow.ja.md`
 
----
-
-## 自部署云端中继
-
-如果需要跨网络访问（手机控制桌面），可自部署中继服务：
-
-- 中文指南：`docs/self-host.zh-CN.md`
+### 自部署中继（跨网络手机访问）
+- 中文：`docs/self-host.zh-CN.md`
 - English: `docs/self-host.md`
 
 ---
 
 ## 从源码构建
 
-需要 Node.js 20+（推荐 20.11.1）和 Rust 1.70+
+环境要求：
+- Node.js 20+（推荐 20.11.1）
+- Rust 1.70+
 
 ```bash
 git clone https://github.com/blueberrycongee/Lumina-Note.git
@@ -127,18 +127,18 @@ npm run tauri dev
 
 ## 技术栈
 
-- **框架**: Tauri v2 (Rust + WebView)
-- **前端**: React 18, TypeScript, Tailwind CSS
-- **编辑器**: CodeMirror 6
-- **状态管理**: Zustand
-- **向量数据库**: SQLite
+- 框架：Tauri v2（Rust + WebView）
+- 前端：React 18、TypeScript、Tailwind CSS
+- 编辑器：CodeMirror 6
+- 状态管理：Zustand
+- 向量存储：SQLite
 
 ---
 
 ## 开源组件
 
-- 编辑器核心组件已开源：[codemirror-live-markdown](https://github.com/blueberrycongee/codemirror-live-markdown)
-- Rust 编排框架已开源：[forge](https://github.com/blueberrycongee/forge)
+- 编辑器核心：[codemirror-live-markdown](https://github.com/blueberrycongee/codemirror-live-markdown)
+- Rust 编排运行时：[forge](https://github.com/blueberrycongee/forge)
 
 ---
 
