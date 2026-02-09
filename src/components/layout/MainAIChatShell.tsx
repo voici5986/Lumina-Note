@@ -12,7 +12,7 @@ import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { processMessageWithFiles } from "@/hooks/useChatSend";
 import { parseMarkdown } from "@/services/markdown/markdown";
 import { resolve } from "@/lib/path";
-import { listAgentSkills, readAgentSkill, getDocToolsStatus, installDocTools } from "@/lib/tauri";
+import { listAgentSkills, readAgentSkill, getDocToolsStatus, installDocTools, createDir, saveFile } from "@/lib/tauri";
 import type { SelectedSkill, SkillInfo } from "@/types/skills";
 import {
   ArrowUp,
@@ -37,21 +37,32 @@ import {
   Microscope,
   Globe,
   Bug,
+  Download,
 } from "lucide-react";
 import { AgentMessageRenderer } from "../chat/AgentMessageRenderer";
 import { PlanCard } from "../chat/PlanCard";
 import { StreamingOutput } from "../chat/StreamingMessage";
+import { SelectableConversationList } from "../chat/SelectableConversationList";
 import type { ReferencedFile } from "@/hooks/useChatSend";
 import { useShallow } from "zustand/react/shallow";
 import { AISettingsModal } from "../ai/AISettingsModal";
 import type { MessageContent, TextContent } from "@/services/llm";
 import { DeepResearchCard } from "../deep-research";
 import { CodexPanelSlot } from "@/components/codex/CodexPanelSlot";
+import { join as joinPath } from "@tauri-apps/api/path";
 import { 
   useDeepResearchStore, 
   setupDeepResearchListener,
   type DeepResearchConfig,
 } from "@/stores/useDeepResearchStore";
+import {
+  buildAgentExportMessages,
+  buildChatExportMessages,
+  buildConversationExportMarkdown,
+  sanitizeExportFileName,
+  type ExportMessage,
+  type RawConversationMessage,
+} from "@/features/conversation-export/exportUtils";
 
 // 从消息内容中提取文本（处理多模态内容）
 function getTextFromContent(content: MessageContent): string {
@@ -129,6 +140,9 @@ export function MainAIChatShell() {
   const [skillsLoading, setSkillsLoading] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [enableWebSearch, setEnableWebSearch] = useState(false); // 网络搜索开关
+  const [isExportSelectionMode, setIsExportSelectionMode] = useState(false);
+  const [selectedExportIds, setSelectedExportIds] = useState<string[]>([]);
+  const [isExportingConversation, setIsExportingConversation] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const autoSendMessageRef = useRef<string | null>(null);
@@ -310,13 +324,14 @@ export function MainAIChatShell() {
     return chatMode === "chat" && chatSessionId === id;
   }, [chatMode, rustSessionId, chatSessionId, researchSelectedId]);
 
-  const { vaultPath, currentFile, currentContent, fileTree, openFile } = useFileStore(
+  const { vaultPath, currentFile, currentContent, fileTree, openFile, refreshFileTree } = useFileStore(
     useShallow((state) => ({
       vaultPath: state.vaultPath,
       currentFile: state.currentFile,
       currentContent: state.currentContent,
       fileTree: state.fileTree,
       openFile: state.openFile,
+      refreshFileTree: state.refreshFileTree,
     })),
   );
 
@@ -420,6 +435,145 @@ export function MainAIChatShell() {
       : chatMode === "chat"
         ? chatLoading || chatStreaming
         : false;
+
+  const isConversationMode = chatMode === "chat" || chatMode === "agent";
+
+  const exportCandidates = useMemo<ExportMessage[]>(() => {
+    if (chatMode === "chat") {
+      const normalizedMessages: RawConversationMessage[] = chatMessages.map((message) => ({
+        id: (message as { id?: string }).id,
+        role: message.role as RawConversationMessage["role"],
+        content: message.content,
+      }));
+      return buildChatExportMessages(normalizedMessages);
+    }
+    if (chatMode === "agent") {
+      const normalizedMessages: RawConversationMessage[] = agentMessages.map((message) => ({
+        id: message.id,
+        role: message.role as RawConversationMessage["role"],
+        content: message.content,
+      }));
+      return buildAgentExportMessages(normalizedMessages);
+    }
+    return [];
+  }, [chatMode, chatMessages, agentMessages]);
+
+  const selectedExportIdSet = useMemo(() => new Set(selectedExportIds), [selectedExportIds]);
+  const allExportSelected =
+    exportCandidates.length > 0 && selectedExportIds.length === exportCandidates.length;
+
+  const currentConversationTitle = useMemo(() => {
+    if (chatMode === "agent") {
+      const currentSession = rustSessions.find((session) => session.id === rustSessionId);
+      return currentSession?.title || t.ai.conversation;
+    }
+
+    if (chatMode === "chat") {
+      const currentSession = chatSessions.find((session) => session.id === chatSessionId);
+      return currentSession?.title || t.ai.conversation;
+    }
+
+    return t.ai.conversation;
+  }, [chatMode, rustSessions, rustSessionId, chatSessions, chatSessionId, t.ai.conversation]);
+
+  useEffect(() => {
+    if (!isConversationMode) {
+      setIsExportSelectionMode(false);
+      setSelectedExportIds([]);
+    }
+  }, [isConversationMode]);
+
+  useEffect(() => {
+    const validIds = new Set(exportCandidates.map((message) => message.id));
+    setSelectedExportIds((prev) => prev.filter((id) => validIds.has(id)));
+  }, [exportCandidates]);
+
+  const handleStartExportSelection = useCallback(() => {
+    setIsExportSelectionMode(true);
+    setSelectedExportIds([]);
+  }, []);
+
+  const handleCancelExportSelection = useCallback(() => {
+    setIsExportSelectionMode(false);
+    setSelectedExportIds([]);
+  }, []);
+
+  const handleToggleExportMessage = useCallback((id: string) => {
+    setSelectedExportIds((prev) => (
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    ));
+  }, []);
+
+  const handleToggleSelectAllExportMessages = useCallback(() => {
+    if (allExportSelected) {
+      setSelectedExportIds([]);
+      return;
+    }
+    setSelectedExportIds(exportCandidates.map((message) => message.id));
+  }, [allExportSelected, exportCandidates]);
+
+  const handleExportSelectedMessages = useCallback(async () => {
+    if (!vaultPath || selectedExportIds.length === 0 || !isConversationMode || isExportingConversation) {
+      return;
+    }
+
+    try {
+      setIsExportingConversation(true);
+      const selectedIdSet = new Set(selectedExportIds);
+      const selectedMessages = exportCandidates
+        .filter((message) => selectedIdSet.has(message.id))
+        .sort((a, b) => a.order - b.order);
+
+      if (selectedMessages.length === 0) {
+        return;
+      }
+
+      const modeName = chatMode === "agent" ? "agent" : "chat";
+      const markdown = buildConversationExportMarkdown({
+        title: currentConversationTitle,
+        modeLabel: `${t.ai.mode}: ${chatMode === "agent" ? t.ai.modeAgent : t.ai.modeChat}`,
+        messages: selectedMessages,
+        roleLabels: {
+          user: t.ai.exportRoleUser,
+          assistant: t.ai.exportRoleAssistant,
+        },
+      });
+
+      const safeTitle = sanitizeExportFileName(currentConversationTitle);
+      const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+/, "").replace("T", "-");
+      const exportDir = await joinPath(vaultPath, "Exports", "Conversations");
+      await createDir(exportDir, { recursive: true });
+
+      const exportFilePath = await joinPath(exportDir, `${modeName}-${safeTitle}-${stamp}.md`);
+      await saveFile(exportFilePath, markdown);
+      await refreshFileTree();
+      await openFile(exportFilePath);
+
+      setIsExportSelectionMode(false);
+      setSelectedExportIds([]);
+    } catch (error) {
+      console.error("[ConversationExport] failed:", error);
+      alert(t.ai.exportFailed.replace("{error}", String(error)));
+    } finally {
+      setIsExportingConversation(false);
+    }
+  }, [
+    vaultPath,
+    selectedExportIds,
+    isConversationMode,
+    isExportingConversation,
+    exportCandidates,
+    chatMode,
+    currentConversationTitle,
+    t.ai.mode,
+    t.ai.modeAgent,
+    t.ai.modeChat,
+    t.ai.exportRoleUser,
+    t.ai.exportRoleAssistant,
+    t.ai.exportFailed,
+    refreshFileTree,
+    openFile,
+  ]);
 
   // 自动滚动到底部
   useEffect(() => {
@@ -647,6 +801,9 @@ export function MainAIChatShell() {
     if (import.meta.env.DEV) {
       console.log("[handleSend] Called, chatMode:", chatMode, "input:", input, "isLoading:", isLoading);
     }
+    if (isExportSelectionMode) {
+      return;
+    }
     if (chatMode === "codex") {
       return;
     }
@@ -740,7 +897,7 @@ export function MainAIChatShell() {
       await sendMessageStream(fullMessage, currentFileInfo, displayMessage);
       finalizePerf();
     }
-  }, [input, chatMode, isLoading, vaultPath, currentFile, currentContent, referencedFiles, rustStartTask, sendMessageStream, isOnlyWebLink, startResearch, enableWebSearch, config, selectedSkills]);
+  }, [input, chatMode, isLoading, vaultPath, currentFile, currentContent, referencedFiles, rustStartTask, sendMessageStream, isOnlyWebLink, startResearch, enableWebSearch, config, selectedSkills, isExportSelectionMode]);
 
   const handleSendRef = useRef(handleSend);
   useLayoutEffect(() => {
@@ -915,6 +1072,8 @@ export function MainAIChatShell() {
     if (chatMode === "codex") {
       return;
     }
+    setIsExportSelectionMode(false);
+    setSelectedExportIds([]);
     setSelectedSkills([]);
     if (chatMode === "research") {
       // Research 模式: 重置当前研究会话，准备新研究
@@ -1026,6 +1185,18 @@ export function MainAIChatShell() {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            {isConversationMode && (
+              <button
+                onClick={isExportSelectionMode ? handleCancelExportSelection : handleStartExportSelection}
+                disabled={isLoading || exportCandidates.length === 0}
+                className="flex items-center gap-1.5 px-2 py-1 text-xs rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Download size={14} />
+                <span className="ui-compact-text ui-compact-hide">
+                  {isExportSelectionMode ? t.ai.exportCancel : t.ai.exportConversation}
+                </span>
+              </button>
+            )}
             <button
               onClick={handleNewChat}
               className="flex items-center gap-1.5 px-2 py-1 text-xs rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors whitespace-nowrap"
@@ -1203,12 +1374,49 @@ export function MainAIChatShell() {
               >
 
                 {/* Agent 模式：任务计划卡片 + 消息渲染 */}
-                {chatMode === "agent" && rustCurrentPlan && rustCurrentPlan.steps.length > 0 && (
+                {chatMode === "agent" && !isExportSelectionMode && rustCurrentPlan && rustCurrentPlan.steps.length > 0 && (
                   <PlanCard plan={rustCurrentPlan} className="mb-4" />
                 )}
 
-                {/* Agent 模式：使用 AgentMessageRenderer 组件 */}
-                {chatMode === "agent" ? (
+                {isExportSelectionMode ? (
+                  <>
+                    <div className="mb-4 rounded-xl border border-border bg-card/70 px-3 py-2 flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {t.ai.exportSelectedCount.replace("{count}", String(selectedExportIds.length))}
+                      </span>
+                      <button
+                        onClick={handleToggleSelectAllExportMessages}
+                        className="px-2 py-1 text-xs rounded-md bg-muted hover:bg-muted/80 transition-colors"
+                      >
+                        {allExportSelected ? t.ai.exportUnselectAll : t.ai.exportSelectAll}
+                      </button>
+                      <button
+                        onClick={handleExportSelectedMessages}
+                        disabled={selectedExportIds.length === 0 || isExportingConversation}
+                        className="px-2 py-1 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isExportingConversation ? t.ai.exporting : t.ai.exportConfirm}
+                      </button>
+                      <button
+                        onClick={handleCancelExportSelection}
+                        className="px-2 py-1 text-xs rounded-md bg-muted hover:bg-muted/80 transition-colors"
+                      >
+                        {t.ai.exportCancel}
+                      </button>
+                    </div>
+
+                    <SelectableConversationList
+                      messages={exportCandidates}
+                      selectedIds={selectedExportIdSet}
+                      onToggleMessage={handleToggleExportMessage}
+                      emptyText={t.ai.exportNoMessages}
+                      roleLabels={{
+                        user: t.ai.exportRoleUser,
+                        assistant: t.ai.exportRoleAssistant,
+                      }}
+                    />
+                  </>
+                ) : chatMode === "agent" ? (
                   <AgentMessageRenderer
                     messages={agentMessages}
                     isRunning={agentStatus === "running"}
@@ -1250,7 +1458,7 @@ export function MainAIChatShell() {
                 )}
 
                 {/* 创建/编辑的文件链接 */}
-                {chatMode === "agent" && agentStatus !== "running" && (() => {
+                {!isExportSelectionMode && chatMode === "agent" && agentStatus !== "running" && (() => {
                   const createdFiles = extractCreatedFiles();
                   if (createdFiles.length === 0) return null;
 
@@ -1278,7 +1486,7 @@ export function MainAIChatShell() {
                 })()}
 
                 {/* 工具审批 */}
-                {chatMode === "agent" && pendingTool && agentStatus === "waiting_approval" && (
+                {!isExportSelectionMode && chatMode === "agent" && pendingTool && agentStatus === "waiting_approval" && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -1318,7 +1526,7 @@ export function MainAIChatShell() {
                 )}
 
                 {/* 流式输出 - Agent 和 Chat 模式统一使用 StreamingOutput 组件 */}
-                {(chatMode === "agent" || chatMode === "chat") && (
+                {!isExportSelectionMode && (chatMode === "agent" || chatMode === "chat") && (
                   <StreamingOutput mode={chatMode} />
                 )}
 
