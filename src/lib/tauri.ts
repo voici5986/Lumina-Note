@@ -448,30 +448,30 @@ export async function readAgentSkill(
 // ============ Plugin ecosystem ============
 
 export async function listPlugins(workspacePath?: string): Promise<PluginInfo[]> {
-  return invoke("plugin_list", { workspace_path: workspacePath });
+  return invoke("plugin_list", { workspacePath });
 }
 
 export async function readPluginEntry(
   pluginId: string,
   workspacePath?: string
 ): Promise<PluginEntry> {
-  return invoke("plugin_read_entry", { plugin_id: pluginId, workspace_path: workspacePath });
+  return invoke("plugin_read_entry", { pluginId, workspacePath });
 }
 
 export async function getWorkspacePluginDir(workspacePath: string): Promise<string> {
-  return invoke("plugin_get_workspace_dir", { workspace_path: workspacePath });
+  return invoke("plugin_get_workspace_dir", { workspacePath });
 }
 
 export async function scaffoldWorkspaceExamplePlugin(workspacePath: string): Promise<string> {
-  return invoke("plugin_scaffold_example", { workspace_path: workspacePath });
+  return invoke("plugin_scaffold_example", { workspacePath });
 }
 
 export async function scaffoldWorkspaceThemePlugin(workspacePath: string): Promise<string> {
-  return invoke("plugin_scaffold_theme", { workspace_path: workspacePath });
+  return invoke("plugin_scaffold_theme", { workspacePath });
 }
 
 export async function scaffoldWorkspaceUiOverhaulPlugin(workspacePath: string): Promise<string> {
-  return invoke("plugin_scaffold_ui_overhaul", { workspace_path: workspacePath });
+  return invoke("plugin_scaffold_ui_overhaul", { workspacePath });
 }
 
 // ============ Doc tools ============
