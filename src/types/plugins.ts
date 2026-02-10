@@ -48,6 +48,11 @@ export interface PluginInfo {
   source: string;
   root_path: string;
   entry_path: string;
+  validation_error?: {
+    code: string;
+    field?: string;
+    message: string;
+  } | null;
 }
 
 export interface PluginEntry {

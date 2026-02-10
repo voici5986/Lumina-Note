@@ -8,6 +8,7 @@ const PLUGIN_MANIFEST: &str = "plugin.json";
 const DEFAULT_ENTRYPOINT: &str = "index.js";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 struct PluginManifestRaw {
     id: Option<String>,
     name: Option<String>,
@@ -21,6 +22,13 @@ struct PluginManifestRaw {
     min_app_version: Option<String>,
     api_version: Option<String>,
     is_desktop_only: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PluginValidationError {
+    pub code: String,
+    pub field: Option<String>,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,6 +48,7 @@ pub struct PluginInfo {
     pub source: String,
     pub root_path: String,
     pub entry_path: String,
+    pub validation_error: Option<PluginValidationError>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -86,29 +95,110 @@ fn read_manifest(path: &Path) -> Result<PluginManifestRaw, String> {
     serde_json::from_str(&content).map_err(|e| format!("Invalid JSON in {}: {}", path.display(), e))
 }
 
-fn normalize_manifest(raw: PluginManifestRaw, folder_name: &str) -> PluginManifestRaw {
-    let mut normalized = raw;
-    if normalized.id.as_deref().unwrap_or_default().is_empty() {
-        normalized.id = Some(folder_name.to_string());
+fn validation_error(code: &str, field: Option<&str>, message: impl Into<String>) -> PluginValidationError {
+    PluginValidationError {
+        code: code.to_string(),
+        field: field.map(|v| v.to_string()),
+        message: message.into(),
     }
-    if normalized.name.as_deref().unwrap_or_default().is_empty() {
-        normalized.name = Some(
-            normalized
-                .id
-                .clone()
-                .unwrap_or_else(|| folder_name.to_string()),
-        );
+}
+
+fn is_valid_semver(value: &str) -> bool {
+    let core = value.split('-').next().unwrap_or(value);
+    let core = core.split('+').next().unwrap_or(core);
+    let parts: Vec<&str> = core.split('.').collect();
+    if parts.len() != 3 {
+        return false;
     }
-    if normalized.version.as_deref().unwrap_or_default().is_empty() {
-        normalized.version = Some("0.1.0".to_string());
+    parts.iter().all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit()))
+}
+
+fn is_valid_plugin_id(value: &str) -> bool {
+    if value.is_empty() {
+        return false;
     }
-    if normalized.entry.as_deref().unwrap_or_default().is_empty() {
-        normalized.entry = Some(DEFAULT_ENTRYPOINT.to_string());
+    value
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '.' || c == '_' || c == '-')
+}
+
+fn contains_parent_path(value: &str) -> bool {
+    value.split('/').any(|part| part == "..") || value.split('\\').any(|part| part == "..")
+}
+
+fn validate_manifest(raw: PluginManifestRaw, folder_name: &str) -> Result<PluginManifestRaw, PluginValidationError> {
+    let id = raw.id.as_deref().unwrap_or_default().trim();
+    if id.is_empty() {
+        return Err(validation_error(
+            "missing_required_field",
+            Some("id"),
+            format!("Field `id` is required for plugin folder `{}`", folder_name),
+        ));
     }
-    if normalized.api_version.as_deref().unwrap_or_default().is_empty() {
-        normalized.api_version = Some("1".to_string());
+    if !is_valid_plugin_id(id) {
+        return Err(validation_error(
+            "invalid_plugin_id",
+            Some("id"),
+            "Plugin id must use lowercase letters, numbers, dot, underscore or hyphen.",
+        ));
     }
-    normalized
+
+    let name = raw.name.as_deref().unwrap_or_default().trim();
+    if name.is_empty() {
+        return Err(validation_error(
+            "missing_required_field",
+            Some("name"),
+            "Field `name` is required.",
+        ));
+    }
+
+    let version = raw.version.as_deref().unwrap_or_default().trim();
+    if version.is_empty() {
+        return Err(validation_error(
+            "missing_required_field",
+            Some("version"),
+            "Field `version` is required.",
+        ));
+    }
+    if !is_valid_semver(version) {
+        return Err(validation_error(
+            "invalid_semver",
+            Some("version"),
+            "Field `version` must be semantic version format x.y.z.",
+        ));
+    }
+
+    let entry = raw.entry.as_deref().unwrap_or(DEFAULT_ENTRYPOINT).trim();
+    if entry.is_empty() {
+        return Err(validation_error(
+            "missing_required_field",
+            Some("entry"),
+            "Field `entry` is required.",
+        ));
+    }
+    if Path::new(entry).is_absolute() || contains_parent_path(entry) {
+        return Err(validation_error(
+            "invalid_entry_path",
+            Some("entry"),
+            "Field `entry` must be a relative path inside plugin folder.",
+        ));
+    }
+
+    if let Some(api_version) = raw.api_version.as_deref() {
+        if api_version.trim().is_empty() {
+            return Err(validation_error(
+                "invalid_api_version",
+                Some("api_version"),
+                "Field `api_version` cannot be empty.",
+            ));
+        }
+    }
+
+    Ok(PluginManifestRaw {
+        entry: Some(entry.to_string()),
+        api_version: Some(raw.api_version.unwrap_or_else(|| "1".to_string())),
+        ..raw
+    })
 }
 
 fn build_info(source: &str, root: &Path, dir: &Path, manifest: PluginManifestRaw) -> PluginInfo {
@@ -116,7 +206,30 @@ fn build_info(source: &str, root: &Path, dir: &Path, manifest: PluginManifestRaw
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("plugin");
-    let normalized = normalize_manifest(manifest, folder_name);
+    let validated = validate_manifest(manifest, folder_name);
+    let normalized = match validated {
+        Ok(value) => value,
+        Err(err) => {
+            return PluginInfo {
+                id: folder_name.to_string(),
+                name: folder_name.to_string(),
+                version: "0.0.0".to_string(),
+                description: None,
+                author: None,
+                homepage: None,
+                entry: DEFAULT_ENTRYPOINT.to_string(),
+                permissions: vec![],
+                enabled_by_default: false,
+                min_app_version: None,
+                api_version: "1".to_string(),
+                is_desktop_only: false,
+                source: source.to_string(),
+                root_path: root.to_string_lossy().to_string(),
+                entry_path: dir.join(DEFAULT_ENTRYPOINT).to_string_lossy().to_string(),
+                validation_error: Some(err),
+            };
+        }
+    };
 
     let entry = normalized
         .entry
@@ -139,6 +252,7 @@ fn build_info(source: &str, root: &Path, dir: &Path, manifest: PluginManifestRaw
         source: source.to_string(),
         root_path: root.to_string_lossy().to_string(),
         entry_path: entry_path.to_string_lossy().to_string(),
+        validation_error: None,
     }
 }
 
@@ -166,6 +280,10 @@ fn list_plugins_in_root(root: &Path, source: &str) -> Vec<PluginInfo> {
             }
         };
         let info = build_info(source, root, &dir, manifest);
+        if info.validation_error.is_some() {
+            plugins.push(info);
+            continue;
+        }
         if Path::new(&info.entry_path).exists() {
             plugins.push(info);
         } else {
@@ -220,6 +338,12 @@ pub fn read_plugin_entry(
 
             let manifest = read_manifest(&manifest_path)?;
             let info = build_info(&source, &root, &dir, manifest);
+            if let Some(err) = info.validation_error.clone() {
+                return Err(format!(
+                    "PLUGIN_MANIFEST_VALIDATION:{}:{}",
+                    err.code, err.message
+                ));
+            }
             if info.id != plugin_id {
                 continue;
             }

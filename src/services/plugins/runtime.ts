@@ -219,6 +219,20 @@ class PluginRuntime {
         continue;
       }
 
+      if (plugin.validation_error) {
+        const reason = `[${plugin.validation_error.code}] ${plugin.validation_error.message}`;
+        statuses[plugin.id] = {
+          enabled: true,
+          loaded: false,
+          incompatible: true,
+          reason,
+          error: reason,
+        };
+        this.removePluginCommands(plugin.id);
+        this.removePluginListeners(plugin.id);
+        continue;
+      }
+
       const compatibilityIssue = getCompatibilityIssue(plugin);
       if (compatibilityIssue) {
         statuses[plugin.id] = {
