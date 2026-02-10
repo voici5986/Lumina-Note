@@ -29,16 +29,21 @@ Each plugin lives in its own folder and must include `plugin.json`:
   "description": "Example plugin",
   "author": "Lumina",
   "entry": "index.js",
+  "min_app_version": "0.1.0",
+  "api_version": "1",
   "permissions": [
-    "commands:register",
-    "events:subscribe",
-    "workspace:read",
-    "workspace:write",
-    "storage:read",
-    "storage:write",
-    "network:fetch"
+    "commands:*",
+    "events:*",
+    "vault:*",
+    "workspace:*",
+    "editor:*",
+    "ui:*",
+    "storage:*",
+    "network:*",
+    "runtime:*"
   ],
-  "enabled_by_default": true
+  "enabled_by_default": true,
+  "is_desktop_only": false
 }
 ```
 
@@ -52,6 +57,7 @@ Each plugin lives in its own folder and must include `plugin.json`:
 ### Optional fields
 
 - `description`, `author`, `homepage`
+- `min_app_version`, `api_version`, `is_desktop_only`
 - `permissions`: capability list
 - `enabled_by_default`: defaults to `true`
 

@@ -69,6 +69,14 @@ interface LuminaPluginApi {
   };
 }
 
+const hasPermission = (permissions: Set<string>, required: string) => {
+  if (permissions.has("*") || permissions.has(required)) {
+    return true;
+  }
+  const [namespace] = required.split(":");
+  return permissions.has(`${namespace}:*`);
+};
+
 class PluginRuntime {
   private loaded = new Map<string, LoadedPlugin>();
   private listeners = new Map<PluginHostEvent, Map<string, Set<PluginEventHandler>>>();
@@ -183,7 +191,7 @@ return exported(api, plugin);
     workspacePath?: string
   ): LuminaPluginApi {
     const requirePermission = (permission: PluginPermission) => {
-      if (!permissions.has(permission) && !permissions.has("*")) {
+      if (!hasPermission(permissions, permission)) {
         throw new Error(`Plugin ${info.id} missing permission: ${permission}`);
       }
     };
@@ -292,11 +300,11 @@ return exported(api, plugin);
       workspace: {
         getPath: () => workspacePath || null,
         readFile: async (path: string) => {
-          requirePermission("workspace:read");
+          requirePermission("vault:read");
           return readFile(resolveWorkspacePath(path));
         },
         writeFile: async (path: string, content: string) => {
-          requirePermission("workspace:write");
+          requirePermission("vault:write");
           return saveFile(resolveWorkspacePath(path), content);
         },
       },

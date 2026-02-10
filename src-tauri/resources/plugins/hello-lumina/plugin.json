@@ -5,10 +5,14 @@
   "description": "Built-in example plugin demonstrating Lumina plugin APIs.",
   "author": "Lumina",
   "entry": "index.js",
+  "min_app_version": "0.1.0",
+  "api_version": "1",
   "permissions": [
-    "commands:register",
-    "events:subscribe",
-    "storage:write"
+    "commands:*",
+    "events:*",
+    "storage:*",
+    "ui:notify"
   ],
-  "enabled_by_default": false
+  "enabled_by_default": false,
+  "is_desktop_only": false
 }

@@ -18,6 +18,9 @@ struct PluginManifestRaw {
     entry: Option<String>,
     permissions: Option<Vec<String>>,
     enabled_by_default: Option<bool>,
+    min_app_version: Option<String>,
+    api_version: Option<String>,
+    is_desktop_only: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,6 +34,9 @@ pub struct PluginInfo {
     pub entry: String,
     pub permissions: Vec<String>,
     pub enabled_by_default: bool,
+    pub min_app_version: Option<String>,
+    pub api_version: String,
+    pub is_desktop_only: bool,
     pub source: String,
     pub root_path: String,
     pub entry_path: String,
@@ -99,6 +105,9 @@ fn normalize_manifest(raw: PluginManifestRaw, folder_name: &str) -> PluginManife
     if normalized.entry.as_deref().unwrap_or_default().is_empty() {
         normalized.entry = Some(DEFAULT_ENTRYPOINT.to_string());
     }
+    if normalized.api_version.as_deref().unwrap_or_default().is_empty() {
+        normalized.api_version = Some("1".to_string());
+    }
     normalized
 }
 
@@ -124,6 +133,9 @@ fn build_info(source: &str, root: &Path, dir: &Path, manifest: PluginManifestRaw
         entry,
         permissions: normalized.permissions.unwrap_or_default(),
         enabled_by_default: normalized.enabled_by_default.unwrap_or(true),
+        min_app_version: normalized.min_app_version,
+        api_version: normalized.api_version.unwrap_or_else(|| "1".to_string()),
+        is_desktop_only: normalized.is_desktop_only.unwrap_or(false),
         source: source.to_string(),
         root_path: root.to_string_lossy().to_string(),
         entry_path: entry_path.to_string_lossy().to_string(),
@@ -246,13 +258,16 @@ fn write_example_plugin(plugin_dir: &Path) -> Result<(), String> {
   "description": "Example plugin that registers a slash command.",
   "author": "Lumina",
   "entry": "index.js",
+  "min_app_version": "0.1.0",
+  "api_version": "1",
   "permissions": [
-    "commands:register",
-    "workspace:read",
-    "events:subscribe",
-    "storage:write"
+    "commands:*",
+    "vault:read",
+    "events:*",
+    "storage:*"
   ],
-  "enabled_by_default": true
+  "enabled_by_default": true,
+  "is_desktop_only": false
 }
 "#,
         )
