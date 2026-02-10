@@ -4,6 +4,7 @@
 >
 > - `docs/plugin-open-strategy.md`
 > - `docs/plugin-manifest.v1.md`
+> - `packages/plugin-api/index.d.ts`
 
 Lumina now exposes a first-party plugin runtime for developers.
 
