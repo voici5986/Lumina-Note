@@ -1,5 +1,10 @@
 # Lumina Plugin Ecosystem (Developer Preview)
 
+> 建议先阅读：
+>
+> - `docs/plugin-open-strategy.md`
+> - `docs/plugin-manifest.v1.md`
+
 Lumina now exposes a first-party plugin runtime for developers.
 
 ## Plugin locations
