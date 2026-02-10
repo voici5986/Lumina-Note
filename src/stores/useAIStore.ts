@@ -785,9 +785,12 @@ export const useAIStore = create<AIState>()(
               : "";
             const decryptedConfig = { ...state.config, apiKey: decryptedKey };
             setAIConfig(decryptedConfig);
-            useAIStore.setState({ 
-              config: decryptedConfig,
-              encryptedApiKey: storedEncryptedKey 
+            // Avoid touching useAIStore binding during store bootstrap (TDZ).
+            queueMicrotask(() => {
+              useAIStore.setState({
+                config: decryptedConfig,
+                encryptedApiKey: storedEncryptedKey,
+              });
             });
           } catch (error) {
             console.error('Failed to decrypt API key:', error);

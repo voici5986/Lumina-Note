@@ -5,10 +5,8 @@ import { useUIStore } from "@/stores/useUIStore";
 import { getDebugLogPath } from "@/lib/debugLogger";
 
 export function DiagnosticsSection() {
-  const { diagnosticsEnabled, setDiagnosticsEnabled } = useUIStore((s) => ({
-    diagnosticsEnabled: s.diagnosticsEnabled,
-    setDiagnosticsEnabled: s.setDiagnosticsEnabled,
-  }));
+  const diagnosticsEnabled = useUIStore((s) => s.diagnosticsEnabled);
+  const setDiagnosticsEnabled = useUIStore((s) => s.setDiagnosticsEnabled);
 
   const [logPath, setLogPath] = useState<string>("");
   const [busy, setBusy] = useState(false);
