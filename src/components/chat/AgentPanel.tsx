@@ -66,7 +66,7 @@ export function AgentPanel() {
     });
   };
 
-  const { vaultPath, currentFile, currentContent } = useFileStore();
+  const vaultPath = useFileStore((state) => state.vaultPath);
 
   // 滚动到底部
   useEffect(() => {
@@ -78,6 +78,7 @@ export function AgentPanel() {
     if ((!message.trim() && referencedFiles.length === 0) || status === "running") return;
 
     setInput("");
+    const { currentFile, currentContent } = useFileStore.getState();
 
     // 使用共享函数处理消息和文件
     const { displayMessage, fullMessage } = await processMessageWithFiles(message, referencedFiles);
@@ -198,6 +199,7 @@ export function AgentPanel() {
                 // 重新发送最后一条用户消息
                 const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
                 if (lastUserMsg && vaultPath) {
+                  const { currentFile, currentContent } = useFileStore.getState();
                   startTask(lastUserMsg.content, {
                     workspacePath: vaultPath,
                     activeNote: currentFile || undefined,

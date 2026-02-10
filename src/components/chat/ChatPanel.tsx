@@ -149,7 +149,7 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
     clearPendingEdits,
     setPendingDiff,
   } = useAIStore();
-  const { currentFile, currentContent } = useFileStore();
+  const currentFile = useFileStore((state) => state.currentFile);
   const { t } = useLocaleStore();
   
   const [inputValue, setInputValue] = useState("");
@@ -165,16 +165,26 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [messages, isLoading, isStreaming]);
 
-  // 当前文件信息
-  const currentFileInfo = useMemo(() => {
+  const getCurrentFileInfo = useCallback(() => {
+    const { currentFile: activeFile, currentContent: activeContent } = useFileStore.getState();
+    if (!activeFile) return null;
+    const name = activeFile.split(/[/\\]/).pop()?.replace(/\.md$/, "") || "";
+    return {
+      path: activeFile,
+      name,
+      content: activeContent,
+    };
+  }, []);
+
+  // 当前文件标识（仅用于 UI 展示，避免跟随编辑内容高频重渲染）
+  const currentFileMeta = useMemo(() => {
     if (!currentFile) return null;
     const name = currentFile.split(/[/\\]/).pop()?.replace(/\.md$/, "") || "";
     return {
       path: currentFile,
       name,
-      content: currentContent,
     };
-  }, [currentFile, currentContent]);
+  }, [currentFile]);
 
   // Handle send message with referenced files and images
   const handleSendWithFiles = useCallback(async (message: string, files: ReferencedFile[], images?: AttachedImage[]) => {
@@ -182,10 +192,16 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
     if (isLoading || isStreaming) return;
 
     const { displayMessage, fullMessage } = await processMessageWithFiles(message, files);
+    const latestFileInfo = getCurrentFileInfo();
 
     setInputValue("");
-    await sendMessageStream(fullMessage, files.length === 0 ? (currentFileInfo || undefined) : undefined, displayMessage, images);
-  }, [isLoading, isStreaming, sendMessageStream, currentFileInfo]);
+    await sendMessageStream(
+      fullMessage,
+      files.length === 0 ? (latestFileInfo || undefined) : undefined,
+      displayMessage,
+      images
+    );
+  }, [isLoading, isStreaming, sendMessageStream, getCurrentFileInfo]);
 
   // Preview edit in diff view
   const handlePreviewEdit = useCallback((edit: EditSuggestion) => {
@@ -198,15 +214,16 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
              editFileName.includes(refName);
     });
     
-    if (!file && currentFileInfo) {
-      const currentName = currentFileInfo.name.toLowerCase();
+    const latestFileInfo = getCurrentFileInfo();
+    if (!file && latestFileInfo) {
+      const currentName = latestFileInfo.name.toLowerCase();
       if (
-        currentFileInfo.path.toLowerCase().includes(editFileName) ||
+        latestFileInfo.path.toLowerCase().includes(editFileName) ||
         currentName.includes(editFileName) ||
         editFileName.includes(currentName) ||
         currentName === editFileName
       ) {
-        file = currentFileInfo;
+        file = latestFileInfo;
       }
     }
 
@@ -224,7 +241,7 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
     } else {
       alert(t.ai.editFileNotFound);
     }
-  }, [referencedFiles, currentFileInfo, setPendingDiff]);
+  }, [referencedFiles, getCurrentFileInfo, setPendingDiff, t.ai.editFileNotFound]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -246,10 +263,10 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
                   </button>
                 </span>
               ))
-            ) : currentFileInfo ? (
+            ) : currentFileMeta ? (
               <span className="inline-flex items-center gap-1 text-xs bg-muted text-muted-foreground px-2 py-1 rounded">
                 <FileText size={10} />
-                {currentFileInfo.name}
+                {currentFileMeta.name}
                 <span className="text-[10px] opacity-60">({t.common.auto})</span>
               </span>
             ) : (
@@ -339,10 +356,11 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
           <div className="flex justify-end">
             <button
               onClick={() => {
+                const latestFileInfo = getCurrentFileInfo();
                 retry(currentFile ? {
-                  path: currentFile,
-                  name: currentFile.split(/[/\\]/).pop() || currentFile,
-                  content: currentContent || "",
+                  path: latestFileInfo?.path || currentFile,
+                  name: latestFileInfo?.name || currentFile.split(/[/\\]/).pop() || currentFile,
+                  content: latestFileInfo?.content || "",
                 } : undefined);
               }}
               className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors"
