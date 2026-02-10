@@ -42,6 +42,7 @@ type PluginCommandRecord = {
   title: string;
   description?: string;
   hotkey?: string;
+  normalizedHotkey?: string;
   run: () => void;
 };
 
@@ -253,6 +254,25 @@ const matchHotkey = (event: KeyboardEvent, pattern: string) => {
   return event.key.toLowerCase() === keyToken;
 };
 
+const normalizeHotkeyPattern = (pattern: string) => {
+  const tokens = pattern
+    .split("+")
+    .map(normalizeHotkeyToken)
+    .filter(Boolean);
+  if (tokens.length === 0) return "";
+  const modifiers: string[] = [];
+  if (tokens.includes("mod")) modifiers.push("mod");
+  else if (tokens.includes("meta")) modifiers.push("meta");
+  else if (tokens.includes("ctrl")) modifiers.push("ctrl");
+  if (tokens.includes("shift")) modifiers.push("shift");
+  if (tokens.includes("alt") || tokens.includes("option")) modifiers.push("alt");
+  const key = tokens.find(
+    (token) => !["mod", "meta", "ctrl", "shift", "alt", "option"].includes(token),
+  );
+  if (!key) return "";
+  return [...modifiers, key].join("+");
+};
+
 class PluginRuntime {
   private loaded = new Map<string, LoadedPlugin>();
   private listeners = new Map<PluginHostEvent, Map<string, Set<PluginEventHandler>>>();
@@ -386,8 +406,8 @@ class PluginRuntime {
 
   handleHotkey(event: KeyboardEvent): boolean {
     for (const command of this.pluginCommands.values()) {
-      if (!command.hotkey) continue;
-      if (matchHotkey(event, command.hotkey)) {
+      if (!command.normalizedHotkey) continue;
+      if (matchHotkey(event, command.normalizedHotkey)) {
         event.preventDefault();
         return this.executeCommand(command.id);
       }
@@ -521,12 +541,17 @@ return exported(api, plugin);
         throw new Error("Command id cannot be empty");
       }
       const id = `plugin-command:${info.id}:${rawId}`;
-      if (input.hotkey) {
+      const normalizedHotkey = input.hotkey ? normalizeHotkeyPattern(input.hotkey) : "";
+      if (input.hotkey && !normalizedHotkey) {
+        throw new Error(`Invalid hotkey pattern: ${input.hotkey}`);
+      }
+      if (normalizedHotkey) {
         const conflict = Array.from(this.pluginCommands.values()).find(
-          (cmd) => cmd.hotkey && cmd.hotkey === input.hotkey && cmd.id !== id,
+          (cmd) =>
+            cmd.normalizedHotkey && cmd.normalizedHotkey === normalizedHotkey && cmd.id !== id,
         );
         if (conflict) {
-          throw new Error(`Hotkey conflict: ${input.hotkey}`);
+          throw new Error(`Hotkey conflict: ${input.hotkey} (matches ${conflict.hotkey})`);
         }
       }
       this.pluginCommands.set(id, {
@@ -535,6 +560,7 @@ return exported(api, plugin);
         title: input.title || rawId,
         description: input.description,
         hotkey: input.hotkey,
+        normalizedHotkey: normalizedHotkey || undefined,
         run: input.run,
       });
       window.dispatchEvent(new CustomEvent("lumina-plugin-commands-updated"));
