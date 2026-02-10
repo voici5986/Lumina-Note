@@ -22,9 +22,10 @@ describe('processMessageWithFiles', () => {
     expect(result.displayMessage).toBe('Hello AI');
     expect(result.fullMessage).toBe('Hello AI');
     expect(result.fileContext).toBe('');
+    expect(result.attachments).toEqual([]);
   });
 
-  it('should add file labels to display message', async () => {
+  it('should expose file attachments for UI rendering', async () => {
     vi.mocked(readFile).mockResolvedValue('File content');
     
     const files: ReferencedFile[] = [
@@ -33,10 +34,13 @@ describe('processMessageWithFiles', () => {
     
     const result = await processMessageWithFiles('Check this', files);
     
-    expect(result.displayMessage).toBe('Check this [📎 note.md]');
+    expect(result.displayMessage).toBe('Check this');
+    expect(result.attachments).toEqual([
+      { type: 'file', name: 'note.md', path: '/path/to/note.md' },
+    ]);
   });
 
-  it('should add multiple file labels', async () => {
+  it('should keep multiple attachments in order', async () => {
     vi.mocked(readFile).mockResolvedValue('Content');
     
     const files: ReferencedFile[] = [
@@ -46,10 +50,14 @@ describe('processMessageWithFiles', () => {
     
     const result = await processMessageWithFiles('Test', files);
     
-    expect(result.displayMessage).toBe('Test [📎 file1.md] [📎 file2.md]');
+    expect(result.displayMessage).toBe('Test');
+    expect(result.attachments).toEqual([
+      { type: 'file', name: 'file1.md', path: '/file1.md' },
+      { type: 'file', name: 'file2.md', path: '/file2.md' },
+    ]);
   });
 
-  it('should skip folders in labels', async () => {
+  it('should skip folders when building attachments', async () => {
     const files: ReferencedFile[] = [
       { path: '/folder', name: 'folder', isFolder: true },
       { path: '/file.md', name: 'file.md', isFolder: false },
@@ -59,7 +67,10 @@ describe('processMessageWithFiles', () => {
     
     const result = await processMessageWithFiles('Message', files);
     
-    expect(result.displayMessage).toBe('Message [📎 file.md]');
+    expect(result.displayMessage).toBe('Message');
+    expect(result.attachments).toEqual([
+      { type: 'file', name: 'file.md', path: '/file.md' },
+    ]);
   });
 
   it('should include file content in fullMessage', async () => {
@@ -86,8 +97,11 @@ describe('processMessageWithFiles', () => {
     const result = await processMessageWithFiles('Test', files);
     
     // Should still work, just without file content
-    expect(result.displayMessage).toBe('Test [📎 invalid.md]');
+    expect(result.displayMessage).toBe('Test');
     expect(result.fileContext).toBe('');
+    expect(result.attachments).toEqual([
+      { type: 'file', name: 'invalid.md', path: '/invalid.md' },
+    ]);
   });
 
   it('should handle empty message with files', async () => {
@@ -99,7 +113,10 @@ describe('processMessageWithFiles', () => {
     
     const result = await processMessageWithFiles('', files);
     
-    expect(result.displayMessage).toBe('[📎 file.md]');
+    expect(result.displayMessage).toBe('');
+    expect(result.attachments).toEqual([
+      { type: 'file', name: 'file.md', path: '/file.md' },
+    ]);
   });
 
   it('should set fileContext correctly', async () => {

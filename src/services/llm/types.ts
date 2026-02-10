@@ -23,9 +23,16 @@ export interface TextContent {
 // 消息内容可以是纯文本字符串，或多模态内容数组
 export type MessageContent = string | (TextContent | ImageContent)[];
 
+export interface FileAttachment {
+  type: "file";
+  name: string;
+  path?: string;
+}
+
 export interface Message {
   role: "user" | "assistant" | "system";
   content: MessageContent;
+  attachments?: FileAttachment[];
 }
 
 // ============ Provider 类型 ============

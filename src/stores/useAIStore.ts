@@ -13,7 +13,7 @@ import {
   getAIConfig,
 } from "@/services/ai/ai";
 import { readFile } from "@/lib/tauri";
-import { callLLMStream, type ImageContent, type TextContent, type MessageContent } from "@/services/llm";
+import { callLLMStream, type FileAttachment, type ImageContent, type TextContent, type MessageContent } from "@/services/llm";
 import { getCurrentTranslations } from "@/stores/useLocaleStore";
 import { encryptApiKey, decryptApiKey } from "@/lib/crypto";
 import type { AttachedImage } from "@/types/chat";
@@ -145,8 +145,20 @@ interface AIState {
   consumeInputAppends: () => string[];
 
   // Actions
-  sendMessage: (content: string, currentFile?: { path: string; name: string; content: string }, displayContent?: string, images?: AttachedImage[]) => Promise<void>;
-  sendMessageStream: (content: string, currentFile?: { path: string; name: string; content: string }, displayContent?: string, images?: AttachedImage[]) => Promise<void>;
+  sendMessage: (
+    content: string,
+    currentFile?: { path: string; name: string; content: string },
+    displayContent?: string,
+    images?: AttachedImage[],
+    attachments?: FileAttachment[],
+  ) => Promise<void>;
+  sendMessageStream: (
+    content: string,
+    currentFile?: { path: string; name: string; content: string },
+    displayContent?: string,
+    images?: AttachedImage[],
+    attachments?: FileAttachment[],
+  ) => Promise<void>;
   stopStreaming: () => void;
   clearChat: () => void;
   retry: (currentFile?: { path: string; name: string; content: string }) => Promise<void>;  // 重新生成
@@ -321,7 +333,7 @@ export const useAIStore = create<AIState>()(
       },
 
       // Send message
-      sendMessage: async (content, currentFile, displayContent) => {
+      sendMessage: async (content, currentFile, displayContent, _images, attachments) => {
         const { referencedFiles, currentSessionId } = get();
         const t = getCurrentTranslations();
         // 使用内存中的配置（已解密），而不是 store 中可能未同步的配置
@@ -336,7 +348,12 @@ export const useAIStore = create<AIState>()(
         const fileRefs = parseFileReferences(content);
         
         // Add user message (use displayContent for showing, content for AI)
-        const userMessage: Message = { role: "user", content: displayContent || content };
+        const visibleContent = displayContent ?? content;
+        const userMessage: Message = {
+          role: "user",
+          content: visibleContent,
+          ...(attachments && attachments.length > 0 ? { attachments } : {}),
+        };
 
         // 确保有当前会话
         if (!currentSessionId) {
@@ -497,18 +514,19 @@ export const useAIStore = create<AIState>()(
       },
 
       // 流式发送消息
-      sendMessageStream: async (content, currentFile, displayContent, images) => {
+      sendMessageStream: async (content, currentFile, displayContent, images, attachments) => {
         const { referencedFiles, currentSessionId } = get();
         const runtimeConfig = getAIConfig();
         const t = getCurrentTranslations();
 
         // 构建用户消息内容（支持多模态）
         let userMessageContent: MessageContent;
+        const visibleContent = displayContent ?? content;
         if (images && images.length > 0) {
           // 多模态消息：文本 + 图片
           const parts: (TextContent | ImageContent)[] = [];
-          if (displayContent || content) {
-            parts.push({ type: "text", text: displayContent || content });
+          if (visibleContent.trim().length > 0) {
+            parts.push({ type: "text", text: visibleContent });
           }
           for (const img of images) {
             parts.push({
@@ -520,13 +538,17 @@ export const useAIStore = create<AIState>()(
               },
             });
           }
-          userMessageContent = parts;
+          userMessageContent = parts.length > 0 ? parts : visibleContent;
         } else {
-          userMessageContent = displayContent || content;
+          userMessageContent = visibleContent;
         }
 
         // Add user message (use displayContent for showing, content for AI)
-        const userMessage: Message = { role: "user", content: userMessageContent };
+        const userMessage: Message = {
+          role: "user",
+          content: userMessageContent,
+          ...(attachments && attachments.length > 0 ? { attachments } : {}),
+        };
 
         if (!currentSessionId) {
           get().createSession();

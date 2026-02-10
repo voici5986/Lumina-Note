@@ -23,42 +23,7 @@ import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { ChatInput, type ChatInputRef } from "./ChatInput";
 import type { AttachedImage } from "@/types/chat";
 import { processMessageWithFiles, type ReferencedFile } from "@/hooks/useChatSend";
-import type { MessageContent, TextContent, ImageContent } from "@/services/llm";
-
-// 渲染消息内容（支持多模态）
-function renderMessageContent(content: MessageContent): React.ReactNode {
-  if (typeof content === 'string') {
-    return content;
-  }
-  // 多模态内容
-  return content.map((part, i) => {
-    if (part.type === 'text') {
-      return <span key={i}>{(part as TextContent).text}</span>;
-    } else if (part.type === 'image') {
-      const img = part as ImageContent;
-      return (
-        <img
-          key={i}
-          src={`data:${img.source.mediaType};base64,${img.source.data}`}
-          alt="attached"
-          className="max-w-[200px] max-h-[200px] rounded-lg mt-1"
-        />
-      );
-    }
-    return null;
-  });
-}
-
-// 从消息内容提取文本用于 Markdown 渲染
-function getTextFromContent(content: MessageContent): string {
-  if (typeof content === 'string') {
-    return content;
-  }
-  return content
-    .filter(part => part.type === 'text')
-    .map(part => (part as TextContent).text)
-    .join('\n');
-}
+import { getImagesFromContent, getTextFromContent, getUserMessageDisplay } from "./messageContentUtils";
 
 // Edit suggestion card
 function EditCard({ 
@@ -191,7 +156,7 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
     if (!message.trim() && files.length === 0 && (!images || images.length === 0)) return;
     if (isLoading || isStreaming) return;
 
-    const { displayMessage, fullMessage } = await processMessageWithFiles(message, files);
+    const { displayMessage, fullMessage, attachments } = await processMessageWithFiles(message, files);
     const latestFileInfo = getCurrentFileInfo();
 
     setInputValue("");
@@ -199,7 +164,8 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
       fullMessage,
       files.length === 0 ? (latestFileInfo || undefined) : undefined,
       displayMessage,
-      images
+      images,
+      attachments
     );
   }, [isLoading, isStreaming, sendMessageStream, getCurrentFileInfo]);
 
@@ -291,7 +257,40 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
           <div key={idx} className={`${msg.role === "user" ? "flex justify-end" : ""}`}>
             {msg.role === "user" ? (
               <div className="max-w-[85%] bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-2.5 text-sm">
-                {renderMessageContent(msg.content)}
+                {(() => {
+                  const { text: userText, attachments } = getUserMessageDisplay(msg.content, msg.attachments);
+                  const images = getImagesFromContent(msg.content);
+                  return (
+                    <>
+                      {attachments.length > 0 && (
+                        <div className="mb-2 flex flex-wrap gap-1.5">
+                          {attachments.map((attachment, attachmentIdx) => (
+                            <span
+                              key={`${attachment.path ?? attachment.name}-${attachmentIdx}`}
+                              className="inline-flex items-center gap-1 rounded-full bg-primary-foreground/20 px-2 py-0.5 text-xs"
+                            >
+                              <FileText size={10} />
+                              <span className="max-w-[180px] truncate">{attachment.name}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {userText && <span className="whitespace-pre-wrap">{userText}</span>}
+                      {images.length > 0 && (
+                        <div className={`flex flex-wrap gap-2 ${userText || attachments.length > 0 ? "mt-2" : ""}`}>
+                          {images.map((img, imageIdx) => (
+                            <img
+                              key={`${img.source.data.slice(0, 16)}-${imageIdx}`}
+                              src={`data:${img.source.mediaType};base64,${img.source.data}`}
+                              alt="attached"
+                              className="max-w-[200px] max-h-[200px] rounded-lg"
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             ) : (
               <div 

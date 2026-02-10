@@ -6,6 +6,7 @@
 import { useCallback } from "react";
 import { readFile } from "@/lib/tauri";
 import { getCurrentTranslations } from "@/stores/useLocaleStore";
+import type { FileAttachment } from "@/services/llm";
 
 export interface ReferencedFile {
   path: string;
@@ -19,9 +20,10 @@ export interface SendOptions {
 }
 
 export interface ProcessedMessage {
-  displayMessage: string;  // 用于前端显示（用户输入 + 文件标签）
+  displayMessage: string;  // 用于前端显示（仅用户输入文本）
   fullMessage: string;     // 发送给 AI（包含文件完整内容）
   fileContext: string;     // 引用文件的内容（用于上下文）
+  attachments: FileAttachment[];
 }
 
 /**
@@ -32,16 +34,17 @@ export async function processMessageWithFiles(
   referencedFiles: ReferencedFile[]
 ): Promise<ProcessedMessage> {
   const t = getCurrentTranslations();
-  // 构建显示消息（用户输入 + 文件名标签）
-  const fileLabels = referencedFiles
+  // 构建文件附件（在气泡里独立展示，不再拼到文本里）
+  const attachments: FileAttachment[] = referencedFiles
     .filter(f => !f.isFolder)
-    .map(f => `[📎 ${f.name}]`)
-    .join(" ");
+    .map(f => ({
+      type: "file",
+      name: f.name,
+      path: f.path,
+    }));
   
   const trimmedMessage = message.trim();
-  const displayMessage = fileLabels 
-    ? `${trimmedMessage}${trimmedMessage ? " " : ""}${fileLabels}`
-    : trimmedMessage;
+  const displayMessage = trimmedMessage;
 
   // 读取引用文件的内容（用于发送给 AI）
   let fileContext = "";
@@ -66,6 +69,7 @@ export async function processMessageWithFiles(
     displayMessage,
     fullMessage,
     fileContext: fileContext.trim(),
+    attachments,
   };
 }
 

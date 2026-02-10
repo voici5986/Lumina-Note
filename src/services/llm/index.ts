@@ -6,6 +6,7 @@
 export type {
   Message,
   MessageContent,
+  FileAttachment,
   ImageContent,
   TextContent,
   LLMConfig,

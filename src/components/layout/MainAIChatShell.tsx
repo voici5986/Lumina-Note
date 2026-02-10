@@ -43,10 +43,10 @@ import { AgentMessageRenderer } from "../chat/AgentMessageRenderer";
 import { PlanCard } from "../chat/PlanCard";
 import { StreamingOutput } from "../chat/StreamingMessage";
 import { SelectableConversationList } from "../chat/SelectableConversationList";
+import { getImagesFromContent, getTextFromContent, getUserMessageDisplay } from "../chat/messageContentUtils";
 import type { ReferencedFile } from "@/hooks/useChatSend";
 import { useShallow } from "zustand/react/shallow";
 import { AISettingsModal } from "../ai/AISettingsModal";
-import type { MessageContent, TextContent } from "@/services/llm";
 import { DeepResearchCard } from "../deep-research";
 import { CodexPanelSlot } from "@/components/codex/CodexPanelSlot";
 import { join as joinPath } from "@tauri-apps/api/path";
@@ -63,17 +63,6 @@ import {
   type ExportMessage,
   type RawConversationMessage,
 } from "@/features/conversation-export/exportUtils";
-
-// 从消息内容中提取文本（处理多模态内容）
-function getTextFromContent(content: MessageContent): string {
-  if (typeof content === 'string') {
-    return content;
-  }
-  return content
-    .filter(item => item.type === 'text')
-    .map(item => (item as TextContent).text)
-    .join('\n');
-}
 
 // 随机黄豆 emoji 列表
 const WELCOME_EMOJIS = [
@@ -874,7 +863,7 @@ export function MainAIChatShell() {
     setReferencedFiles([]);
     setShowSkillMenu(false);
 
-    const { displayMessage, fullMessage } = await processMessageWithFiles(message, files);
+    const { displayMessage, fullMessage, attachments } = await processMessageWithFiles(message, files);
     if (import.meta.env.DEV && typeof performance !== "undefined") {
       performance.mark("lumina:send:processed");
     }
@@ -929,7 +918,7 @@ export function MainAIChatShell() {
         name: currentFile.split(/[/\\]/).pop()?.replace(/\.md$/, "") || "",
         content: currentContent,
       } : undefined;
-      await sendMessageStream(fullMessage, currentFileInfo, displayMessage);
+      await sendMessageStream(fullMessage, currentFileInfo, displayMessage, undefined, attachments);
       finalizePerf();
     }
   }, [input, chatMode, isLoading, vaultPath, currentFile, currentContent, referencedFiles, rustStartTask, sendMessageStream, isOnlyWebLink, startResearch, enableWebSearch, config, selectedSkills, isExportSelectionMode]);
@@ -1479,7 +1468,40 @@ export function MainAIChatShell() {
                             : "text-foreground"
                           }`}>
                           {isUser ? (
-                            <span className="text-sm">{getTextFromContent(msg.content)}</span>
+                            (() => {
+                              const { text: userText, attachments } = getUserMessageDisplay(msg.content, msg.attachments);
+                              const images = getImagesFromContent(msg.content);
+                              return (
+                                <>
+                                  {attachments.length > 0 && (
+                                    <div className="mb-2 flex flex-wrap gap-1.5">
+                                      {attachments.map((attachment, attachmentIdx) => (
+                                        <span
+                                          key={`${attachment.path ?? attachment.name}-${attachmentIdx}`}
+                                          className="inline-flex items-center gap-1 rounded-full bg-background/70 px-2 py-0.5 text-xs"
+                                        >
+                                          <FileText size={10} />
+                                          <span className="max-w-[220px] truncate">{attachment.name}</span>
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {userText && <span className="text-sm whitespace-pre-wrap">{userText}</span>}
+                                  {images.length > 0 && (
+                                    <div className={`flex flex-wrap gap-2 ${userText || attachments.length > 0 ? "mt-2" : ""}`}>
+                                      {images.map((img, imageIdx) => (
+                                        <img
+                                          key={`${img.source.data.slice(0, 16)}-${imageIdx}`}
+                                          src={`data:${img.source.mediaType};base64,${img.source.data}`}
+                                          alt="attached"
+                                          className="max-w-[220px] max-h-[220px] rounded-lg"
+                                        />
+                                      ))}
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()
                           ) : (
                             <div
                               className="prose prose-sm dark:prose-invert max-w-none leading-relaxed"

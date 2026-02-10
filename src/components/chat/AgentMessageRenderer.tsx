@@ -11,23 +11,13 @@ import { useState, useMemo, useCallback, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocaleStore, getCurrentTranslations } from '@/stores/useLocaleStore';
 import { parseMarkdown } from "@/services/markdown/markdown";
-import type { MessageContent, TextContent } from "@/services/llm";
+import type { MessageContent } from "@/services/llm";
 import { useTimeout } from "@/hooks/useTimeout";
 import { DiffView } from "@/components/effects/DiffView";
 import { useAIStore, type PendingDiff } from "@/stores/useAIStore";
 import { useFileStore } from "@/stores/useFileStore";
 import { saveFile } from "@/lib/tauri";
-
-// 从消息内容中提取文本（处理多模态内容）
-function getTextFromContent(content: MessageContent): string {
-  if (typeof content === 'string') {
-    return content;
-  }
-  return content
-    .filter(item => item.type === 'text')
-    .map(item => (item as TextContent).text)
-    .join('\n');
-}
+import { getTextFromContent, getUserMessageDisplay } from "./messageContentUtils";
 import {
   ChevronRight,
   ChevronDown,
@@ -40,6 +30,7 @@ import {
   Copy,
   AlertTriangle,
   RefreshCw,
+  FileText,
 } from "lucide-react";
 
 // ============ 类型定义 ============
@@ -54,6 +45,7 @@ interface ToolCallInfo {
 type AgentMessage = {
   role: "user" | "assistant" | "system" | "tool";
   content: MessageContent;
+  attachments?: { type: "file"; name: string; path?: string }[];
   agent?: string;
   id?: string;
 };
@@ -576,6 +568,7 @@ export const AgentMessageRenderer = memo(function AgentMessageRenderer({
     const result: Array<{
       userIdx: number;
       userContent: string;
+      userAttachments: { type: "file"; name: string; path?: string }[];
       parts: TimelinePart[];
       roundKey: string;
       hasAIContent: boolean;
@@ -592,9 +585,10 @@ export const AgentMessageRenderer = memo(function AgentMessageRenderer({
 
     userMessageIndices.forEach((userIdx, roundIndex) => {
       const userMsg = messages[userIdx];
-      const displayContent = cleanUserMessage(getTextFromContent(userMsg.content));
+      const normalizedUserMessage = getUserMessageDisplay(userMsg.content, userMsg.attachments);
+      const displayContent = cleanUserMessage(normalizedUserMessage.text);
 
-      if (!displayContent) return;
+      if (!displayContent && normalizedUserMessage.attachments.length === 0) return;
 
       const nextUserIdx = userMessageIndices[roundIndex + 1] ?? messages.length;
       const parts: TimelinePart[] = [];
@@ -657,6 +651,7 @@ export const AgentMessageRenderer = memo(function AgentMessageRenderer({
       result.push({
         userIdx,
         userContent: displayContent,
+        userAttachments: normalizedUserMessage.attachments,
         parts,
         roundKey,
         hasAIContent,
@@ -673,7 +668,20 @@ export const AgentMessageRenderer = memo(function AgentMessageRenderer({
           {/* 用户消息 */}
           <div className="flex justify-end mb-4">
             <div className="max-w-[80%] bg-muted text-foreground rounded-2xl rounded-tr-sm px-4 py-2.5">
-              <span className="text-sm">{round.userContent}</span>
+              {round.userAttachments.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {round.userAttachments.map((attachment, attachmentIdx) => (
+                    <span
+                      key={`${attachment.path ?? attachment.name}-${attachmentIdx}`}
+                      className="inline-flex items-center gap-1 rounded-full bg-background/70 px-2 py-0.5 text-xs"
+                    >
+                      <FileText size={10} />
+                      <span className="max-w-[220px] truncate">{attachment.name}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {round.userContent && <span className="text-sm whitespace-pre-wrap">{round.userContent}</span>}
             </div>
           </div>
 
