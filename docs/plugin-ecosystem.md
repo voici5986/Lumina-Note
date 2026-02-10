@@ -124,6 +124,9 @@ Plugin metadata:
 
 - `registerSlashCommand({ key, description, prompt })`
 - Returns `unregister()` cleanup function
+- `registerCommand({ id, title, description?, hotkey?, run })`
+  - Appears in command palette
+  - Supports default hotkey and conflict detection
 
 ### `api.workspace`
 
@@ -132,6 +135,9 @@ Plugin metadata:
 - `openFile(path)`
 - `readFile(path)`
 - `writeFile(path, content)`
+- `registerPanel({ id, title, html })`
+- `registerTabType({ type, title, render(payload) })`
+- `openRegisteredTab(type, payload?)`
 
 Workspace/vault operations are restricted to the current workspace path.
 
@@ -141,6 +147,7 @@ Workspace/vault operations are restricted to the current workspace path.
 - `getActiveContent()`
 - `setActiveContent(next)`
 - `replaceRange(start, end, next)`
+- `registerDecoration(className, css)`
 
 ### `api.storage`
 

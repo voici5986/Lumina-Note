@@ -30,7 +30,8 @@ export type TabType =
   | "webpage"
   | "flashcard"
   | "cardflow"
-  | "profile-preview";
+  | "profile-preview"
+  | "plugin-view";
 
 // 孤立视图节点信息
 export interface IsolatedNodeInfo {
@@ -58,6 +59,8 @@ export interface Tab {
   webpageUrl?: string; // 网页 URL
   webpageTitle?: string; // 网页标题
   flashcardDeckId?: string; // 闪卡牌组 ID
+  pluginViewType?: string; // 插件视图类型
+  pluginViewHtml?: string; // 插件视图 HTML
 }
 
 type MobileWorkspaceSyncStatus = {
@@ -139,6 +142,7 @@ interface FileState {
   updateWebpageTab: (tabId: string, url?: string, title?: string) => void;
   openFlashcardTab: (deckId?: string) => void;
   openCardFlowTab: () => void;
+  openPluginViewTab: (viewType: string, title: string, html: string) => void;
 
   // Undo/Redo actions
   undo: () => void;
@@ -1381,6 +1385,67 @@ export const useFileStore = create<FileState>()(
           undoStack: [],
           redoStack: [],
           lastSavedContent: "",
+        });
+      },
+
+      openPluginViewTab: (viewType: string, title: string, html: string) => {
+        const { tabs, activeTabIndex, currentContent, isDirty, undoStack, redoStack, switchTab } = get();
+        const existingIndex = tabs.findIndex(
+          (tab) => tab.type === "plugin-view" && tab.pluginViewType === viewType
+        );
+        if (existingIndex !== -1) {
+          const updatedTabs = [...tabs];
+          if (activeTabIndex >= 0 && tabs[activeTabIndex]) {
+            updatedTabs[activeTabIndex] = {
+              ...updatedTabs[activeTabIndex],
+              content: currentContent,
+              isDirty,
+              undoStack,
+              redoStack,
+            };
+          }
+          updatedTabs[existingIndex] = {
+            ...updatedTabs[existingIndex],
+            name: title || updatedTabs[existingIndex].name,
+            pluginViewHtml: html,
+          };
+          set({ tabs: updatedTabs });
+          switchTab(existingIndex);
+          return;
+        }
+
+        const tabId = `__plugin_view_${viewType}_${Date.now()}__`;
+        let updatedTabs = [...tabs];
+        if (activeTabIndex >= 0 && tabs[activeTabIndex]) {
+          updatedTabs[activeTabIndex] = {
+            ...updatedTabs[activeTabIndex],
+            content: currentContent,
+            isDirty,
+            undoStack,
+            redoStack,
+          };
+        }
+
+        const pluginTab: Tab = {
+          id: tabId,
+          type: "plugin-view",
+          path: "",
+          name: title || viewType,
+          content: "",
+          isDirty: false,
+          undoStack: [],
+          redoStack: [],
+          pluginViewType: viewType,
+          pluginViewHtml: html,
+        };
+
+        updatedTabs.push(pluginTab);
+        set({
+          tabs: updatedTabs,
+          activeTabIndex: updatedTabs.length - 1,
+          currentFile: null,
+          currentContent: "",
+          isDirty: false,
         });
       },
 

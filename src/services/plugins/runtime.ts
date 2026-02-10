@@ -10,6 +10,7 @@ import {
 } from "@/lib/tauri";
 import { useCommandStore } from "@/stores/useCommandStore";
 import { useFileStore } from "@/stores/useFileStore";
+import { usePluginUiStore } from "@/stores/usePluginUiStore";
 import type { PluginInfo, PluginPermission, PluginRuntimeStatus } from "@/types/plugins";
 
 type PluginHostEvent = "app:ready" | "workspace:changed" | "active-file:changed";
@@ -19,6 +20,13 @@ type SlashCommandInput = {
   description: string;
   prompt: string;
 };
+type PluginCommandInput = {
+  id: string;
+  title: string;
+  description?: string;
+  hotkey?: string;
+  run: () => void;
+};
 
 type PluginSetupResult =
   | void
@@ -27,6 +35,15 @@ type PluginSetupResult =
   | { dispose?: () => void };
 
 type PluginEventHandler = (payload: Record<string, unknown>) => void;
+type PluginTabRenderer = (payload: Record<string, unknown>) => string;
+type PluginCommandRecord = {
+  pluginId: string;
+  id: string;
+  title: string;
+  description?: string;
+  hotkey?: string;
+  run: () => void;
+};
 
 type LoadedPlugin = {
   info: PluginInfo;
@@ -64,6 +81,7 @@ interface LuminaPluginApi {
   };
   commands: {
     registerSlashCommand: (input: SlashCommandInput) => () => void;
+    registerCommand: (input: PluginCommandInput) => () => void;
   };
   vault: {
     getPath: () => string | null;
@@ -87,12 +105,20 @@ interface LuminaPluginApi {
     openFile: (path: string) => Promise<void>;
     readFile: (path: string) => Promise<string>;
     writeFile: (path: string, content: string) => Promise<void>;
+    registerPanel: (input: { id: string; title: string; html: string }) => () => void;
+    registerTabType: (input: {
+      type: string;
+      title: string;
+      render: (payload: Record<string, unknown>) => string;
+    }) => () => void;
+    openRegisteredTab: (type: string, payload?: Record<string, unknown>) => void;
   };
   editor: {
     getActiveFile: () => string | null;
     getActiveContent: () => string | null;
     setActiveContent: (next: string) => void;
     replaceRange: (start: number, end: number, next: string) => void;
+    registerDecoration: (className: string, css: string) => () => void;
   };
   storage: {
     get: (key: string) => string | null;
@@ -196,9 +222,42 @@ const parseLinksAndTags = (content: string) => {
   };
 };
 
+const normalizeHotkeyToken = (value: string) => value.trim().toLowerCase();
+
+const matchHotkey = (event: KeyboardEvent, pattern: string) => {
+  const tokens = pattern
+    .split("+")
+    .map(normalizeHotkeyToken)
+    .filter(Boolean);
+  if (tokens.length === 0) return false;
+  const wantMeta = tokens.includes("mod")
+    ? /mac|iphone|ipad|ipod/i.test(navigator.platform)
+      ? event.metaKey
+      : event.ctrlKey
+    : tokens.includes("meta")
+      ? event.metaKey
+      : tokens.includes("ctrl")
+        ? event.ctrlKey
+        : false;
+  const wantShift = tokens.includes("shift");
+  const wantAlt = tokens.includes("alt") || tokens.includes("option");
+  if (Boolean(event.shiftKey) !== wantShift) return false;
+  if (Boolean(event.altKey) !== wantAlt) return false;
+  const expectMod = tokens.includes("mod") || tokens.includes("meta") || tokens.includes("ctrl");
+  if (expectMod && !wantMeta) return false;
+  if (!expectMod && (event.metaKey || event.ctrlKey)) return false;
+  const keyToken = tokens.find(
+    (token) => !["mod", "meta", "ctrl", "shift", "alt", "option"].includes(token),
+  );
+  if (!keyToken) return false;
+  return event.key.toLowerCase() === keyToken;
+};
+
 class PluginRuntime {
   private loaded = new Map<string, LoadedPlugin>();
   private listeners = new Map<PluginHostEvent, Map<string, Set<PluginEventHandler>>>();
+  private pluginTabTypes = new Map<string, { pluginId: string; title: string; render: PluginTabRenderer }>();
+  private pluginCommands = new Map<string, PluginCommandRecord>();
 
   async sync(input: SyncInput): Promise<Record<string, PluginRuntimeStatus>> {
     const statuses: Record<string, PluginRuntimeStatus> = {};
@@ -301,6 +360,39 @@ class PluginRuntime {
       this.unload(pluginId, loaded);
     }
     this.loaded.clear();
+  }
+
+  getRegisteredCommands() {
+    return Array.from(this.pluginCommands.values()).map((item) => ({
+      id: item.id,
+      pluginId: item.pluginId,
+      title: item.title,
+      description: item.description,
+      hotkey: item.hotkey,
+    }));
+  }
+
+  executeCommand(commandId: string): boolean {
+    const command = this.pluginCommands.get(commandId);
+    if (!command) return false;
+    try {
+      command.run();
+      return true;
+    } catch (err) {
+      console.error(`[PluginRuntime:${command.pluginId}] command failed`, err);
+      return false;
+    }
+  }
+
+  handleHotkey(event: KeyboardEvent): boolean {
+    for (const command of this.pluginCommands.values()) {
+      if (!command.hotkey) continue;
+      if (matchHotkey(event, command.hotkey)) {
+        event.preventDefault();
+        return this.executeCommand(command.id);
+      }
+    }
+    return false;
   }
 
   private async runPlugin(
@@ -422,7 +514,92 @@ return exported(api, plugin);
       return unregister;
     };
 
+    const registerCommand = (input: PluginCommandInput) => {
+      requirePermission("commands:register");
+      const rawId = input.id.trim();
+      if (!rawId) {
+        throw new Error("Command id cannot be empty");
+      }
+      const id = `plugin-command:${info.id}:${rawId}`;
+      if (input.hotkey) {
+        const conflict = Array.from(this.pluginCommands.values()).find(
+          (cmd) => cmd.hotkey && cmd.hotkey === input.hotkey && cmd.id !== id,
+        );
+        if (conflict) {
+          throw new Error(`Hotkey conflict: ${input.hotkey}`);
+        }
+      }
+      this.pluginCommands.set(id, {
+        pluginId: info.id,
+        id,
+        title: input.title || rawId,
+        description: input.description,
+        hotkey: input.hotkey,
+        run: input.run,
+      });
+      window.dispatchEvent(new CustomEvent("lumina-plugin-commands-updated"));
+      const cleanup = withOnce(() => {
+        this.pluginCommands.delete(id);
+        window.dispatchEvent(new CustomEvent("lumina-plugin-commands-updated"));
+      });
+      unsubscribers.push(cleanup);
+      return cleanup;
+    };
+
     const resolvePluginPath = (path: string) => resolveWorkspacePath(path);
+
+    const registerPanel = (panel: { id: string; title: string; html: string }) => {
+      requirePermission("workspace:*");
+      const panelId = panel.id.trim();
+      if (!panelId) {
+        throw new Error("Panel id cannot be empty");
+      }
+      usePluginUiStore.getState().registerPanel({
+        pluginId: info.id,
+        panelId,
+        title: panel.title || panelId,
+        html: panel.html || "",
+      });
+      const cleanup = withOnce(() => {
+        usePluginUiStore.getState().unregisterPanel(info.id, panelId);
+      });
+      unsubscribers.push(cleanup);
+      return cleanup;
+    };
+
+    const registerTabType = (input: {
+      type: string;
+      title: string;
+      render: (payload: Record<string, unknown>) => string;
+    }) => {
+      requirePermission("workspace:*");
+      const type = input.type.trim();
+      if (!type) {
+        throw new Error("Tab type cannot be empty");
+      }
+      const scopedType = `${info.id}:${type}`;
+      this.pluginTabTypes.set(scopedType, {
+        pluginId: info.id,
+        title: input.title || type,
+        render: input.render,
+      });
+      const cleanup = withOnce(() => {
+        this.pluginTabTypes.delete(scopedType);
+      });
+      unsubscribers.push(cleanup);
+      return cleanup;
+    };
+
+    const openRegisteredTab = (type: string, payload: Record<string, unknown> = {}) => {
+      requirePermission("workspace:*");
+      const scopedType = `${info.id}:${type.trim()}`;
+      const def = this.pluginTabTypes.get(scopedType);
+      if (!def) {
+        throw new Error(`Tab type not found: ${type}`);
+      }
+      const html = def.render(payload);
+      useFileStore.getState().openPluginViewTab(scopedType, def.title, html);
+    };
 
     const storageKey = (key: string) => `lumina-plugin:${info.id}:${key}`;
 
@@ -486,6 +663,7 @@ return exported(api, plugin);
       },
       commands: {
         registerSlashCommand,
+        registerCommand,
       },
       vault: {
         getPath: () => workspacePath || null,
@@ -555,6 +733,9 @@ return exported(api, plugin);
           requirePermission("vault:write");
           return saveFile(resolvePluginPath(path), content);
         },
+        registerPanel,
+        registerTabType,
+        openRegisteredTab,
       },
       editor: {
         getActiveFile: () => useFileStore.getState().currentFile,
@@ -582,6 +763,16 @@ return exported(api, plugin);
           const updated =
             store.currentContent.slice(0, safeStart) + next + store.currentContent.slice(safeEnd);
           store.updateContent(updated, "ai", `plugin:${info.id}:replace-range`);
+        },
+        registerDecoration: (className: string, css: string) => {
+          requirePermission("editor:decorate");
+          const style = document.createElement("style");
+          style.setAttribute("data-lumina-plugin-editor-decoration", info.id);
+          style.textContent = `.cm-editor .${className} { ${css} }`;
+          document.head.appendChild(style);
+          const cleanup = withOnce(() => style.remove());
+          unsubscribers.push(cleanup);
+          return cleanup;
         },
       },
       storage: {
@@ -654,6 +845,18 @@ return exported(api, plugin);
         console.error(`[PluginRuntime:${pluginId}] cleanup failed`, err);
       }
     }
+    usePluginUiStore.getState().clearPluginPanels(pluginId);
+    for (const [type, def] of this.pluginTabTypes.entries()) {
+      if (def.pluginId === pluginId) {
+        this.pluginTabTypes.delete(type);
+      }
+    }
+    for (const [id, command] of this.pluginCommands.entries()) {
+      if (command.pluginId === pluginId) {
+        this.pluginCommands.delete(id);
+      }
+    }
+    window.dispatchEvent(new CustomEvent("lumina-plugin-commands-updated"));
     this.removePluginCommands(pluginId);
     this.removePluginListeners(pluginId);
     this.loaded.delete(pluginId);

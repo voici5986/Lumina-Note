@@ -73,6 +73,13 @@ export interface LuminaPluginApi {
       description: string;
       prompt: string;
     }) => () => void;
+    registerCommand: (input: {
+      id: string;
+      title: string;
+      description?: string;
+      hotkey?: string;
+      run: () => void;
+    }) => () => void;
   };
   vault: {
     getPath: () => string | null;
@@ -96,12 +103,20 @@ export interface LuminaPluginApi {
     openFile: (path: string) => Promise<void>;
     readFile: (path: string) => Promise<string>;
     writeFile: (path: string, content: string) => Promise<void>;
+    registerPanel: (input: { id: string; title: string; html: string }) => () => void;
+    registerTabType: (input: {
+      type: string;
+      title: string;
+      render: (payload: Record<string, unknown>) => string;
+    }) => () => void;
+    openRegisteredTab: (type: string, payload?: Record<string, unknown>) => void;
   };
   editor: {
     getActiveFile: () => string | null;
     getActiveContent: () => string | null;
     setActiveContent: (next: string) => void;
     replaceRange: (start: number, end: number, next: string) => void;
+    registerDecoration: (className: string, css: string) => () => void;
   };
   storage: {
     get: (key: string) => string | null;

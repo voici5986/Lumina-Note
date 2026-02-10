@@ -6,6 +6,7 @@ import { useLocaleStore } from "@/stores/useLocaleStore";
 import { usePublishStore } from "@/stores/usePublishStore";
 import { useProfileStore } from "@/stores/useProfileStore";
 import { publishSite } from "@/services/publish/exporter";
+import { pluginRuntime } from "@/services/plugins/runtime";
 import { FileEntry } from "@/lib/tauri";
 import { cn, getFileName } from "@/lib/utils";
 import {
@@ -50,6 +51,7 @@ export function CommandPalette({ isOpen, mode, onClose, onModeChange }: CommandP
   const { t } = useLocaleStore();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [pluginCommandVersion, setPluginCommandVersion] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -96,6 +98,12 @@ export function CommandPalette({ isOpen, mode, onClose, onModeChange }: CommandP
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isOpen, mode]);
+
+  useEffect(() => {
+    const onUpdate = () => setPluginCommandVersion((value) => value + 1);
+    window.addEventListener("lumina-plugin-commands-updated", onUpdate);
+    return () => window.removeEventListener("lumina-plugin-commands-updated", onUpdate);
+  }, []);
 
   // Flatten file tree
   const allFiles = useMemo(() => {
@@ -245,6 +253,17 @@ export function CommandPalette({ isOpen, mode, onClose, onModeChange }: CommandP
         window.dispatchEvent(new CustomEvent("open-global-search"));
       },
     },
+    ...pluginRuntime.getRegisteredCommands().map((cmd) => ({
+      id: cmd.id,
+      label: cmd.title,
+      description: cmd.description || `Plugin command from ${cmd.pluginId}`,
+      icon: <Command size={16} />,
+      shortcut: cmd.hotkey,
+      action: () => {
+        onClose();
+        pluginRuntime.executeCommand(cmd.id);
+      },
+    })),
   ], [
     t,
     onClose,
@@ -262,6 +281,7 @@ export function CommandPalette({ isOpen, mode, onClose, onModeChange }: CommandP
     publishConfig,
     profileConfig,
     fileTree,
+    pluginCommandVersion,
   ]);
 
   // Filter items based on query and mode

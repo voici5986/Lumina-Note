@@ -45,6 +45,8 @@ import { DevProfiler } from "@/perf/DevProfiler";
 import type { FsChangePayload } from "@/lib/fsChange";
 import { usePluginStore } from "@/stores/usePluginStore";
 import { pluginRuntime } from "@/services/plugins/runtime";
+import { PluginViewPane } from "@/components/plugins/PluginViewPane";
+import { PluginPanelDock } from "@/components/plugins/PluginPanelDock";
 
 // Debug logging is enabled via a runtime toggle (or always in dev).
 
@@ -604,6 +606,10 @@ function App() {
         return;
       }
 
+      if (pluginRuntime.handleHotkey(e)) {
+        return;
+      }
+
       // Esc: Close eval panel
       if (e.key === "Escape" && evalPanelOpen) {
         e.preventDefault();
@@ -841,6 +847,14 @@ function App() {
               <TabBar />
               <ProfilePreview />
             </div>
+          ) : activeTab?.type === "plugin-view" ? (
+            <div className="flex-1 flex flex-col overflow-hidden bg-background">
+              <TabBar />
+              <PluginViewPane
+                title={activeTab.name}
+                html={activeTab.pluginViewHtml || "<p>Empty plugin view</p>"}
+              />
+            </div>
           ) : activeTab?.type === "ai-chat" ? (
             // 主视图区 AI 聊天标签页，交给 Editor 内部根据 tab 类型渲染
             <Editor />
@@ -958,6 +972,7 @@ function App() {
       )}
 
       <MobileWorkspaceToast />
+      <PluginPanelDock />
     </div>
   );
 }
