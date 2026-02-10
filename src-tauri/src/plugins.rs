@@ -126,7 +126,10 @@ fn contains_parent_path(value: &str) -> bool {
     value.split('/').any(|part| part == "..") || value.split('\\').any(|part| part == "..")
 }
 
-fn validate_manifest(raw: PluginManifestRaw, folder_name: &str) -> Result<PluginManifestRaw, PluginValidationError> {
+fn validate_manifest(
+    raw: PluginManifestRaw,
+    folder_name: &str,
+) -> Result<PluginManifestRaw, PluginValidationError> {
     let id = raw.id.as_deref().unwrap_or_default().trim();
     if id.is_empty() {
         return Err(validation_error(
@@ -206,13 +209,27 @@ fn build_info(source: &str, root: &Path, dir: &Path, manifest: PluginManifestRaw
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("plugin");
+    let hinted_id = manifest
+        .id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(folder_name)
+        .to_string();
+    let hinted_name = manifest
+        .name
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(folder_name)
+        .to_string();
     let validated = validate_manifest(manifest, folder_name);
     let normalized = match validated {
         Ok(value) => value,
         Err(err) => {
             return PluginInfo {
-                id: folder_name.to_string(),
-                name: folder_name.to_string(),
+                id: hinted_id,
+                name: hinted_name,
                 version: "0.0.0".to_string(),
                 description: None,
                 author: None,
@@ -304,6 +321,10 @@ pub fn list_plugins(app: &AppHandle, workspace_path: Option<&str>) -> Vec<Plugin
 
     for (source, root) in roots {
         for info in list_plugins_in_root(&root, &source) {
+            if info.validation_error.is_some() {
+                ordered.push(info);
+                continue;
+            }
             if seen.contains(&info.id) {
                 continue;
             }
@@ -338,14 +359,14 @@ pub fn read_plugin_entry(
 
             let manifest = read_manifest(&manifest_path)?;
             let info = build_info(&source, &root, &dir, manifest);
+            if info.id != plugin_id {
+                continue;
+            }
             if let Some(err) = info.validation_error.clone() {
                 return Err(format!(
                     "PLUGIN_MANIFEST_VALIDATION:{}:{}",
                     err.code, err.message
                 ));
-            }
-            if info.id != plugin_id {
-                continue;
             }
 
             let code = fs::read_to_string(&info.entry_path)
