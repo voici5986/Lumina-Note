@@ -53,7 +53,12 @@ const IS_TYPESETTING_HARNESS =
 
 // Component that shows tabs + graph/editor content
 function EditorWithGraph() {
-  const { tabs, activeTabIndex } = useFileStore();
+  const { tabs, activeTabIndex } = useFileStore(
+    useShallow((state) => ({
+      tabs: state.tabs,
+      activeTabIndex: state.activeTabIndex,
+    }))
+  );
   const activeTab = activeTabIndex >= 0 ? tabs[activeTabIndex] : null;
 
   return (
@@ -74,7 +79,7 @@ function EditorWithGraph() {
 function DiffViewWrapper() {
   const { t } = useLocaleStore();
   const { pendingDiff, setPendingDiff, clearPendingEdits, diffResolver } = useAIStore();
-  const { openFile } = useFileStore();
+  const openFile = useFileStore((state) => state.openFile);
 
   const handleAccept = useCallback(async () => {
     if (!pendingDiff) return;
@@ -127,7 +132,7 @@ function DiffViewWrapper() {
 }
 
 function MobileWorkspaceToast() {
-  const { mobileWorkspaceSync } = useFileStore();
+  const mobileWorkspaceSync = useFileStore((state) => state.mobileWorkspaceSync);
   const [message, setMessage] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
   const hideTimerRef = useRef<number | null>(null);
