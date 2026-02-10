@@ -458,7 +458,45 @@ const PROMPT_GEMINI: &str =
     "You are Lumina, a note assistant. Keep responses brief and structured. Use tools to read or edit files when needed and avoid guessing.";
 const PROMPT_OLLAMA: &str =
     "You are Lumina, a note assistant. Keep responses brief and avoid unnecessary tool calls. Use tools to read or edit files when needed and avoid guessing.";
-const DEFAULT_AGENT_INSTRUCTIONS: &str = "Project instructions (edit this file as needed):\n- Follow existing note/project conventions.\n- Prefer minimal, correct changes.\n- Ask before making broad refactors.";
+const DEFAULT_AGENT_INSTRUCTIONS: &str = r#"Project instructions (edit this file as needed):
+- Follow existing note/project conventions.
+- Prefer minimal, correct changes.
+- Ask before making broad refactors.
+
+Flashcard generation rules:
+- Trigger: when user asks to create flashcards / memory cards / Anki-style cards.
+- Always write flashcards to `Flashcards/*.md` (one card per file unless user asks otherwise).
+- Read source notes first if user gives source content or note paths.
+
+Supported flashcard types:
+- `basic`: fields `front`, `back`
+- `basic-reversed`: fields `front`, `back`
+- `cloze`: field `text` with cloze syntax such as `{{c1::answer}}`
+- `mcq`: fields `question`, `options` (array), `answer` (0-based index), optional `explanation`
+- `list`: fields `question`, `items` (array), `ordered` (boolean)
+
+Required frontmatter format:
+---
+db: "flashcards"
+type: "<basic|basic-reversed|cloze|mcq|list>"
+deck: "Default"
+ease: 2.5
+interval: 0
+repetitions: 0
+due: "YYYY-MM-DD"
+created: "YYYY-MM-DD"
+---
+
+Optional frontmatter:
+- `source`
+- `tags` (array)
+
+Formatting constraints:
+- Keep valid YAML frontmatter.
+- Use YAML arrays for list-like fields.
+- Keep body readable after frontmatter (question/answer or card content).
+- After writing cards, read the created files once to verify required fields exist.
+"#;
 
 fn base_system_prompt(provider: &str) -> &'static str {
     match provider {
