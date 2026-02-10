@@ -67,9 +67,8 @@ type SyncInput = {
 
 const HOST_API_VERSION = "1";
 const HOST_APP_VERSION =
-  typeof globalThis !== "undefined" &&
-  typeof (globalThis as { __LUMINA_APP_VERSION__?: unknown }).__LUMINA_APP_VERSION__ === "string"
-    ? ((globalThis as { __LUMINA_APP_VERSION__?: string }).__LUMINA_APP_VERSION__ as string)
+  typeof __LUMINA_APP_VERSION__ === "string" && __LUMINA_APP_VERSION__.trim().length > 0
+    ? __LUMINA_APP_VERSION__
     : "0.0.0";
 
 interface LuminaPluginApi {
