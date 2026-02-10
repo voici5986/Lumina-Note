@@ -30,6 +30,7 @@ interface ChatInputProps {
   value: string;
   onChange: (value: string) => void;
   onSend: (message: string, files: ReferencedFile[], images?: AttachedImage[]) => void;
+  onCanSendChange?: (canSend: boolean) => void;
   isLoading?: boolean;
   isStreaming?: boolean;
   onStop?: () => void;
@@ -45,6 +46,7 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
   value,
   onChange,
   onSend,
+  onCanSendChange,
   isLoading = false,
   isStreaming = false,
   onStop,
@@ -453,6 +455,19 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
     const selected = commandRef.current.querySelector('[data-selected="true"]');
     selected?.scrollIntoView({ block: "nearest" });
   }, [commandIndex, showCommand]);
+
+  // 通知父组件当前是否可发送（用于外部发送按钮）
+  useEffect(() => {
+    if (!onCanSendChange) return;
+    const canSend = Boolean(
+      value.trim() ||
+      referencedFiles.length > 0 ||
+      textSelections.length > 0 ||
+      attachedImages.length > 0 ||
+      activeCommand
+    );
+    onCanSendChange(canSend);
+  }, [onCanSendChange, value, referencedFiles.length, textSelections.length, attachedImages.length, activeCommand]);
 
   return (
     <div

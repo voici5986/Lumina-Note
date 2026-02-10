@@ -118,6 +118,7 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
   const { t } = useLocaleStore();
   
   const [inputValue, setInputValue] = useState("");
+  const [canSend, setCanSend] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<ChatInputRef>(null);
@@ -168,6 +169,14 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
       attachments
     );
   }, [isLoading, isStreaming, sendMessageStream, getCurrentFileInfo]);
+
+  const handlePrimaryAction = useCallback(() => {
+    if (isLoading || isStreaming) {
+      stopStreaming();
+      return;
+    }
+    chatInputRef.current?.send();
+  }, [isLoading, isStreaming, stopStreaming]);
 
   // Preview edit in diff view
   const handlePreviewEdit = useCallback((edit: EditSuggestion) => {
@@ -382,6 +391,7 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
             value={inputValue}
             onChange={setInputValue}
             onSend={handleSendWithFiles}
+            onCanSendChange={setCanSend}
             isLoading={isLoading || isStreaming}
             placeholder={t.ai.inputPlaceholder}
             rows={compact ? 2 : 2}
@@ -412,12 +422,14 @@ export function ChatPanel({ compact = false }: ChatPanelProps) {
                 {isRecording ? <MicOff size={14} className="relative z-10" /> : <Mic size={14} />}
               </button>
               <button
-                onClick={() => (isLoading || isStreaming) ? stopStreaming() : handleSendWithFiles(inputValue, [])}
-                disabled={(!inputValue.trim() && !(isLoading || isStreaming))}
+                onClick={handlePrimaryAction}
+                disabled={!canSend && !(isLoading || isStreaming)}
                 className={`${
                   (isLoading || isStreaming)
                     ? "bg-red-500 hover:bg-red-600 text-white" 
-                    : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                    : canSend
+                      ? "bg-primary hover:bg-primary/90 text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
                 } disabled:opacity-50 rounded p-1.5 transition-colors flex items-center justify-center`}
                 title={(isLoading || isStreaming) ? t.ai.stop : t.ai.send}
               >
