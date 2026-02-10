@@ -93,6 +93,25 @@ Plugin metadata:
 ### `api.ui`
 
 - `notify(message)`
+- `injectStyle(css, scopeId?)`
+- `setThemeVariables(record)`
+
+### `api.vault`
+
+- `getPath()`
+- `readFile(path)`
+- `writeFile(path, content)`
+- `deleteFile(path)`
+- `renameFile(oldPath, newPath)`
+- `moveFile(sourcePath, targetFolder)`
+- `listFiles()`
+
+### `api.metadata`
+
+- `getFileMetadata(path)` returns:
+  - `frontmatter`
+  - `links`
+  - `tags`
 
 ### `api.commands`
 
@@ -102,10 +121,19 @@ Plugin metadata:
 ### `api.workspace`
 
 - `getPath()`
+- `getActiveFile()`
+- `openFile(path)`
 - `readFile(path)`
 - `writeFile(path, content)`
 
-Workspace read/write operations are restricted to the current workspace path.
+Workspace/vault operations are restricted to the current workspace path.
+
+### `api.editor`
+
+- `getActiveFile()`
+- `getActiveContent()`
+- `setActiveContent(next)`
+- `replaceRange(start, end, next)`
 
 ### `api.storage`
 
@@ -123,19 +151,34 @@ Data is namespaced by plugin id in local storage.
 
 - `fetch(input, init)`
 
+### `api.runtime`
+
+- `setInterval(handler, ms)`
+- `clearInterval(id)`
+- `setTimeout(handler, ms)`
+- `clearTimeout(id)`
+
+### `api.interop`
+
+- `openExternal(url)`
+
 ## Permission model
 
 Every sensitive API checks permissions declared in `plugin.json`.
 
-- `commands:register`
-- `events:subscribe`
-- `workspace:read`
-- `workspace:write`
-- `storage:read`
-- `storage:write`
-- `network:fetch`
+- `commands:*` / `commands:register`
+- `events:*` / `events:subscribe`
+- `vault:*` (`vault:read`, `vault:write`, `vault:delete`, `vault:move`, `vault:list`)
+- `metadata:read`
+- `workspace:*` (`workspace:read`, `workspace:open`)
+- `editor:*` (`editor:read`, `editor:write`, `editor:decorate`)
+- `ui:*` (`ui:notify`, `ui:theme`, `ui:decorate`)
+- `storage:*` (`storage:read`, `storage:write`)
+- `network:*` (`network:fetch`)
+- `runtime:*` (`runtime:timer`)
+- `interop:*` (`interop:open-external`)
 
-You can also use `"*"` to allow all capabilities.
+You can also use `"*"` to allow all capabilities. `namespace:*` wildcard is also supported.
 
 ## Plugin manager (UI)
 

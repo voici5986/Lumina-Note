@@ -1,6 +1,15 @@
 import { isAbsolute, join, normalize } from "@/lib/path";
-import { readFile, saveFile, readPluginEntry } from "@/lib/tauri";
+import {
+  deleteFile,
+  listDirectory,
+  moveFile,
+  readFile,
+  readPluginEntry,
+  renameFile,
+  saveFile,
+} from "@/lib/tauri";
 import { useCommandStore } from "@/stores/useCommandStore";
+import { useFileStore } from "@/stores/useFileStore";
 import type { PluginInfo, PluginPermission, PluginRuntimeStatus } from "@/types/plugins";
 
 type PluginHostEvent = "app:ready" | "workspace:changed" | "active-file:changed";
@@ -47,14 +56,40 @@ interface LuminaPluginApi {
   };
   ui: {
     notify: (message: string) => void;
+    injectStyle: (css: string, scopeId?: string) => () => void;
+    setThemeVariables: (variables: Record<string, string>) => () => void;
   };
   commands: {
     registerSlashCommand: (input: SlashCommandInput) => () => void;
   };
-  workspace: {
+  vault: {
     getPath: () => string | null;
     readFile: (path: string) => Promise<string>;
     writeFile: (path: string, content: string) => Promise<void>;
+    deleteFile: (path: string) => Promise<void>;
+    renameFile: (oldPath: string, newPath: string) => Promise<void>;
+    moveFile: (sourcePath: string, targetFolder: string) => Promise<string>;
+    listFiles: () => Promise<string[]>;
+  };
+  metadata: {
+    getFileMetadata: (path: string) => Promise<{
+      frontmatter: Record<string, unknown> | null;
+      links: string[];
+      tags: string[];
+    }>;
+  };
+  workspace: {
+    getPath: () => string | null;
+    getActiveFile: () => string | null;
+    openFile: (path: string) => Promise<void>;
+    readFile: (path: string) => Promise<string>;
+    writeFile: (path: string, content: string) => Promise<void>;
+  };
+  editor: {
+    getActiveFile: () => string | null;
+    getActiveContent: () => string | null;
+    setActiveContent: (next: string) => void;
+    replaceRange: (start: number, end: number, next: string) => void;
   };
   storage: {
     get: (key: string) => string | null;
@@ -67,6 +102,15 @@ interface LuminaPluginApi {
   network: {
     fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
   };
+  runtime: {
+    setInterval: (handler: () => void, ms: number) => number;
+    clearInterval: (id: number) => void;
+    setTimeout: (handler: () => void, ms: number) => number;
+    clearTimeout: (id: number) => void;
+  };
+  interop: {
+    openExternal: (url: string) => void;
+  };
 }
 
 const hasPermission = (permissions: Set<string>, required: string) => {
@@ -75,6 +119,39 @@ const hasPermission = (permissions: Set<string>, required: string) => {
   }
   const [namespace] = required.split(":");
   return permissions.has(`${namespace}:*`);
+};
+
+const withOnce = (fn: () => void) => {
+  let called = false;
+  return () => {
+    if (called) return;
+    called = true;
+    fn();
+  };
+};
+
+const parseFrontmatter = (content: string): Record<string, unknown> | null => {
+  const match = content.match(/^---\n([\s\S]*?)\n---\n?/);
+  if (!match) return null;
+  const lines = match[1].split("\n");
+  const result: Record<string, unknown> = {};
+  for (const line of lines) {
+    const idx = line.indexOf(":");
+    if (idx <= 0) continue;
+    const key = line.slice(0, idx).trim();
+    const value = line.slice(idx + 1).trim();
+    if (key) result[key] = value;
+  }
+  return Object.keys(result).length > 0 ? result : null;
+};
+
+const parseLinksAndTags = (content: string) => {
+  const links = Array.from(content.matchAll(/\[\[([^\]]+)\]\]/g)).map((m) => m[1].trim());
+  const tags = Array.from(content.matchAll(/(^|\s)#([^\s#]+)/g)).map((m) => m[2].trim());
+  return {
+    links: Array.from(new Set(links.filter(Boolean))),
+    tags: Array.from(new Set(tags.filter(Boolean))),
+  };
 };
 
 class PluginRuntime {
@@ -114,13 +191,14 @@ class PluginRuntime {
       try {
         const entry = await readPluginEntry(plugin.id, input.workspacePath);
         const permissions = new Set(entry.info.permissions || []);
-        const api = this.createApi(entry.info, permissions, input.workspacePath);
+        const unsubscribers: Array<() => void> = [];
+        const api = this.createApi(entry.info, permissions, input.workspacePath, unsubscribers);
         const dispose = await this.runPlugin(entry.info, entry.code, api);
         this.loaded.set(plugin.id, {
           info: entry.info,
           signature,
           dispose,
-          unsubscribers: [],
+          unsubscribers,
         });
         statuses[plugin.id] = { enabled: true, loaded: true };
       } catch (err) {
@@ -188,7 +266,8 @@ return exported(api, plugin);
   private createApi(
     info: PluginInfo,
     permissions: Set<string>,
-    workspacePath?: string
+    workspacePath?: string,
+    unsubscribers: Array<() => void> = []
   ): LuminaPluginApi {
     const requirePermission = (permission: PluginPermission) => {
       if (!hasPermission(permissions, permission)) {
@@ -226,12 +305,14 @@ return exported(api, plugin);
       }
       handlers.add(handler);
 
-      return () => {
+      const unsubscribe = withOnce(() => {
         handlers?.delete(handler);
         if (handlers && handlers.size === 0) {
           eventMap?.delete(info.id);
         }
-      };
+      });
+      unsubscribers.push(unsubscribe);
+      return unsubscribe;
     };
 
     const registerSlashCommand = (input: SlashCommandInput) => {
@@ -261,13 +342,17 @@ return exported(api, plugin);
         return { ...state, commands };
       });
 
-      return () => {
+      const unregister = withOnce(() => {
         useCommandStore.setState((state) => ({
           ...state,
           commands: state.commands.filter((cmd) => cmd.id !== id),
         }));
-      };
+      });
+      unsubscribers.push(unregister);
+      return unregister;
     };
+
+    const resolvePluginPath = (path: string) => resolveWorkspacePath(path);
 
     const storageKey = (key: string) => `lumina-plugin:${info.id}:${key}`;
 
@@ -286,6 +371,7 @@ return exported(api, plugin);
       },
       ui: {
         notify: (message: string) => {
+          requirePermission("ui:notify");
           console.info(`[PluginNotify:${info.id}] ${message}`);
           window.dispatchEvent(
             new CustomEvent("lumina-plugin-notify", {
@@ -293,19 +379,139 @@ return exported(api, plugin);
             })
           );
         },
+        injectStyle: (css: string, scopeId?: string) => {
+          requirePermission("ui:decorate");
+          const style = document.createElement("style");
+          style.setAttribute("data-lumina-plugin-style", info.id);
+          if (scopeId) {
+            style.setAttribute("data-lumina-plugin-scope", scopeId);
+          }
+          style.textContent = css;
+          document.head.appendChild(style);
+          const cleanup = withOnce(() => style.remove());
+          unsubscribers.push(cleanup);
+          return cleanup;
+        },
+        setThemeVariables: (variables: Record<string, string>) => {
+          requirePermission("ui:theme");
+          const root = document.documentElement;
+          const previous = new Map<string, string>();
+          for (const [key, value] of Object.entries(variables)) {
+            const varName = key.startsWith("--") ? key : `--${key}`;
+            previous.set(varName, root.style.getPropertyValue(varName));
+            root.style.setProperty(varName, value);
+          }
+          const cleanup = withOnce(() => {
+            for (const [varName, value] of previous.entries()) {
+              if (value) {
+                root.style.setProperty(varName, value);
+              } else {
+                root.style.removeProperty(varName);
+              }
+            }
+          });
+          unsubscribers.push(cleanup);
+          return cleanup;
+        },
       },
       commands: {
         registerSlashCommand,
       },
-      workspace: {
+      vault: {
         getPath: () => workspacePath || null,
         readFile: async (path: string) => {
           requirePermission("vault:read");
-          return readFile(resolveWorkspacePath(path));
+          return readFile(resolvePluginPath(path));
         },
         writeFile: async (path: string, content: string) => {
           requirePermission("vault:write");
-          return saveFile(resolveWorkspacePath(path), content);
+          return saveFile(resolvePluginPath(path), content);
+        },
+        deleteFile: async (path: string) => {
+          requirePermission("vault:delete");
+          return deleteFile(resolvePluginPath(path));
+        },
+        renameFile: async (oldPath: string, newPath: string) => {
+          requirePermission("vault:move");
+          return renameFile(resolvePluginPath(oldPath), resolvePluginPath(newPath));
+        },
+        moveFile: async (sourcePath: string, targetFolder: string) => {
+          requirePermission("vault:move");
+          return moveFile(resolvePluginPath(sourcePath), resolvePluginPath(targetFolder));
+        },
+        listFiles: async () => {
+          requirePermission("vault:list");
+          if (!workspacePath) {
+            throw new Error("No workspace is currently open");
+          }
+          const entries = await listDirectory(workspacePath);
+          const files: string[] = [];
+          const stack = [...entries];
+          while (stack.length > 0) {
+            const next = stack.pop();
+            if (!next) continue;
+            if (next.is_dir && Array.isArray(next.children)) {
+              stack.push(...next.children);
+              continue;
+            }
+            if (!next.is_dir && next.path) {
+              files.push(next.path);
+            }
+          }
+          return files;
+        },
+      },
+      metadata: {
+        getFileMetadata: async (path: string) => {
+          requirePermission("metadata:read");
+          const content = await readFile(resolvePluginPath(path));
+          const frontmatter = parseFrontmatter(content);
+          const { links, tags } = parseLinksAndTags(content);
+          return { frontmatter, links, tags };
+        },
+      },
+      workspace: {
+        getPath: () => workspacePath || null,
+        getActiveFile: () => useFileStore.getState().currentFile,
+        openFile: async (path: string) => {
+          requirePermission("workspace:open");
+          await useFileStore.getState().openFile(resolvePluginPath(path), true, false);
+        },
+        readFile: async (path: string) => {
+          requirePermission("vault:read");
+          return readFile(resolvePluginPath(path));
+        },
+        writeFile: async (path: string, content: string) => {
+          requirePermission("vault:write");
+          return saveFile(resolvePluginPath(path), content);
+        },
+      },
+      editor: {
+        getActiveFile: () => useFileStore.getState().currentFile,
+        getActiveContent: () => {
+          requirePermission("editor:read");
+          const { currentFile, currentContent } = useFileStore.getState();
+          return currentFile ? currentContent : null;
+        },
+        setActiveContent: (next: string) => {
+          requirePermission("editor:write");
+          const store = useFileStore.getState();
+          if (!store.currentFile) {
+            throw new Error("No active file to edit");
+          }
+          store.updateContent(next, "ai", `plugin:${info.id}:set-active-content`);
+        },
+        replaceRange: (start: number, end: number, next: string) => {
+          requirePermission("editor:write");
+          const store = useFileStore.getState();
+          if (!store.currentFile) {
+            throw new Error("No active file to edit");
+          }
+          const safeStart = Math.max(0, Math.min(start, store.currentContent.length));
+          const safeEnd = Math.max(safeStart, Math.min(end, store.currentContent.length));
+          const updated =
+            store.currentContent.slice(0, safeStart) + next + store.currentContent.slice(safeEnd);
+          store.updateContent(updated, "ai", `plugin:${info.id}:replace-range`);
         },
       },
       storage: {
@@ -334,6 +540,34 @@ return exported(api, plugin);
           return fetch(input, init);
         },
       },
+      runtime: {
+        setInterval: (handler: () => void, ms: number) => {
+          requirePermission("runtime:timer");
+          const id = window.setInterval(handler, ms);
+          unsubscribers.push(withOnce(() => window.clearInterval(id)));
+          return id;
+        },
+        clearInterval: (id: number) => {
+          requirePermission("runtime:timer");
+          window.clearInterval(id);
+        },
+        setTimeout: (handler: () => void, ms: number) => {
+          requirePermission("runtime:timer");
+          const id = window.setTimeout(handler, ms);
+          unsubscribers.push(withOnce(() => window.clearTimeout(id)));
+          return id;
+        },
+        clearTimeout: (id: number) => {
+          requirePermission("runtime:timer");
+          window.clearTimeout(id);
+        },
+      },
+      interop: {
+        openExternal: (url: string) => {
+          requirePermission("interop:open-external");
+          window.open(url, "_blank", "noopener,noreferrer");
+        },
+      },
     };
   }
 
@@ -342,6 +576,13 @@ return exported(api, plugin);
       loaded.dispose?.();
     } catch (err) {
       console.error(`[PluginRuntime:${pluginId}] dispose failed`, err);
+    }
+    for (const unsubscribe of loaded.unsubscribers) {
+      try {
+        unsubscribe();
+      } catch (err) {
+        console.error(`[PluginRuntime:${pluginId}] cleanup failed`, err);
+      }
     }
     this.removePluginCommands(pluginId);
     this.removePluginListeners(pluginId);
