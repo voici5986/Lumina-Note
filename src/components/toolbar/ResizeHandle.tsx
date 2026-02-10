@@ -91,6 +91,10 @@ export function ResizeHandle({
 
   const glowAlpha = isDragging ? 0.2 : 0.12;
   const edgeAlpha = isDragging ? 0.08 : 0.05;
+  const hitAreaStyle =
+    direction === "left"
+      ? { left: "-1px", right: "-7px" }
+      : { left: "-7px", right: "-1px" };
 
   return (
     <div
@@ -140,8 +144,9 @@ export function ResizeHandle({
       />
       
       {/* Clickable area - 这是实际的点击区域 */}
-      <div 
-        className="absolute inset-y-0 -left-4 -right-4 cursor-col-resize z-30"
+      <div
+        className="absolute inset-y-0 cursor-col-resize z-30"
+        style={hitAreaStyle}
         onMouseDown={handleMouseDown}
         onDoubleClick={onDoubleClick}
         onMouseEnter={(e) => {
