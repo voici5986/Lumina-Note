@@ -5,6 +5,7 @@ import { useLocaleStore } from "@/stores/useLocaleStore";
 import {
   FileText,
   Network,
+  Puzzle,
   Search,
   Settings,
   Sun,
@@ -21,9 +22,11 @@ import { cn } from "@/lib/utils";
 import { exists } from "@/lib/tauri";
 import { SettingsModal } from "./SettingsModal";
 import { usePluginUiStore } from "@/stores/usePluginUiStore";
+import { InstalledPluginsModal } from "@/components/plugins/InstalledPluginsModal";
 
 export function Ribbon() {
   const [showSettings, setShowSettings] = useState(false);
+  const [showPlugins, setShowPlugins] = useState(false);
   const { t } = useLocaleStore();
   const { isDarkMode, toggleTheme, setRightPanelTab } = useUIStore();
   const {
@@ -253,6 +256,15 @@ export function Ribbon() {
           <Globe size={18} />
         </button>
 
+        {/* Plugins */}
+        <button
+          onClick={() => setShowPlugins(true)}
+          className="w-8 h-8 ui-icon-btn"
+          title="Plugins"
+        >
+          <Puzzle size={18} />
+        </button>
+
         {ribbonItems
           .filter((item) => item.section === "top")
           .sort((a, b) => a.order - b.order)
@@ -311,6 +323,7 @@ export function Ribbon() {
         isOpen={showSettings} 
         onClose={() => setShowSettings(false)} 
       />
+      <InstalledPluginsModal isOpen={showPlugins} onClose={() => setShowPlugins(false)} />
     </div>
   );
 }
