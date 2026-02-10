@@ -6,7 +6,6 @@
 import { useRef, useEffect, useState } from "react";
 import { useUIStore } from "@/stores/useUIStore";
 import { useAIStore } from "@/stores/useAIStore";
-import { useFileStore } from "@/stores/useFileStore";
 import { useRustAgentStore } from "@/stores/useRustAgentStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 
@@ -39,7 +38,6 @@ export function AIFloatingPanel({ ballPosition, onDock }: AIFloatingPanelProps) 
   } = useAIStore();
   // 使用 Rust Agent store
   void useRustAgentStore();
-  useFileStore(); // Hook for store subscription
 
   const [showSettings, setShowSettings] = useState(false);
   const [isDraggingFileOver, setIsDraggingFileOver] = useState(false);
@@ -328,4 +326,3 @@ export function AIFloatingPanel({ ballPosition, onDock }: AIFloatingPanelProps) 
     </div>
   );
 }
-

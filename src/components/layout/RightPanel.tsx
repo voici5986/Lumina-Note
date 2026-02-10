@@ -32,6 +32,7 @@ import { ChatPanel } from "../chat/ChatPanel";
 import { useConversationManager } from "@/hooks/useConversationManager";
 import { CodexPanelSlot } from "@/components/codex/CodexPanelSlot";
 import { ThinkingModelIcon } from "@/components/ai/ThinkingModelIcon";
+import { useShallow } from "zustand/react/shallow";
 
 // Heading item in outline
 interface HeadingItem {
@@ -66,7 +67,12 @@ function formatModelOptionLabel(model: { name: string; supportsThinking?: boolea
 // Backlinks view component
 function BacklinksView() {
   const { t } = useLocaleStore();
-  const { currentFile, openFile } = useFileStore();
+  const { currentFile, openFile } = useFileStore(
+    useShallow((state) => ({
+      currentFile: state.currentFile,
+      openFile: state.openFile,
+    }))
+  );
   const { getBacklinks, isIndexing } = useNoteIndexStore();
   
   const currentFileName = useMemo(() => {
@@ -148,7 +154,7 @@ function BacklinksView() {
 function TagsView() {
   const { t } = useLocaleStore();
   const { allTags, isIndexing } = useNoteIndexStore();
-  const { openFile } = useFileStore();
+  const openFile = useFileStore((state) => state.openFile);
   const [expandedTags, setExpandedTags] = useState<Set<string>>(new Set());
   
   const toggleTag = useCallback((tag: string) => {
@@ -236,7 +242,12 @@ function TagsView() {
 // Outline view component
 function OutlineView() {
   const { t } = useLocaleStore();
-  const { currentContent, currentFile } = useFileStore();
+  const { currentContent, currentFile } = useFileStore(
+    useShallow((state) => ({
+      currentContent: state.currentContent,
+      currentFile: state.currentFile,
+    }))
+  );
   const [expandedLevels, setExpandedLevels] = useState<Set<number>>(new Set([1, 2, 3]));
   
   const headings = useMemo(() => parseHeadings(currentContent), [currentContent]);
@@ -352,13 +363,17 @@ export function RightPanel() {
     setFloatingBallDragging,
     setSkillManagerOpen,
   } = useUIStore();
-  const { tabs, activeTabIndex } = useFileStore();
+  const { tabs, activeTabIndex } = useFileStore(
+    useShallow((state) => ({
+      tabs: state.tabs,
+      activeTabIndex: state.activeTabIndex,
+    }))
+  );
   const { 
     config,
     setConfig,
     checkFirstLoad: checkChatFirstLoad,
   } = useAIStore();
-  useFileStore(); // Hook needed for store subscription
   const { 
     config: ragConfig, 
     setConfig: setRAGConfig, 

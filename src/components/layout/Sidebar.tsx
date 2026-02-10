@@ -50,8 +50,37 @@ interface CreatingState {
 
 export function Sidebar() {
   const { t, locale } = useLocaleStore();
-  const { vaultPath, fileTree, currentFile, openFile, refreshFileTree, isLoadingTree, closeFile, openDatabaseTab, openPDFTab, tabs, activeTabIndex } =
-    useFileStore();
+  const {
+    vaultPath,
+    fileTree,
+    currentFile,
+    openFile,
+    refreshFileTree,
+    isLoadingTree,
+    closeFile,
+    openDatabaseTab,
+    openPDFTab,
+    tabs,
+    activeTabIndex,
+    moveFileToFolder,
+    moveFolderToFolder,
+  } = useFileStore(
+    useShallow((state) => ({
+      vaultPath: state.vaultPath,
+      fileTree: state.fileTree,
+      currentFile: state.currentFile,
+      openFile: state.openFile,
+      refreshFileTree: state.refreshFileTree,
+      isLoadingTree: state.isLoadingTree,
+      closeFile: state.closeFile,
+      openDatabaseTab: state.openDatabaseTab,
+      openPDFTab: state.openPDFTab,
+      tabs: state.tabs,
+      activeTabIndex: state.activeTabIndex,
+      moveFileToFolder: state.moveFileToFolder,
+      moveFolderToFolder: state.moveFolderToFolder,
+    }))
+  );
   const { config: ragConfig, isIndexing: ragIsIndexing, indexStatus, rebuildIndex, cancelIndex } = useRAGStore();
   const { setRightPanelTab, splitView } = useUIStore();
   const { activePane, openSecondaryFile, openSecondaryPdf } = useSplitStore();
@@ -142,9 +171,6 @@ export function Sidebar() {
 
   // 当前是否激活了 AI 主对话标签
   const isAIMainActive = tabs[activeTabIndex]?.type === "ai-chat";
-
-  // 获取 store 的移动方法
-  const { moveFileToFolder, moveFolderToFolder } = useFileStore();
 
   // 监听根目录放置
   useEffect(() => {
@@ -1030,7 +1056,12 @@ function FileTreeItem({
 }: FileTreeItemProps) {
   const { t } = useLocaleStore();
   const [isDragOver, setIsDragOver] = useState(false);
-  const { moveFileToFolder, moveFolderToFolder } = useFileStore();
+  const { moveFileToFolder, moveFolderToFolder } = useFileStore(
+    useShallow((state) => ({
+      moveFileToFolder: state.moveFileToFolder,
+      moveFolderToFolder: state.moveFolderToFolder,
+    }))
+  );
   
   const isExpanded = expandedPaths.has(entry.path);
   const isActive = currentFile === entry.path;
