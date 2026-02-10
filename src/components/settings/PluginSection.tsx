@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { usePluginStore } from "@/stores/usePluginStore";
 import { useFileStore } from "@/stores/useFileStore";
 import { showInExplorer } from "@/lib/tauri";
@@ -26,10 +26,6 @@ export function PluginSection() {
     isolatePluginStyles,
   } = usePluginStore();
   const [busyAction, setBusyAction] = useState<string | null>(null);
-
-  useEffect(() => {
-    void loadPlugins(vaultPath || undefined);
-  }, [vaultPath, loadPlugins]);
 
   const grouped = useMemo(() => {
     const groups: Record<string, typeof plugins> = {};
