@@ -78,34 +78,76 @@ pub struct PluginEntry {
 
 fn plugin_roots(app: &AppHandle, workspace_path: Option<&str>) -> Vec<(String, PathBuf)> {
     let mut roots = Vec::new();
+    let mut seen = HashSet::<String>::new();
+    let mut push_root = |source: &str, root: PathBuf| {
+        let key = root.to_string_lossy().to_string();
+        if seen.insert(key) {
+            roots.push((source.to_string(), root));
+        }
+    };
+
+    if let Ok(global_root) = default_plugin_dir(app) {
+        if global_root.exists() {
+            push_root("global", global_root);
+        }
+    }
 
     if let Some(workspace) = workspace_path {
         let workspace_root = Path::new(workspace).join(".lumina").join("plugins");
         if workspace_root.exists() {
-            roots.push(("workspace".to_string(), workspace_root));
+            push_root("workspace", workspace_root);
         }
     }
 
     if let Ok(app_data_dir) = app.path().app_data_dir() {
         let user_root = app_data_dir.join("plugins");
         if user_root.exists() {
-            roots.push(("user".to_string(), user_root));
+            push_root("user", user_root);
         }
     }
 
     if let Ok(resource_dir) = app.path().resource_dir() {
         let direct = resource_dir.join("plugins");
         if direct.exists() {
-            roots.push(("builtin".to_string(), direct));
+            push_root("builtin", direct);
         } else {
             let nested = resource_dir.join("resources").join("plugins");
             if nested.exists() {
-                roots.push(("builtin".to_string(), nested));
+                push_root("builtin", nested);
             }
         }
     }
 
     roots
+}
+
+fn default_plugin_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let (Some(exe_dir), Some(app_contents)) =
+            (exe_path.parent(), exe_path.parent().and_then(Path::parent))
+        {
+            if app_contents.file_name().and_then(|name| name.to_str()) == Some("Contents") {
+                if let Some(app_bundle) = app_contents.parent() {
+                    if let Some(install_dir) = app_bundle.parent() {
+                        return Ok(install_dir.join("lumina-plugins"));
+                    }
+                }
+            }
+            return Ok(exe_dir.join("plugins"));
+        }
+    }
+
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        if let Some(parent) = resource_dir.parent() {
+            return Ok(parent.join("plugins"));
+        }
+    }
+
+    if let Ok(app_data_dir) = app.path().app_data_dir() {
+        return Ok(app_data_dir.join("plugins"));
+    }
+
+    Err("Unable to resolve default plugin directory".to_string())
 }
 
 fn read_manifest(path: &Path) -> Result<PluginManifestRaw, String> {
@@ -422,8 +464,8 @@ fn read_plugin_entry_from_roots(
     Err(format!("Plugin not found: {}", plugin_id))
 }
 
-fn ensure_workspace_plugin_dir(workspace_path: &str) -> Result<PathBuf, String> {
-    let plugin_dir = Path::new(workspace_path).join(".lumina").join("plugins");
+fn ensure_default_plugin_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let plugin_dir = default_plugin_dir(app)?;
     fs::create_dir_all(&plugin_dir)
         .map_err(|e| format!("Failed to create {}: {}", plugin_dir.display(), e))?;
     Ok(plugin_dir)
@@ -722,30 +764,42 @@ pub async fn plugin_read_entry(
 }
 
 #[tauri::command]
-pub async fn plugin_get_workspace_dir(workspace_path: String) -> Result<String, String> {
-    let dir = ensure_workspace_plugin_dir(&workspace_path)?;
+pub async fn plugin_get_workspace_dir(
+    app: AppHandle,
+    _workspace_path: Option<String>,
+) -> Result<String, String> {
+    let dir = ensure_default_plugin_dir(&app)?;
     Ok(dir.to_string_lossy().to_string())
 }
 
 #[tauri::command]
-pub async fn plugin_scaffold_example(workspace_path: String) -> Result<String, String> {
-    let plugins_dir = ensure_workspace_plugin_dir(&workspace_path)?;
+pub async fn plugin_scaffold_example(
+    app: AppHandle,
+    _workspace_path: Option<String>,
+) -> Result<String, String> {
+    let plugins_dir = ensure_default_plugin_dir(&app)?;
     let example_dir = plugins_dir.join("hello-lumina");
     write_example_plugin(&example_dir)?;
     Ok(example_dir.to_string_lossy().to_string())
 }
 
 #[tauri::command]
-pub async fn plugin_scaffold_theme(workspace_path: String) -> Result<String, String> {
-    let plugins_dir = ensure_workspace_plugin_dir(&workspace_path)?;
+pub async fn plugin_scaffold_theme(
+    app: AppHandle,
+    _workspace_path: Option<String>,
+) -> Result<String, String> {
+    let plugins_dir = ensure_default_plugin_dir(&app)?;
     let dir = plugins_dir.join("theme-oceanic");
     write_theme_plugin(&dir)?;
     Ok(dir.to_string_lossy().to_string())
 }
 
 #[tauri::command]
-pub async fn plugin_scaffold_ui_overhaul(workspace_path: String) -> Result<String, String> {
-    let plugins_dir = ensure_workspace_plugin_dir(&workspace_path)?;
+pub async fn plugin_scaffold_ui_overhaul(
+    app: AppHandle,
+    _workspace_path: Option<String>,
+) -> Result<String, String> {
+    let plugins_dir = ensure_default_plugin_dir(&app)?;
     let dir = plugins_dir.join("ui-overhaul-lab");
     write_ui_overhaul_plugin(&dir)?;
     Ok(dir.to_string_lossy().to_string())

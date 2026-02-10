@@ -4,7 +4,7 @@ import { useFileStore } from "@/stores/useFileStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 import { showInExplorer } from "@/lib/tauri";
 
-const SOURCE_ORDER = ["workspace", "user", "builtin"];
+const SOURCE_ORDER = ["global", "workspace", "user", "builtin"];
 
 export function PluginSection() {
   const { t } = useLocaleStore();
@@ -40,6 +40,7 @@ export function PluginSection() {
   }, [plugins]);
 
   const sourceLabel = (source: string) => {
+    if (source === "global") return t.plugins.sourceGlobal;
     if (source === "workspace") return t.plugins.sourceWorkspace;
     if (source === "user") return t.plugins.sourceUser;
     if (source === "builtin") return t.plugins.sourceBuiltin;
@@ -54,10 +55,9 @@ export function PluginSection() {
   };
 
   const handleOpenWorkspacePluginDir = async () => {
-    if (!vaultPath) return;
     try {
       setBusyAction("open-dir");
-      const dir = await ensureWorkspacePluginDir(vaultPath);
+      const dir = await ensureWorkspacePluginDir();
       await showInExplorer(dir);
     } finally {
       setBusyAction(null);
@@ -65,10 +65,9 @@ export function PluginSection() {
   };
 
   const handleScaffold = async () => {
-    if (!vaultPath) return;
     try {
       setBusyAction("scaffold");
-      const dir = await scaffoldExamplePlugin(vaultPath);
+      const dir = await scaffoldExamplePlugin();
       await showInExplorer(dir);
     } finally {
       setBusyAction(null);
@@ -76,10 +75,9 @@ export function PluginSection() {
   };
 
   const handleScaffoldTheme = async () => {
-    if (!vaultPath) return;
     try {
       setBusyAction("scaffold-theme");
-      const dir = await scaffoldThemePlugin(vaultPath);
+      const dir = await scaffoldThemePlugin();
       await showInExplorer(dir);
     } finally {
       setBusyAction(null);
@@ -87,10 +85,9 @@ export function PluginSection() {
   };
 
   const handleScaffoldUiOverhaul = async () => {
-    if (!vaultPath) return;
     try {
       setBusyAction("scaffold-ui-overhaul");
-      const dir = await scaffoldUiOverhaulPlugin(vaultPath);
+      const dir = await scaffoldUiOverhaulPlugin();
       await showInExplorer(dir);
     } finally {
       setBusyAction(null);
@@ -145,7 +142,7 @@ export function PluginSection() {
         <button
           type="button"
           onClick={handleOpenWorkspacePluginDir}
-          disabled={!vaultPath || busyAction === "open-dir"}
+          disabled={busyAction === "open-dir"}
           className="h-9 px-3 rounded-lg text-sm font-medium border border-border bg-background/60 hover:bg-muted disabled:opacity-50"
         >
           {t.plugins.openWorkspaceFolder}
@@ -153,7 +150,7 @@ export function PluginSection() {
         <button
           type="button"
           onClick={handleScaffold}
-          disabled={!vaultPath || busyAction === "scaffold"}
+          disabled={busyAction === "scaffold"}
           className="h-9 px-3 rounded-lg text-sm font-medium border border-border bg-background/60 hover:bg-muted disabled:opacity-50"
         >
           {t.plugins.scaffoldExample}
@@ -161,7 +158,7 @@ export function PluginSection() {
         <button
           type="button"
           onClick={handleScaffoldTheme}
-          disabled={!vaultPath || busyAction === "scaffold-theme"}
+          disabled={busyAction === "scaffold-theme"}
           className="h-9 px-3 rounded-lg text-sm font-medium border border-border bg-background/60 hover:bg-muted disabled:opacity-50"
         >
           {t.plugins.scaffoldTheme}
@@ -169,7 +166,7 @@ export function PluginSection() {
         <button
           type="button"
           onClick={handleScaffoldUiOverhaul}
-          disabled={!vaultPath || busyAction === "scaffold-ui-overhaul"}
+          disabled={busyAction === "scaffold-ui-overhaul"}
           className="h-9 px-3 rounded-lg text-sm font-medium border border-border bg-background/60 hover:bg-muted disabled:opacity-50"
         >
           {t.plugins.scaffoldUiOverhaul}

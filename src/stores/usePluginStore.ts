@@ -22,10 +22,10 @@ interface PluginStoreState {
   loadPlugins: (workspacePath?: string) => Promise<void>;
   reloadPlugins: (workspacePath?: string) => Promise<void>;
   setPluginEnabled: (pluginId: string, enabled: boolean, workspacePath?: string) => Promise<void>;
-  ensureWorkspacePluginDir: (workspacePath: string) => Promise<string>;
-  scaffoldExamplePlugin: (workspacePath: string) => Promise<string>;
-  scaffoldThemePlugin: (workspacePath: string) => Promise<string>;
-  scaffoldUiOverhaulPlugin: (workspacePath: string) => Promise<string>;
+  ensureWorkspacePluginDir: () => Promise<string>;
+  scaffoldExamplePlugin: () => Promise<string>;
+  scaffoldThemePlugin: () => Promise<string>;
+  scaffoldUiOverhaulPlugin: () => Promise<string>;
   setAppearanceSafeMode: (enabled: boolean, workspacePath?: string) => Promise<void>;
   isolatePluginStyles: () => void;
 }
@@ -121,25 +121,25 @@ export const usePluginStore = create<PluginStoreState>()(
         set({ runtimeStatus });
       },
 
-      ensureWorkspacePluginDir: async (workspacePath: string) => {
-        const dir = await getWorkspacePluginDir(workspacePath);
+      ensureWorkspacePluginDir: async () => {
+        const dir = await getWorkspacePluginDir();
         set({ workspacePluginDir: dir });
         return dir;
       },
 
-      scaffoldExamplePlugin: async (workspacePath: string) => {
-        const dir = await scaffoldWorkspaceExamplePlugin(workspacePath);
-        await get().loadPlugins(workspacePath);
+      scaffoldExamplePlugin: async () => {
+        const dir = await scaffoldWorkspaceExamplePlugin();
+        await get().loadPlugins();
         return dir;
       },
-      scaffoldThemePlugin: async (workspacePath: string) => {
-        const dir = await scaffoldWorkspaceThemePlugin(workspacePath);
-        await get().loadPlugins(workspacePath);
+      scaffoldThemePlugin: async () => {
+        const dir = await scaffoldWorkspaceThemePlugin();
+        await get().loadPlugins();
         return dir;
       },
-      scaffoldUiOverhaulPlugin: async (workspacePath: string) => {
-        const dir = await scaffoldWorkspaceUiOverhaulPlugin(workspacePath);
-        await get().loadPlugins(workspacePath);
+      scaffoldUiOverhaulPlugin: async () => {
+        const dir = await scaffoldWorkspaceUiOverhaulPlugin();
+        await get().loadPlugins();
         return dir;
       },
       setAppearanceSafeMode: async (enabled: boolean, workspacePath?: string) => {

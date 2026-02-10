@@ -458,20 +458,20 @@ export async function readPluginEntry(
   return invoke("plugin_read_entry", { pluginId, workspacePath });
 }
 
-export async function getWorkspacePluginDir(workspacePath: string): Promise<string> {
-  return invoke("plugin_get_workspace_dir", { workspacePath });
+export async function getWorkspacePluginDir(): Promise<string> {
+  return invoke("plugin_get_workspace_dir");
 }
 
-export async function scaffoldWorkspaceExamplePlugin(workspacePath: string): Promise<string> {
-  return invoke("plugin_scaffold_example", { workspacePath });
+export async function scaffoldWorkspaceExamplePlugin(): Promise<string> {
+  return invoke("plugin_scaffold_example");
 }
 
-export async function scaffoldWorkspaceThemePlugin(workspacePath: string): Promise<string> {
-  return invoke("plugin_scaffold_theme", { workspacePath });
+export async function scaffoldWorkspaceThemePlugin(): Promise<string> {
+  return invoke("plugin_scaffold_theme");
 }
 
-export async function scaffoldWorkspaceUiOverhaulPlugin(workspacePath: string): Promise<string> {
-  return invoke("plugin_scaffold_ui_overhaul", { workspacePath });
+export async function scaffoldWorkspaceUiOverhaulPlugin(): Promise<string> {
+  return invoke("plugin_scaffold_ui_overhaul");
 }
 
 // ============ Doc tools ============
