@@ -12,6 +12,11 @@
       "dmg",
       "app"
     ],
+    "windows": {
+      "nsis": {
+        "installMode": "both"
+      }
+    },
     "resources": [
       "resources/node/*",
       "resources/skills/**/*",
