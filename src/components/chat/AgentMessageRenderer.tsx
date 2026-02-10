@@ -542,7 +542,7 @@ export const AgentMessageRenderer = memo(function AgentMessageRenderer({
   });
 
   const { pendingDiff, setPendingDiff, clearPendingEdits, diffResolver } = useAIStore();
-  const { openFile } = useFileStore();
+  const openFile = useFileStore((state) => state.openFile);
   const { t } = useLocaleStore();
 
   const handleAcceptDiff = useCallback(async () => {

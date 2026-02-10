@@ -56,7 +56,7 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
   enableSlashCommands = true,
 }, ref) => {
   const { t } = useLocaleStore();
-  const { fileTree } = useFileStore();
+  const fileTree = useFileStore((state) => state.fileTree);
   const defaultPlaceholder = placeholder || t.ai.inputPlaceholder;
   const { textSelections, removeTextSelection, clearTextSelections } = useAIStore();
   const [showMention, setShowMention] = useState(false);
