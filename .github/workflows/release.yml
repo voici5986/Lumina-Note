@@ -32,10 +32,18 @@ jobs:
         with:
           node-version: lts/*
 
-      - name: Install Rust stable
+      - name: Install Rust stable (with target)
+        if: matrix.rust_target != ''
         uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: stable
           targets: ${{ matrix.rust_target }}
+
+      - name: Install Rust stable
+        if: matrix.rust_target == ''
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
 
       - name: Install frontend dependencies
         run: npm ci
