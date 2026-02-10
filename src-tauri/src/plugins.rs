@@ -91,6 +91,11 @@ fn plugin_roots(app: &AppHandle, workspace_path: Option<&str>) -> Vec<(String, P
             push_root("global", global_root);
         }
     }
+    if let Ok(global_fallback_root) = fallback_plugin_dir(app) {
+        if global_fallback_root.exists() {
+            push_root("global", global_fallback_root);
+        }
+    }
 
     if let Some(workspace) = workspace_path {
         let workspace_root = Path::new(workspace).join(".lumina").join("plugins");
@@ -148,6 +153,13 @@ fn default_plugin_dir(app: &AppHandle) -> Result<PathBuf, String> {
     }
 
     Err("Unable to resolve default plugin directory".to_string())
+}
+
+fn fallback_plugin_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map(|dir| dir.join("global-plugins"))
+        .map_err(|e| format!("Unable to resolve fallback plugin directory: {}", e))
 }
 
 fn read_manifest(path: &Path) -> Result<PluginManifestRaw, String> {
@@ -465,10 +477,37 @@ fn read_plugin_entry_from_roots(
 }
 
 fn ensure_default_plugin_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    let plugin_dir = default_plugin_dir(app)?;
-    fs::create_dir_all(&plugin_dir)
-        .map_err(|e| format!("Failed to create {}: {}", plugin_dir.display(), e))?;
-    Ok(plugin_dir)
+    let primary = default_plugin_dir(app)?;
+    match ensure_writable_plugin_dir(&primary) {
+        Ok(()) => Ok(primary),
+        Err(primary_err) => {
+            let fallback = fallback_plugin_dir(app)?;
+            if fallback != primary {
+                if ensure_writable_plugin_dir(&fallback).is_ok() {
+                    eprintln!(
+                        "[Plugins] Primary plugin dir is not writable ({}), fallback to {}",
+                        primary_err,
+                        fallback.display()
+                    );
+                    return Ok(fallback);
+                }
+            }
+            Err(format!(
+                "Failed to prepare plugin dir. primary={} error={}",
+                primary.display(),
+                primary_err
+            ))
+        }
+    }
+}
+
+fn ensure_writable_plugin_dir(dir: &Path) -> Result<(), String> {
+    fs::create_dir_all(dir).map_err(|e| format!("Failed to create {}: {}", dir.display(), e))?;
+    let probe = dir.join(".lumina-plugin-write-probe");
+    fs::write(&probe, b"probe")
+        .map_err(|e| format!("Directory is not writable {}: {}", dir.display(), e))?;
+    let _ = fs::remove_file(probe);
+    Ok(())
 }
 
 fn write_example_plugin(plugin_dir: &Path) -> Result<(), String> {
