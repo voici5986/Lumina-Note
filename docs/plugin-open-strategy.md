@@ -29,6 +29,7 @@ Lumina 插件生态的目标是：
   - 访问当前活动视图/文件。
   - 注册自定义视图、面板、标签页。
   - 响应布局与激活变化。
+  - 建议细分：`workspace:open`、`workspace:panel`、`workspace:tab`。
 - `editor:*`
   - 获取选区与光标。
   - 文本变更（插入、替换）。

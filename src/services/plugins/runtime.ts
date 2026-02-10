@@ -606,7 +606,7 @@ return exported(api, plugin);
     const resolvePluginPath = (path: string) => resolveWorkspacePath(path);
 
     const registerPanel = (panel: { id: string; title: string; html: string }) => {
-      requirePermission("workspace:*");
+      requirePermission("workspace:panel");
       const panelId = panel.id.trim();
       if (!panelId) {
         throw new Error("Panel id cannot be empty");
@@ -629,7 +629,7 @@ return exported(api, plugin);
       title: string;
       render: (payload: Record<string, unknown>) => string;
     }) => {
-      requirePermission("workspace:*");
+      requirePermission("workspace:tab");
       const type = input.type.trim();
       if (!type) {
         throw new Error("Tab type cannot be empty");
@@ -648,7 +648,7 @@ return exported(api, plugin);
     };
 
     const openRegisteredTab = (type: string, payload: Record<string, unknown> = {}) => {
-      requirePermission("workspace:*");
+      requirePermission("workspace:tab");
       const scopedType = `${info.id}:${type.trim()}`;
       const def = this.pluginTabTypes.get(scopedType);
       if (!def) {

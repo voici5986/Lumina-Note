@@ -185,6 +185,7 @@ Every sensitive API checks permissions declared in `plugin.json`.
 - `vault:*` (`vault:read`, `vault:write`, `vault:delete`, `vault:move`, `vault:list`)
 - `metadata:read`
 - `workspace:*` (`workspace:read`, `workspace:open`)
+- `workspace:*` (`workspace:read`, `workspace:open`, `workspace:panel`, `workspace:tab`)
 - `editor:*` (`editor:read`, `editor:write`, `editor:decorate`)
 - `ui:*` (`ui:notify`, `ui:theme`, `ui:decorate`)
 - `storage:*` (`storage:read`, `storage:write`)

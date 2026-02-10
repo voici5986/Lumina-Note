@@ -12,7 +12,9 @@
     "events:*",
     "storage:*",
     "ui:*",
-    "runtime:*"
+    "runtime:*",
+    "workspace:panel",
+    "workspace:tab"
   ],
   "enabled_by_default": false,
   "is_desktop_only": false

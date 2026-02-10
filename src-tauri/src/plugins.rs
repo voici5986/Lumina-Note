@@ -412,7 +412,9 @@ fn write_example_plugin(plugin_dir: &Path) -> Result<(), String> {
     "events:*",
     "storage:*",
     "ui:*",
-    "runtime:*"
+    "runtime:*",
+    "workspace:panel",
+    "workspace:tab"
   ],
   "enabled_by_default": true,
   "is_desktop_only": false

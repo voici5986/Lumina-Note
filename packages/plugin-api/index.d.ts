@@ -14,6 +14,8 @@ export type LuminaPluginPermission =
   | "workspace:*"
   | "workspace:read"
   | "workspace:open"
+  | "workspace:panel"
+  | "workspace:tab"
   | "editor:*"
   | "editor:read"
   | "editor:write"
