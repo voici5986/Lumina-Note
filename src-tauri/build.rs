@@ -2,6 +2,12 @@ use std::fs;
 use std::path::Path;
 
 fn main() {
+    // Ensure Cargo reruns build script when plugin/resources directories change,
+    // including newly added files.
+    println!("cargo:rerun-if-changed=resources/plugins");
+    println!("cargo:rerun-if-changed=resources/skills");
+    println!("cargo:rerun-if-changed=resources/node");
+
     // tauri-build >=2.5 expects `DEP_TAURI_DEV` to be set via a dependency build script.
     // In some environments (e.g. running `cargo test` directly), it may be missing.
     // Fall back to Cargo's `PROFILE` so builds don't panic during the build script.
