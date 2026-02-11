@@ -55,6 +55,7 @@ export default {
     search: '検索',
     graph: 'グラフ',
     newNote: '新規ノート',
+    newDiagram: '新規図',
     newFolder: '新規フォルダ',
     refresh: '更新',
     toggleSidebar: 'サイドバーを切替',

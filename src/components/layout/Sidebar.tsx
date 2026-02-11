@@ -45,9 +45,22 @@ interface ContextMenuState {
 
 // 新建模式状态
 interface CreatingState {
-  type: "file" | "folder";
+  type: "file" | "folder" | "diagram";
   parentPath: string;
 }
+
+const EMPTY_DIAGRAM_CONTENT = `${JSON.stringify(
+  {
+    type: "excalidraw",
+    version: 2,
+    source: "https://lumina-note.app",
+    elements: [],
+    appState: {},
+    files: {},
+  },
+  null,
+  2,
+)}\n`;
 
 export function Sidebar() {
   const { t, locale } = useLocaleStore();
@@ -372,11 +385,24 @@ export function Sidebar() {
         const lastIndex = p.lastIndexOf(sep);
         return lastIndex > 0 ? p.substring(0, lastIndex) : null;
       };
+      const findEntryByPath = (entries: FileEntry[], targetPath: string): FileEntry | null => {
+        for (const entry of entries) {
+          if (entry.path === targetPath) return entry;
+          if (entry.is_dir && entry.children?.length) {
+            const found = findEntryByPath(entry.children, targetPath);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
 
       // 2. 选中项：如果是文件夹直接用，如果是文件取父目录
       if (selectedPath) {
-        // 判断选中的是文件还是文件夹（简单判断：有 .md 后缀是文件）
-        if (selectedPath.toLowerCase().endsWith(".md")) {
+        const selectedEntry = findEntryByPath(fileTree, selectedPath);
+        if (selectedEntry) {
+          return selectedEntry.is_dir ? selectedPath : getParentDir(selectedPath);
+        }
+        if (/\.[^/\\]+$/.test(selectedPath)) {
           return getParentDir(selectedPath);
         }
         return selectedPath;
@@ -390,7 +416,7 @@ export function Sidebar() {
       // 4. 退回 vault 根目录
       return vaultPath;
     },
-    [selectedPath, currentFile, vaultPath]
+    [selectedPath, currentFile, vaultPath, fileTree]
   );
 
   // 展开指定路径的所有父文件夹
@@ -437,6 +463,19 @@ export function Sidebar() {
     setCreateValue("");
   }, [getBasePath, expandToPath]);
 
+  // Handle new diagram - VS Code 风格
+  const handleNewDiagram = useCallback((parentPath?: string) => {
+    const basePath = getBasePath(parentPath);
+    if (!basePath) return;
+
+    // 展开父文件夹
+    expandToPath(basePath);
+
+    // 进入新建模式
+    setCreating({ type: "diagram", parentPath: basePath });
+    setCreateValue("");
+  }, [getBasePath, expandToPath]);
+
   // 确认创建（用户按 Enter）
   const handleCreateSubmit = useCallback(async () => {
     if (!creating || !createValue.trim()) {
@@ -448,14 +487,21 @@ export function Sidebar() {
     const sep = creating.parentPath.includes("\\") ? "\\" : "/";
     
     // 构建完整路径
-    const fullPath = creating.type === "file"
-      ? `${creating.parentPath}${sep}${trimmed}${trimmed.endsWith(".md") ? "" : ".md"}`
-      : `${creating.parentPath}${sep}${trimmed}`;
+    const fullPath =
+      creating.type === "folder"
+        ? `${creating.parentPath}${sep}${trimmed}`
+        : creating.type === "diagram"
+          ? `${creating.parentPath}${sep}${trimmed}${
+              trimmed.endsWith(".diagram.json") || trimmed.endsWith(".excalidraw.json")
+                ? ""
+                : ".diagram.json"
+            }`
+          : `${creating.parentPath}${sep}${trimmed}${trimmed.endsWith(".md") ? "" : ".md"}`;
 
     // 检查是否已存在
     try {
       if (await exists(fullPath)) {
-        alert(`${creating.type === "file" ? t.file.fileExists : t.file.folderExists}: ${trimmed}`);
+        alert(`${creating.type === "folder" ? t.file.folderExists : t.file.fileExists}: ${trimmed}`);
         return;
       }
     } catch {
@@ -467,17 +513,27 @@ export function Sidebar() {
         await createFile(fullPath);
         await refreshFileTree();
         openFile(fullPath);
+      } else if (creating.type === "diagram") {
+        await saveFile(fullPath, EMPTY_DIAGRAM_CONTENT);
+        await refreshFileTree();
+        openDiagramTab(fullPath);
       } else {
         await createDir(fullPath);
         await refreshFileTree();
       }
     } catch (error) {
       console.error("Create failed:", error);
-      alert(`${t.file.createFailed}: ${creating.type === "file" ? t.sidebar.newNote : t.sidebar.newFolder}`);
+      const targetLabel =
+        creating.type === "folder"
+          ? t.sidebar.newFolder
+          : creating.type === "diagram"
+            ? t.sidebar.newDiagram
+            : t.sidebar.newNote;
+      alert(`${t.file.createFailed}: ${targetLabel}`);
     }
 
     setCreating(null);
-  }, [creating, createValue, refreshFileTree, openFile]);
+  }, [creating, createValue, openDiagramTab, openFile, refreshFileTree, t.file.createFailed, t.file.fileExists, t.file.folderExists, t.sidebar.newDiagram, t.sidebar.newFolder, t.sidebar.newNote]);
 
   // 取消创建
   const handleCreateCancel = useCallback(() => {
@@ -491,6 +547,11 @@ export function Sidebar() {
     
     if (entry.is_dir) {
       items.push(menuItems.newFile(() => handleNewFile(entry.path)));
+      items.push({
+        label: t.sidebar.newDiagram,
+        icon: <Shapes size={14} />,
+        onClick: () => handleNewDiagram(entry.path),
+      });
       items.push(menuItems.newFolder(() => handleNewFolder(entry.path)));
     }
 
@@ -509,7 +570,7 @@ export function Sidebar() {
     items.push(menuItems.delete(() => handleDelete(entry)));
     
     return items;
-  }, [handleNewFile, handleNewFolder, handleCopyPath, handleShowInExplorer, handleStartRename, handleDelete, isFavorite, toggleFavorite, t.favorites.add, t.favorites.remove]);
+  }, [handleCopyPath, handleDelete, handleNewDiagram, handleNewFile, handleNewFolder, handleShowInExplorer, handleStartRename, isFavorite, t.favorites.add, t.favorites.remove, t.sidebar.newDiagram, toggleFavorite]);
 
   // 切换文件夹展开状态
   const toggleExpanded = useCallback((path: string) => {
@@ -592,6 +653,13 @@ export function Sidebar() {
             title={t.sidebar.newNote}
           >
             <FilePlus className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => handleNewDiagram()}
+            className="w-7 h-7 ui-icon-btn"
+            title={t.sidebar.newDiagram}
+          >
+            <Shapes className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => handleNewFolder()}
@@ -961,7 +1029,7 @@ export function Sidebar() {
 
 // 新建输入框组件
 interface CreateInputRowProps {
-  type: "file" | "folder";
+  type: "file" | "folder" | "diagram";
   value: string;
   onChange: (value: string) => void;
   onSubmit: () => void;
@@ -989,6 +1057,8 @@ function CreateInputRow({ type, value, onChange, onSubmit, onCancel, level }: Cr
     >
       {type === "folder" ? (
         <Folder className="w-4 h-4 text-muted-foreground shrink-0" />
+      ) : type === "diagram" ? (
+        <Shapes className="w-4 h-4 text-cyan-500 shrink-0" />
       ) : (
         <File className="w-4 h-4 text-muted-foreground shrink-0" />
       )}
@@ -1008,10 +1078,11 @@ function CreateInputRow({ type, value, onChange, onSubmit, onCancel, level }: Cr
         }}
         onKeyDown={handleKeyDown}
         autoFocus
-        placeholder={type === "file" ? t.file.fileNamePlaceholder : t.file.folderNamePlaceholder}
+        placeholder={type === "folder" ? t.file.folderNamePlaceholder : t.file.fileNamePlaceholder}
         className="flex-1 ui-input h-6 px-1.5 border-transparent bg-transparent focus-visible:border-primary/40 focus-visible:ring-1 focus-visible:ring-primary/30"
       />
       {type === "file" && <span className="text-muted-foreground text-sm">.md</span>}
+      {type === "diagram" && <span className="text-muted-foreground text-sm">.diagram.json</span>}
     </div>
   );
 }

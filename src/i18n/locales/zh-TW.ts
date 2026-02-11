@@ -55,6 +55,7 @@ export default {
     search: '搜尋',
     graph: '圖譜',
     newNote: '新增筆記',
+    newDiagram: '新增圖表',
     newFolder: '新增資料夾',
     refresh: '重新整理',
     toggleSidebar: '切換側邊欄',

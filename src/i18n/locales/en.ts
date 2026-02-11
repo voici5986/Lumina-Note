@@ -55,6 +55,7 @@ export default {
     search: 'Search',
     graph: 'Graph',
     newNote: 'New Note',
+    newDiagram: 'New Diagram',
     newFolder: 'New Folder',
     refresh: 'Refresh',
     toggleSidebar: 'Toggle Sidebar',

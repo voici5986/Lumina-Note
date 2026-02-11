@@ -55,6 +55,7 @@ export default {
     search: '搜索',
     graph: '图谱',
     newNote: '新建笔记',
+    newDiagram: '新建图表',
     newFolder: '新建文件夹',
     refresh: '刷新',
     toggleSidebar: '切换侧边栏',
