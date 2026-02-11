@@ -2034,37 +2034,30 @@ export function MainAIChatShell() {
                   </div>
                 </div>
 
-                {supportsThinkingMode && (
-                  <div className="px-4 pb-2 pt-0.5">
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs text-muted-foreground whitespace-nowrap">
-                        {t.aiSettings.thinkingMode}
-                      </label>
-                      <select
-                        value={displayThinkingMode}
-                        onChange={(e) => setConfig({ thinkingMode: e.target.value as ThinkingMode })}
-                        className="h-7 min-w-[108px] text-xs px-2 rounded-md border border-border bg-background"
-                      >
-                        <option value="auto">{t.aiSettings.thinkingModeAuto}</option>
-                        <option value="thinking">{t.aiSettings.thinkingModeThinking}</option>
-                        <option value="instant">{t.aiSettings.thinkingModeInstant}</option>
-                      </select>
+                {/* 底部提示/思考模式栏 */}
+                {(supportsThinkingMode || !hasStarted) && (
+                  <div className="bg-muted/30 border-t border-border px-4 py-2 text-xs text-muted-foreground">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      {!hasStarted && <span>{t.ai.getRealtimeContent}</span>}
+                      {supportsThinkingMode && (
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-muted-foreground whitespace-nowrap">
+                            {t.aiSettings.thinkingMode}
+                          </label>
+                          <select
+                            value={displayThinkingMode}
+                            onChange={(e) => setConfig({ thinkingMode: e.target.value as ThinkingMode })}
+                            className="h-7 min-w-[108px] text-xs px-2 rounded-md border border-border bg-background"
+                          >
+                            <option value="auto">{t.aiSettings.thinkingModeAuto}</option>
+                            <option value="thinking">{t.aiSettings.thinkingModeThinking}</option>
+                            <option value="instant">{t.aiSettings.thinkingModeInstant}</option>
+                          </select>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
-
-                {/* 应用集成栏 - 仅在未开始时显示 */}
-                <AnimatePresence>
-                  {!hasStarted && (
-                    <motion.div
-                      initial={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="bg-muted/30 border-t border-border px-4 py-2.5 text-xs text-muted-foreground overflow-hidden"
-                    >
-                      <span>{t.ai.getRealtimeContent}</span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
 
                 {/* AI 对话设置面板：使用悬浮窗口 */}
                 <AISettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
