@@ -4,6 +4,7 @@ import { useFileStore } from "@/stores/useFileStore";
 import { useBrowserStore } from "@/stores/useBrowserStore";
 import { Database, ListTodo, FolderKanban, Book, X } from "lucide-react";
 import { useLocaleStore } from "@/stores/useLocaleStore";
+import { DatabaseActionButton, DatabaseIconButton, DatabaseTextInput } from "./primitives";
 
 interface CreateDatabaseDialogProps {
   isOpen: boolean;
@@ -79,29 +80,30 @@ export function CreateDatabaseDialog({ isOpen, onClose }: CreateDatabaseDialogPr
       />
       
       {/* 对话框 */}
-      <div className="relative bg-background rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
+      <div className="db-surface relative w-full max-w-md mx-4 p-6">
         {/* 标题 */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-semibold">{t.database.createDialog.title}</h2>
-          <button
+          <DatabaseIconButton
             onClick={onClose}
-            className="p-1 rounded hover:bg-accent text-muted-foreground"
+            aria-label={t.common.close}
+            title={t.common.close}
           >
             <X className="w-5 h-5" />
-          </button>
+          </DatabaseIconButton>
         </div>
         
         {/* 名称输入 */}
         <div className="mb-6">
-          <label className="block text-sm font-medium mb-2">
+          <label htmlFor="database-create-name" className="block text-sm font-medium mb-2">
             {t.database.createDialog.nameLabel}
           </label>
-          <input
+          <DatabaseTextInput
+            id="database-create-name"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={t.database.createDialog.namePlaceholder}
-            className="w-full px-3 py-2 rounded-md border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary"
             autoFocus
             onKeyDown={(e) => {
               if (e.key === 'Enter' && name.trim()) {
@@ -125,10 +127,10 @@ export function CreateDatabaseDialog({ isOpen, onClose }: CreateDatabaseDialogPr
                 <button
                   key={template.id}
                   onClick={() => setSelectedTemplate(template.id)}
-                  className={`flex flex-col items-start p-3 rounded-lg border transition-colors ${
+                  className={`db-panel db-focus-ring flex flex-col items-start p-3 text-left ${
                     isSelected
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-muted-foreground/50'
+                      ? 'border-primary/65 bg-primary/8'
+                      : 'hover:border-border/85'
                   }`}
                 >
                   <Icon className={`w-5 h-5 mb-2 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
@@ -144,17 +146,17 @@ export function CreateDatabaseDialog({ isOpen, onClose }: CreateDatabaseDialogPr
         <div className="flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-md text-sm hover:bg-accent"
+            className="db-toggle-btn h-9 px-4"
           >
             {t.common.cancel}
           </button>
-          <button
+          <DatabaseActionButton
             onClick={handleCreate}
             disabled={!name.trim() || isCreating}
-            className="px-4 py-2 rounded-md text-sm bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4"
           >
             {isCreating ? t.database.createDialog.creating : t.database.createDialog.create}
-          </button>
+          </DatabaseActionButton>
         </div>
       </div>
     </div>

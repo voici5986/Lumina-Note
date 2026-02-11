@@ -82,7 +82,9 @@ export function MultiSelectCell({ value, onChange, isEditing, onBlur, column, db
               {option.name}
               <button
                 onClick={(e) => handleRemove(e, option.id)}
-                className="hover:bg-black/10 rounded"
+                className="db-icon-btn h-4 w-4 border-0 bg-transparent"
+                aria-label={t.common.delete}
+                title={t.common.delete}
               >
                 <X className="w-3 h-3" />
               </button>
@@ -95,14 +97,14 @@ export function MultiSelectCell({ value, onChange, isEditing, onBlur, column, db
       </div>
       
       {showDropdown && (
-        <div className="absolute left-0 top-full mt-1 w-56 bg-popover border border-border rounded-md shadow-lg py-1 z-50 max-h-64 overflow-y-auto">
+        <div className="db-menu absolute left-0 top-full mt-1 w-56 py-1 z-50 max-h-64 overflow-y-auto">
           {options.map((option) => {
             const isSelected = selectedIds.includes(option.id);
             return (
               <button
                 key={option.id}
                 onClick={() => handleToggle(option.id)}
-                className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent"
+                className="db-menu-item"
               >
                 <span className={`w-4 h-4 rounded border flex items-center justify-center ${
                   isSelected ? 'bg-primary border-primary text-primary-foreground' : 'border-muted-foreground/30'
@@ -122,7 +124,7 @@ export function MultiSelectCell({ value, onChange, isEditing, onBlur, column, db
             </div>
           )}
           
-          <div className="border-t border-border mt-1 pt-1 px-2">
+          <div className="border-t border-border/70 mt-1 pt-1 px-2">
             <div className="flex items-center gap-1">
               <input
                 type="text"
@@ -132,12 +134,14 @@ export function MultiSelectCell({ value, onChange, isEditing, onBlur, column, db
                   if (e.key === 'Enter') handleAddOption();
                 }}
                 placeholder={t.database.newOption}
-                className="flex-1 px-2 py-1 text-sm bg-transparent border-none outline-none"
+                className="db-input h-8 flex-1 border-transparent bg-transparent px-2 focus-visible:border-transparent focus-visible:shadow-none"
               />
               <button
                 onClick={handleAddOption}
                 disabled={!newOptionName.trim()}
-                className="p-1 rounded hover:bg-accent disabled:opacity-50"
+                className="db-icon-btn h-7 w-7 disabled:opacity-50"
+                aria-label={t.common.add}
+                title={t.common.add}
               >
                 <Plus className="w-4 h-4" />
               </button>

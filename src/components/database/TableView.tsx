@@ -4,6 +4,7 @@ import { useUIStore } from "@/stores/useUIStore";
 import { useSplitStore } from "@/stores/useSplitStore";
 import { DatabaseCell } from "./cells/DatabaseCell";
 import { ColumnHeader } from "./ColumnHeader";
+import { DatabaseIconButton, DatabaseMenuSurface } from "./primitives";
 import { Plus, MoreHorizontal, Trash2, Copy, FileText } from "lucide-react";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 
@@ -62,10 +63,10 @@ export function TableView({ dbId }: TableViewProps) {
   const columns = db.columns;
   
   return (
-    <div className="h-full overflow-x-auto overflow-y-auto" ref={tableRef}>
+    <div className="h-full overflow-x-auto overflow-y-auto bg-background/20" ref={tableRef}>
       <table className="border-collapse min-w-max">
         {/* 表头 */}
-        <thead className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
+        <thead className="sticky top-0 z-10 bg-background/70 backdrop-blur-md">
           <tr>
             {/* 行操作列 */}
             <th className="w-10 p-0 border-b border-r border-border" />
@@ -82,12 +83,14 @@ export function TableView({ dbId }: TableViewProps) {
             
             {/* 新增列按钮 */}
             <th className="w-10 p-0 border-b border-border">
-              <button
+              <DatabaseIconButton
                 onClick={handleAddColumn}
-                className="w-full h-9 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                className="w-full h-9 rounded-none"
+                aria-label={t.database.newColumn}
+                title={t.database.newColumn}
               >
                 <Plus className="w-4 h-4" />
-              </button>
+              </DatabaseIconButton>
             </th>
           </tr>
         </thead>
@@ -106,21 +109,22 @@ export function TableView({ dbId }: TableViewProps) {
                 <div className="flex items-center justify-center h-9">
                   {hoveredRow === row.id ? (
                     <div className="relative">
-                      <button
+                      <DatabaseIconButton
                         onClick={() => setRowMenuOpen(rowMenuOpen === row.id ? null : row.id)}
-                        className="p-1 rounded hover:bg-accent"
+                        aria-label={t.common.settings}
+                        title={t.common.settings}
                       >
                         <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
-                      </button>
+                      </DatabaseIconButton>
                       
                       {rowMenuOpen === row.id && (
-                        <div className="absolute left-0 top-full mt-1 bg-popover border border-border rounded-md shadow-lg py-1 min-w-[120px] z-50">
+                        <DatabaseMenuSurface className="absolute left-0 top-full mt-1 py-1 min-w-[140px] z-50">
                           <button
                             onClick={() => {
                               duplicateRow(dbId, row.id);
                               setRowMenuOpen(null);
                             }}
-                            className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent"
+                            className="db-menu-item"
                           >
                           <Copy className="w-4 h-4" /> {t.database.copyRow}
                           </button>
@@ -129,11 +133,11 @@ export function TableView({ dbId }: TableViewProps) {
                               deleteRow(dbId, row.id);
                               setRowMenuOpen(null);
                             }}
-                            className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent text-red-500"
+                            className="db-menu-item db-menu-item-danger"
                           >
                           <Trash2 className="w-4 h-4" /> {t.database.deleteRow}
                           </button>
-                        </div>
+                        </DatabaseMenuSurface>
                       )}
                     </div>
                   ) : (
@@ -167,16 +171,17 @@ export function TableView({ dbId }: TableViewProps) {
                     </div>
                     {/* 第一列显示打开笔记按钮 */}
                     {colIndex === 0 && hoveredRow === row.id && row.notePath && (
-                      <button
+                      <DatabaseIconButton
                         onClick={(e) => {
                           e.stopPropagation();
                           handleOpenInSplit(row.notePath);
                         }}
-                        className="p-1 mr-1 rounded hover:bg-accent text-muted-foreground hover:text-primary transition-colors"
+                        className="mr-1"
+                        aria-label={t.database.openInSplit}
                         title={t.database.openInSplit}
                       >
                         <FileText className="w-4 h-4" />
-                      </button>
+                      </DatabaseIconButton>
                     )}
                   </div>
                 </td>
@@ -192,7 +197,7 @@ export function TableView({ dbId }: TableViewProps) {
             <td colSpan={columns.length + 2} className="p-0">
               <button
                 onClick={() => addRow(dbId)}
-                className="w-full h-9 flex items-center gap-2 px-4 text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                className="db-toggle-btn w-full h-9 justify-start rounded-none border-0 px-4"
               >
                 <Plus className="w-4 h-4" />
                 {t.database.newRow}

@@ -47,6 +47,20 @@ body.resizing iframe[data-codex-iframe="true"] {
   --ui-radius-sm: 10px;
   --ui-radius-md: 14px;
   --ui-radius-lg: 18px;
+
+  /* Database UI tokens */
+  --db-surface: var(--background);
+  --db-surface-subtle: var(--muted);
+  --db-surface-strong: var(--accent);
+  --db-border: var(--border);
+  --db-text-muted: var(--muted-foreground);
+  --db-radius-sm: var(--ui-radius-sm);
+  --db-radius-md: var(--ui-radius-md);
+  --db-radius-lg: var(--ui-radius-lg);
+  --db-motion-feedback: 120ms;
+  --db-motion-panel: 180ms;
+  --db-motion-layout: 220ms;
+  --db-motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .dark {
@@ -59,6 +73,11 @@ body.resizing iframe[data-codex-iframe="true"] {
   --primary: 200 75% 55%;  /* 柔和灰蓝 */
   --primary-foreground: 222 30% 12%;
   --border: 220 14% 28%;  /* 暖边框 */
+  --db-surface: var(--background);
+  --db-surface-subtle: var(--muted);
+  --db-surface-strong: var(--accent);
+  --db-border: var(--border);
+  --db-text-muted: var(--muted-foreground);
 }
 
 @layer base {
@@ -149,6 +168,104 @@ body.resizing iframe[data-codex-iframe="true"] {
     @apply hover:bg-accent/60 hover:border-border/60;
     @apply transition-[background-color,border-color,color,transform] duration-150 ease-out;
     @apply focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_hsl(var(--primary)/0.45),0_0_0_4px_hsl(var(--primary)/0.18)];
+  }
+
+  .db-surface {
+    @apply rounded-ui-lg border border-border/60 bg-background/55 backdrop-blur-md shadow-ui-card;
+  }
+
+  .db-panel {
+    @apply rounded-ui-md border border-border/55 bg-muted/35;
+    transition-property: transform, opacity, border-color, background-color, box-shadow;
+    transition-duration: var(--db-motion-panel);
+    transition-timing-function: var(--db-motion-ease);
+  }
+
+  .db-menu {
+    @apply rounded-ui-md border border-border/70 bg-popover/95 shadow-ui-float backdrop-blur-md;
+    animation: fadeIn var(--db-motion-panel) var(--db-motion-ease);
+  }
+
+  .db-toolbar {
+    @apply border-b border-border/60 bg-background/55 backdrop-blur-md;
+  }
+
+  .db-input {
+    @apply h-9 w-full rounded-ui-md border border-border/60 bg-background/40 px-3 text-sm text-foreground;
+    @apply placeholder:text-muted-foreground/70;
+    @apply focus-visible:outline-none focus-visible:border-primary/60 focus-visible:shadow-[0_0_0_1px_hsl(var(--primary)/0.45),0_0_0_4px_hsl(var(--primary)/0.18)];
+    transition-property: border-color, background-color, box-shadow;
+    transition-duration: var(--db-motion-feedback);
+    transition-timing-function: var(--db-motion-ease);
+  }
+
+  .db-icon-btn {
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-ui-md border border-transparent;
+    @apply focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_hsl(var(--primary)/0.45),0_0_0_4px_hsl(var(--primary)/0.18)];
+    transition-property: transform, background-color, border-color, color, opacity;
+    transition-duration: var(--db-motion-feedback);
+    transition-timing-function: var(--db-motion-ease);
+  }
+
+  .db-action-btn {
+    @apply inline-flex h-9 items-center justify-center gap-1.5 rounded-ui-md bg-primary px-3 text-sm font-medium text-primary-foreground;
+    @apply hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50;
+    @apply focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_hsl(var(--primary)/0.45),0_0_0_4px_hsl(var(--primary)/0.18)];
+    transition-property: transform, background-color, border-color, box-shadow, color;
+    transition-duration: var(--db-motion-feedback);
+    transition-timing-function: var(--db-motion-ease);
+  }
+
+  .db-toggle-btn {
+    @apply inline-flex h-8 items-center gap-1.5 rounded-ui-md border border-transparent px-2.5 text-sm text-muted-foreground;
+    @apply hover:bg-accent/55 hover:text-foreground hover:border-border/60;
+    @apply focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_hsl(var(--primary)/0.45),0_0_0_4px_hsl(var(--primary)/0.18)];
+    transition-property: transform, background-color, border-color, color, box-shadow;
+    transition-duration: var(--db-motion-feedback);
+    transition-timing-function: var(--db-motion-ease);
+  }
+
+  .db-toggle-btn[data-active="true"] {
+    @apply border-border/70 bg-background text-foreground shadow-ui-card;
+  }
+
+  .db-count-badge {
+    @apply inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-medium;
+    @apply bg-[hsl(var(--foreground)/0.14)] text-foreground;
+  }
+
+  .db-menu-item {
+    @apply flex w-full items-center gap-2 rounded-ui-sm px-3 py-1.5 text-sm text-foreground;
+    @apply hover:bg-accent/65;
+    @apply focus-visible:outline-none focus-visible:bg-accent/65;
+    transition-property: transform, background-color, color;
+    transition-duration: var(--db-motion-feedback);
+    transition-timing-function: var(--db-motion-ease);
+  }
+
+  .db-menu-item-danger {
+    @apply text-red-500 hover:bg-red-500/10 focus-visible:bg-red-500/10;
+  }
+
+  .db-focus-ring {
+    @apply focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_hsl(var(--primary)/0.45),0_0_0_4px_hsl(var(--primary)/0.18)];
+  }
+
+  .db-empty-state {
+    @apply rounded-ui-md border border-dashed border-border/65 bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .db-panel,
+  .db-menu,
+  .db-input,
+  .db-icon-btn,
+  .db-action-btn,
+  .db-toggle-btn,
+  .db-menu-item {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
   }
 }
 

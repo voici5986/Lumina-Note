@@ -79,7 +79,9 @@ export function SelectCell({ value, onChange, isEditing, onBlur, column, dbId }:
             </span>
             <button
               onClick={handleClear}
-              className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-accent"
+              className="db-icon-btn h-5 w-5 opacity-0 group-hover:opacity-100"
+              aria-label={t.common.clear}
+              title={t.common.clear}
             >
               <X className="w-3 h-3 text-muted-foreground" />
             </button>
@@ -91,12 +93,12 @@ export function SelectCell({ value, onChange, isEditing, onBlur, column, dbId }:
       </div>
       
       {showDropdown && (
-        <div className="absolute left-0 top-full mt-1 w-48 bg-popover border border-border rounded-md shadow-lg py-1 z-50">
+        <div className="db-menu absolute left-0 top-full mt-1 w-48 py-1 z-50">
           {options.map((option) => (
             <button
               key={option.id}
               onClick={() => handleSelect(option.id)}
-              className={`flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent ${
+              className={`db-menu-item ${
                 value === option.id ? 'bg-accent' : ''
               }`}
             >
@@ -112,7 +114,7 @@ export function SelectCell({ value, onChange, isEditing, onBlur, column, dbId }:
             </div>
           )}
           
-          <div className="border-t border-border mt-1 pt-1 px-2">
+          <div className="border-t border-border/70 mt-1 pt-1 px-2">
             <div className="flex items-center gap-1">
               <input
                 type="text"
@@ -122,12 +124,14 @@ export function SelectCell({ value, onChange, isEditing, onBlur, column, dbId }:
                   if (e.key === 'Enter') handleAddOption();
                 }}
                 placeholder={t.database.newOption}
-                className="flex-1 px-2 py-1 text-sm bg-transparent border-none outline-none"
+                className="db-input h-8 flex-1 border-transparent bg-transparent px-2 focus-visible:border-transparent focus-visible:shadow-none"
               />
               <button
                 onClick={handleAddOption}
                 disabled={!newOptionName.trim()}
-                className="p-1 rounded hover:bg-accent disabled:opacity-50"
+                className="db-icon-btn h-7 w-7 disabled:opacity-50"
+                aria-label={t.common.add}
+                title={t.common.add}
               >
                 <Plus className="w-4 h-4" />
               </button>

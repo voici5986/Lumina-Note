@@ -19,11 +19,12 @@ export function CheckboxCell({ value, onChange }: CheckboxCellProps) {
           e.stopPropagation();
           onChange(!isChecked);
         }}
-        className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+        className={`db-focus-ring w-5 h-5 rounded border-2 flex items-center justify-center transition-[background-color,border-color,transform] duration-120 ease-out ${
           isChecked
             ? 'bg-primary border-primary text-primary-foreground'
             : 'border-muted-foreground/30 hover:border-primary/50'
         }`}
+        aria-label="Toggle checkbox value"
       >
         {isChecked && <Check className="w-3 h-3" />}
       </button>

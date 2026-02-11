@@ -3,6 +3,7 @@ import { useUIStore } from "@/stores/useUIStore";
 import { useSplitStore } from "@/stores/useSplitStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 import { DatabaseView } from "./DatabaseView";
+import { DatabaseIconButton } from "./primitives";
 import { CodeMirrorEditor, ViewMode } from "@/editor/CodeMirrorEditor";
 import { getFileName, cn } from "@/lib/utils";
 import { X, Columns, Rows, FileText, Loader2, Save } from "lucide-react";
@@ -54,24 +55,23 @@ export function DatabaseSplitView({ dbId }: DatabaseSplitViewProps) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Split toolbar */}
-      <div className="h-8 flex items-center px-2 gap-1 border-b border-border bg-background shrink-0">
-        <button
+      <div className="db-toolbar h-8 flex items-center px-2 gap-1 shrink-0">
+        <DatabaseIconButton
           onClick={() => setSplitDirection(isHorizontal ? "vertical" : "horizontal")}
-          className={cn(
-            "p-1.5 rounded transition-colors",
-            "hover:bg-accent text-muted-foreground hover:text-foreground"
-          )}
+          className={cn("h-7 w-7")}
           title={isHorizontal ? t.layout.verticalSplit : t.layout.horizontalSplit}
+          aria-label={isHorizontal ? t.layout.verticalSplit : t.layout.horizontalSplit}
         >
           {isHorizontal ? <Rows size={14} /> : <Columns size={14} />}
-        </button>
-        <button
+        </DatabaseIconButton>
+        <DatabaseIconButton
           onClick={toggleSplitView}
-          className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+          className="h-7 w-7"
           title={t.layout.closeSplit}
+          aria-label={t.layout.closeSplit}
         >
           <X size={14} />
-        </button>
+        </DatabaseIconButton>
         <div className="flex-1" />
         <span className="text-xs text-muted-foreground">
           {t.database.splitTitle}
@@ -115,21 +115,23 @@ export function DatabaseSplitView({ dbId }: DatabaseSplitViewProps) {
                   {getFileName(secondaryFile)}
                 </span>
                 {secondaryIsDirty && (
-                  <button
+                  <DatabaseIconButton
                     onClick={saveSecondary}
-                    className="p-1 rounded hover:bg-accent text-primary hover:text-primary"
+                    className="h-7 w-7 text-primary hover:text-primary"
                     title={t.database.saveNote}
+                    aria-label={t.database.saveNote}
                   >
                     <Save size={14} />
-                  </button>
+                  </DatabaseIconButton>
                 )}
-                <button
+                <DatabaseIconButton
                   onClick={closeSecondary}
-                  className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+                  className="h-7 w-7"
                   title={t.common.close}
+                  aria-label={t.common.close}
                 >
                   <X size={14} />
-                </button>
+                </DatabaseIconButton>
               </div>
               
               {/* Editor */}

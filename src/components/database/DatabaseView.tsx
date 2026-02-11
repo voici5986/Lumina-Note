@@ -4,6 +4,7 @@ import { useFileStore } from "@/stores/useFileStore";
 import { TableView } from "./TableView";
 import { KanbanView } from "./KanbanView";
 import { DatabaseToolbar } from "./DatabaseToolbar";
+import { DatabaseIconButton } from "./primitives";
 import { Database, RefreshCw } from "lucide-react";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 
@@ -48,7 +49,7 @@ export function DatabaseView({ dbId, className = "" }: DatabaseViewProps) {
   if (!db) {
     return (
       <div className={`flex items-center justify-center h-full ${className}`}>
-        <div className="text-muted-foreground animate-pulse">
+        <div className="db-empty-state animate-pulse">
           {t.database.loading}
         </div>
       </div>
@@ -56,9 +57,9 @@ export function DatabaseView({ dbId, className = "" }: DatabaseViewProps) {
   }
   
   return (
-    <div className={`flex flex-col h-full bg-background ${className}`}>
+    <div className={`flex flex-col h-full bg-background/30 ${className}`}>
       {/* 数据库头部 */}
-      <div className="flex-shrink-0 px-6 py-4 border-b border-border">
+      <div className="db-toolbar flex-shrink-0 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {db.icon ? (
@@ -68,13 +69,13 @@ export function DatabaseView({ dbId, className = "" }: DatabaseViewProps) {
             )}
             <h1 className="text-xl font-semibold">{db.name}</h1>
           </div>
-          <button
+          <DatabaseIconButton
             onClick={handleRefresh}
-            className="p-2 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+            aria-label={t.database.refresh}
             title={t.database.refresh}
           >
             <RefreshCw className="w-4 h-4" />
-          </button>
+          </DatabaseIconButton>
         </div>
         {db.description && (
           <p className="mt-1 text-sm text-muted-foreground">{db.description}</p>
@@ -93,13 +94,13 @@ export function DatabaseView({ dbId, className = "" }: DatabaseViewProps) {
           <KanbanView dbId={dbId} />
         )}
         {activeView?.type === 'calendar' && (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
-            {t.database.calendarComingSoon}
+          <div className="flex items-center justify-center h-full p-6">
+            <div className="db-empty-state w-full max-w-lg">{t.database.calendarComingSoon}</div>
           </div>
         )}
         {activeView?.type === 'gallery' && (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
-            {t.database.galleryComingSoon}
+          <div className="flex items-center justify-center h-full p-6">
+            <div className="db-empty-state w-full max-w-lg">{t.database.galleryComingSoon}</div>
           </div>
         )}
       </div>

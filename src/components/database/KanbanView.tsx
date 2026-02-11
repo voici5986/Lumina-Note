@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useDatabaseStore } from "@/stores/useDatabaseStore";
 import type { DatabaseRow } from "@/types/database";
 import { SELECT_COLORS } from "@/types/database";
+import { DatabaseIconButton, DatabasePanel } from "./primitives";
 import { Plus, MoreHorizontal, GripVertical } from "lucide-react";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 
@@ -34,8 +35,8 @@ export function KanbanView({ dbId }: KanbanViewProps) {
   
   if (!groupColumn || (groupColumn.type !== 'select' && groupColumn.type !== 'multi-select')) {
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground">
-        <div className="text-center">
+      <div className="flex items-center justify-center h-full p-6 text-muted-foreground">
+        <div className="db-empty-state w-full max-w-lg">
           <p>{t.database.kanbanMissingGroupTitle}</p>
           <p className="text-sm mt-1">{t.database.kanbanMissingGroupDesc}</p>
         </div>
@@ -99,7 +100,7 @@ export function KanbanView({ dbId }: KanbanViewProps) {
   const titleColumn = db.columns.find(c => c.type === 'text');
   
   return (
-    <div className="h-full overflow-x-auto p-4">
+    <div className="h-full overflow-x-auto p-4 bg-background/20">
       <div className="flex gap-4 h-full min-w-max">
         {/* 各分组列 */}
         {options.map((option) => {
@@ -107,10 +108,10 @@ export function KanbanView({ dbId }: KanbanViewProps) {
           const groupRows = groupedRows[option.id] || [];
           
           return (
-            <div
+            <DatabasePanel
               key={option.id}
-              className={`flex flex-col w-72 rounded-lg transition-colors ${
-                dragOverGroup === option.id ? 'bg-accent' : 'bg-muted/30'
+              className={`flex flex-col w-72 ${
+                dragOverGroup === option.id ? 'border-primary/45 bg-accent/55' : ''
               }`}
               onDragOver={(e) => handleDragOver(e, option.id)}
               onDragLeave={handleDragLeave}
@@ -123,9 +124,9 @@ export function KanbanView({ dbId }: KanbanViewProps) {
                 </span>
                 <span className="text-sm text-muted-foreground">{groupRows.length}</span>
                 <div className="flex-1" />
-                <button className="p-1 rounded hover:bg-accent">
+                <DatabaseIconButton aria-label={t.common.settings} title={t.common.settings}>
                   <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
-                </button>
+                </DatabaseIconButton>
               </div>
               
               {/* 卡片列表 */}
@@ -143,20 +144,20 @@ export function KanbanView({ dbId }: KanbanViewProps) {
                 {/* 新建卡片 */}
                 <button
                   onClick={() => handleAddCardToGroup(option.id)}
-                  className="w-full p-2 rounded-md border border-dashed border-border text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-1"
+                  className="db-toggle-btn w-full h-9 justify-center border-dashed"
                 >
                   <Plus className="w-4 h-4" /> {t.database.newCard}
                 </button>
               </div>
-            </div>
+            </DatabasePanel>
           );
         })}
         
         {/* 未分组 */}
         {ungroupedRows.length > 0 && (
-          <div
-            className={`flex flex-col w-72 rounded-lg transition-colors ${
-              dragOverGroup === 'ungrouped' ? 'bg-accent' : 'bg-muted/30'
+          <DatabasePanel
+            className={`flex flex-col w-72 ${
+              dragOverGroup === 'ungrouped' ? 'border-primary/45 bg-accent/55' : ''
             }`}
             onDragOver={(e) => handleDragOver(e, 'ungrouped')}
             onDragLeave={handleDragLeave}
@@ -179,7 +180,7 @@ export function KanbanView({ dbId }: KanbanViewProps) {
                 />
               ))}
             </div>
-          </div>
+          </DatabasePanel>
         )}
       </div>
     </div>
@@ -202,8 +203,8 @@ function KanbanCard({ row, titleColumnId, isDragging, onDragStart }: KanbanCardP
     <div
       draggable
       onDragStart={onDragStart}
-      className={`bg-background p-3 rounded-lg border border-border shadow-sm cursor-grab active:cursor-grabbing transition-all ${
-        isDragging ? 'opacity-50 scale-95' : 'hover:shadow-md'
+      className={`db-surface p-3 cursor-grab active:cursor-grabbing transition-[transform,opacity,box-shadow] duration-150 ease-out ${
+        isDragging ? 'opacity-50 scale-95' : 'hover:-translate-y-[1px] hover:shadow-ui-float'
       }`}
     >
       <div className="flex items-start gap-2">

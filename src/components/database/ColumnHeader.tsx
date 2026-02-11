@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useDatabaseStore } from "@/stores/useDatabaseStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 import type { DatabaseColumn, ColumnType } from "@/types/database";
+import { DatabaseIconButton, DatabaseMenuSurface } from "./primitives";
 import {
   Type,
   Hash,
@@ -138,7 +139,7 @@ export function ColumnHeader({ dbId, column, onDragStart, onDragEnd }: ColumnHea
                 setIsEditing(false);
               }
             }}
-            className="flex-1 min-w-0 bg-transparent border-none outline-none text-sm font-medium"
+            className="db-input h-7 min-w-0 flex-1 border-transparent bg-transparent px-1 focus-visible:border-transparent focus-visible:shadow-none"
           />
         ) : (
           <span
@@ -151,20 +152,22 @@ export function ColumnHeader({ dbId, column, onDragStart, onDragEnd }: ColumnHea
         
         {/* 下拉菜单 */}
         <div className="relative" ref={menuRef}>
-          <button
+          <DatabaseIconButton
             onClick={() => setShowMenu(!showMenu)}
-            className="p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity"
+            className="h-6 w-6 opacity-0 group-hover:opacity-100"
+            aria-label={t.common.settings}
+            title={t.common.settings}
           >
             <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          </button>
+          </DatabaseIconButton>
           
           {showMenu && (
-            <div className="absolute right-0 top-full mt-1 bg-popover border border-border rounded-md shadow-lg py-1 min-w-[160px] z-50">
+            <DatabaseMenuSurface className="absolute right-0 top-full mt-1 py-1 min-w-[172px] z-50">
               {/* 类型选择 */}
               <div className="relative">
                 <button
                   onClick={() => setShowTypeMenu(!showTypeMenu)}
-                  className="flex items-center justify-between w-full px-3 py-1.5 text-sm hover:bg-accent"
+                  className="db-menu-item justify-between"
                 >
                   <span className="flex items-center gap-2">
                     {typeIcons[column.type]}
@@ -174,12 +177,12 @@ export function ColumnHeader({ dbId, column, onDragStart, onDragEnd }: ColumnHea
                 </button>
                 
                 {showTypeMenu && (
-                  <div className="absolute left-full top-0 ml-1 bg-popover border border-border rounded-md shadow-lg py-1 min-w-[140px]">
+                  <DatabaseMenuSurface className="absolute left-full top-0 ml-1 py-1 min-w-[146px]">
                     {(Object.keys(typeIcons) as ColumnType[]).map((type) => (
                       <button
                         key={type}
                         onClick={() => handleTypeChange(type)}
-                        className={`flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent ${
+                        className={`db-menu-item ${
                           column.type === type ? 'bg-accent' : ''
                         }`}
                       >
@@ -187,39 +190,39 @@ export function ColumnHeader({ dbId, column, onDragStart, onDragEnd }: ColumnHea
                         {typeLabels[type]}
                       </button>
                     ))}
-                  </div>
+                  </DatabaseMenuSurface>
                 )}
               </div>
               
-              <div className="my-1 border-t border-border" />
+              <div className="my-1 border-t border-border/70" />
               
               {/* 排序 */}
-              <button className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent">
+              <button className="db-menu-item">
                 <ArrowUp className="w-4 h-4" /> {t.database.sortAsc}
               </button>
-              <button className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent">
+              <button className="db-menu-item">
                 <ArrowDown className="w-4 h-4" /> {t.database.sortDesc}
               </button>
               
-              <div className="my-1 border-t border-border" />
+              <div className="my-1 border-t border-border/70" />
               
               {/* 操作 */}
               <button
                 onClick={handleDuplicate}
-                className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent"
+                className="db-menu-item"
               >
                 <Copy className="w-4 h-4" /> {t.database.duplicateColumn}
               </button>
-              <button className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent">
+              <button className="db-menu-item">
                 <EyeOff className="w-4 h-4" /> {t.database.hideColumn}
               </button>
               <button
                 onClick={handleDelete}
-                className="flex items-center gap-2 w-full px-3 py-1.5 text-sm hover:bg-accent text-red-500"
+                className="db-menu-item db-menu-item-danger"
               >
                 <Trash2 className="w-4 h-4" /> {t.database.deleteColumn}
               </button>
-            </div>
+            </DatabaseMenuSurface>
           )}
         </div>
       </div>

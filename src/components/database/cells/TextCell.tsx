@@ -51,7 +51,7 @@ export function TextCell({ value, onChange, isEditing, onBlur }: TextCellProps) 
         onChange={(e) => setEditValue(e.target.value)}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
-        className="w-full h-9 px-2 bg-transparent border-none outline-none text-sm"
+        className="db-input h-9 border-transparent bg-transparent px-2 focus-visible:border-transparent focus-visible:shadow-none"
       />
     );
   }

@@ -65,7 +65,7 @@ export function NumberCell({ value, onChange, isEditing, onBlur, column }: Numbe
         onChange={(e) => setEditValue(e.target.value)}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
-        className="w-full h-9 px-2 bg-transparent border-none outline-none text-sm text-right"
+        className="db-input h-9 border-transparent bg-transparent px-2 text-right focus-visible:border-transparent focus-visible:shadow-none"
       />
     );
   }
