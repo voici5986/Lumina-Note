@@ -186,10 +186,10 @@ export function TableView({ dbId }: TableViewProps) {
   if (!db) return null;
   
   return (
-    <div className="h-full overflow-x-auto overflow-y-auto bg-background/20" ref={tableRef}>
+    <div className="h-full overflow-x-auto overflow-y-auto bg-background" ref={tableRef}>
       <table className="border-collapse min-w-max" role="grid" aria-label={db.name}>
         {/* 表头 */}
-        <thead className="sticky top-0 z-10 bg-background/70 backdrop-blur-md">
+        <thead className="sticky top-0 z-10 bg-background">
           <tr>
             {/* 行操作列 */}
             <th className="w-10 p-0 border-b border-r border-border" />
@@ -223,7 +223,7 @@ export function TableView({ dbId }: TableViewProps) {
           {rows.map((row, rowIndex) => (
             <tr
               key={row.id}
-              className={`group ${hoveredRow === row.id ? 'bg-accent/50' : ''}`}
+              className={`group ${hoveredRow === row.id ? 'bg-accent' : ''}`}
               onMouseEnter={() => setHoveredRow(row.id)}
               onMouseLeave={() => setHoveredRow(null)}
             >

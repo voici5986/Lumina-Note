@@ -111,7 +111,7 @@ export function KanbanView({ dbId }: KanbanViewProps) {
   const titleColumn = db.columns.find(c => c.type === 'text');
   
   return (
-    <div className="h-full overflow-x-auto p-4 bg-background/20">
+    <div className="h-full overflow-x-auto p-4 bg-background">
       <div className="flex gap-4 h-full min-w-max">
         {/* 各分组列 */}
         {options.map((option) => {
@@ -122,7 +122,7 @@ export function KanbanView({ dbId }: KanbanViewProps) {
             <DatabasePanel
               key={option.id}
               className={`flex flex-col w-72 ${
-                dragOverGroup === option.id ? 'border-primary/45 bg-accent/55' : ''
+                dragOverGroup === option.id ? 'border-primary/45 bg-accent' : ''
               }`}
               onDragOver={(e) => handleDragOver(e, option.id)}
               onDragLeave={handleDragLeave}
@@ -174,7 +174,7 @@ export function KanbanView({ dbId }: KanbanViewProps) {
         {ungroupedRows.length > 0 && (
           <DatabasePanel
             className={`flex flex-col w-72 ${
-              dragOverGroup === 'ungrouped' ? 'border-primary/45 bg-accent/55' : ''
+              dragOverGroup === 'ungrouped' ? 'border-primary/45 bg-accent' : ''
             }`}
             onDragOver={(e) => handleDragOver(e, 'ungrouped')}
             onDragLeave={handleDragLeave}

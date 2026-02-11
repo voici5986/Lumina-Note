@@ -58,7 +58,7 @@ export function DatabaseView({ dbId, className = "" }: DatabaseViewProps) {
   }
   
   return (
-    <div className={`flex flex-col h-full bg-background/30 ${className}`}>
+    <div className={`flex flex-col h-full bg-background ${className}`}>
       {/* 数据库头部 */}
       <div className="db-toolbar flex-shrink-0 px-6 py-4">
         <div className="flex items-center justify-between">

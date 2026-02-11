@@ -357,7 +357,7 @@ function CalendarNoteCard({
       onClick={onOpenNote}
       onDragStart={(event) => onDragStart(event, row.id)}
       onDragEnd={onDragEnd}
-      className={`db-focus-ring group w-full rounded-ui-sm border border-border/60 bg-background/45 px-1.5 py-1 text-left text-xs transition-[transform,opacity,background-color,border-color] duration-120 ease-out motion-reduce:transform-none motion-reduce:transition-none ${
+      className={`db-focus-ring group w-full rounded-ui-sm border border-border/60 bg-background px-1.5 py-1 text-left text-xs transition-[transform,opacity,background-color,border-color] duration-120 ease-out motion-reduce:transform-none motion-reduce:transition-none ${
         isDragging ? "scale-[0.99] opacity-55" : "hover:-translate-y-[1px] hover:border-border/80 motion-reduce:hover:translate-y-0"
       } ${statusClass}`}
       aria-label={`${openNoteLabel}: ${row.noteTitle}`}

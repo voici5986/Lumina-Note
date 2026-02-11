@@ -621,7 +621,7 @@ export function DatabaseToolbar({ dbId }: DatabaseToolbarProps) {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           aria-label={t.common.search}
-          className="h-8 w-36 border-transparent bg-transparent px-1.5 focus-visible:border-transparent focus-visible:shadow-none"
+          className="h-8 w-36 px-1.5"
         />
       </div>
 
