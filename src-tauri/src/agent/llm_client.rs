@@ -193,6 +193,37 @@ impl LlmClient {
         }
     }
 
+    fn apply_moonshot_k25_constraints(&self, body: &mut Value, model: &str) {
+        if self.config.provider != "moonshot"
+            || (!Self::model_matches(model, "kimi-k2.5")
+                && !Self::model_matches(model, "kimi-k2-5"))
+        {
+            return;
+        }
+
+        // Moonshot K2.5 参数约束（官方文档）：
+        // - 思考开启/auto: temperature 必须 1.0
+        // - 思考关闭（instant）: temperature 必须 0.6
+        // - top_p 必须 0.95
+        // - n 必须 1
+        // - presence_penalty 必须 0.0
+        // - frequency_penalty 必须 0.0
+        // 任一值偏离都可能返回 400，因此在请求构建层统一强制覆盖，防止后续改动误传。
+        body["temperature"] = json!(match self.config.thinking_mode {
+            ThinkingMode::Instant => 0.6,
+            _ => 1.0,
+        });
+        body["top_p"] = json!(0.95);
+        body["n"] = json!(1);
+        body["presence_penalty"] = json!(0.0);
+        body["frequency_penalty"] = json!(0.0);
+
+        // 如果是默认 max_tokens（4096），提升到 K2.5 默认值 32768。
+        if body["max_tokens"].as_u64() == Some(4096) {
+            body["max_tokens"] = json!(32768);
+        }
+    }
+
     fn fixed_temperature(provider: &str, model: &str, thinking_mode: &ThinkingMode) -> Option<f32> {
         if provider == "moonshot"
             && (Self::model_matches(model, "kimi-k2.5") || Self::model_matches(model, "kimi-k2-5"))
@@ -319,6 +350,7 @@ impl LlmClient {
             "stream": false,
         });
         self.apply_thinking_controls(&mut body, &resolved_model);
+        self.apply_moonshot_k25_constraints(&mut body, &resolved_model);
 
         let has_tools = tools.is_some();
         if let Some(tools) = tools {
@@ -608,6 +640,7 @@ impl LlmClient {
             "stream": true,
         });
         self.apply_thinking_controls(&mut body, &resolved_model);
+        self.apply_moonshot_k25_constraints(&mut body, &resolved_model);
 
         if let Some(tools) = tools {
             body["tools"] = json!(tools);
@@ -1045,6 +1078,7 @@ impl LlmClient {
             "stream": true,
         });
         self.apply_thinking_controls(&mut body, &resolved_model);
+        self.apply_moonshot_k25_constraints(&mut body, &resolved_model);
 
         if let Some(tools) = tools {
             body["tools"] = json!(tools);
@@ -1283,6 +1317,7 @@ impl LlmClient {
             "stream": true,
         });
         self.apply_thinking_controls(&mut body, &resolved_model);
+        self.apply_moonshot_k25_constraints(&mut body, &resolved_model);
 
         let mut req = self.client.post(&url);
         for (key, value) in headers {

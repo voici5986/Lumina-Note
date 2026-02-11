@@ -22,6 +22,10 @@ function resolveFixedTemperature(params: {
   if (!isMoonshotK25Model(params.provider, params.model)) {
     return undefined;
   }
+  // Moonshot K2.5 文档约束：temperature 不是自由参数。
+  // - thinking/auto: 1.0
+  // - instant (non-thinking): 0.6
+  // 若传其他值会被服务端拒绝（HTTP 400），因此必须在客户端强制覆盖。
   return params.thinkingMode === "instant" ? 0.6 : 1.0;
 }
 
