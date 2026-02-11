@@ -1318,3 +1318,65 @@ impl LlmClient {
         Ok(rx)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use reqwest::header::{HeaderMap, HeaderValue};
+
+    #[test]
+    fn parse_retry_after_ms_prefers_retry_after_ms_header() {
+        let mut headers = HeaderMap::new();
+        headers.insert("retry-after-ms", HeaderValue::from_static("2500"));
+        headers.insert("retry-after", HeaderValue::from_static("10"));
+
+        let parsed = LlmClient::parse_retry_after_ms(&headers);
+        assert_eq!(parsed, Some(2500));
+    }
+
+    #[test]
+    fn parse_retry_after_ms_parses_seconds() {
+        let mut headers = HeaderMap::new();
+        headers.insert("retry-after", HeaderValue::from_static("1.5"));
+
+        let parsed = LlmClient::parse_retry_after_ms(&headers);
+        assert_eq!(parsed, Some(1500));
+    }
+
+    #[test]
+    fn parse_retry_after_ms_parses_http_date() {
+        let retry_at = chrono::Utc::now() + chrono::Duration::seconds(3);
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "retry-after",
+            HeaderValue::from_str(&retry_at.to_rfc2822()).expect("valid header"),
+        );
+
+        let parsed = LlmClient::parse_retry_after_ms(&headers).expect("retry-after parsed");
+        assert!((1000..=4000).contains(&parsed), "parsed={parsed}");
+    }
+
+    #[test]
+    fn retry_delay_ms_respects_retry_after_cap() {
+        let capped = LlmClient::retry_delay_ms(1, Some(u64::MAX));
+        assert_eq!(capped, STREAM_RETRY_MAX_DELAY_MS * 20);
+    }
+
+    #[test]
+    fn to_http_error_marks_retryable_status() {
+        let headers = HeaderMap::new();
+        let retryable = LlmClient::to_http_error(StatusCode::TOO_MANY_REQUESTS, "rate limited", &headers);
+        assert!(retryable.retryable);
+
+        let fatal = LlmClient::to_http_error(StatusCode::BAD_REQUEST, "bad request", &headers);
+        assert!(!fatal.retryable);
+    }
+
+    #[test]
+    fn retry_reason_truncates_long_error() {
+        let long_message = "x".repeat(300);
+        let reason = LlmClient::retry_reason(&long_message);
+        assert_eq!(reason.len(), 160);
+        assert!(reason.ends_with("..."));
+    }
+}
