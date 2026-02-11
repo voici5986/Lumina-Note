@@ -17,11 +17,21 @@ describe("LLM temperature strategy", () => {
     ).toBe(1.0);
   });
 
-  it("respects user configured temperature when provided", () => {
+  it("forces kimi-k2.5 to use temperature=1.0", () => {
     expect(
       resolveTemperature({
         provider: "moonshot",
         model: "kimi-k2.5",
+        configuredTemperature: 1.4,
+      })
+    ).toBe(1.0);
+  });
+
+  it("respects user configured temperature for non-fixed models", () => {
+    expect(
+      resolveTemperature({
+        provider: "openai",
+        model: "gpt-4o",
         configuredTemperature: 1.4,
       })
     ).toBe(1.4);
@@ -44,4 +54,3 @@ describe("LLM temperature strategy", () => {
     ).toBe(0);
   });
 });
-

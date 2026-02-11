@@ -4,6 +4,16 @@ function includesAny(text: string, patterns: readonly string[]): boolean {
   return patterns.some((pattern) => text.includes(pattern));
 }
 
+function isMoonshotK25Model(provider: LLMProviderType, model: string): boolean {
+  if (provider !== "moonshot") return false;
+  const normalized = model.toLowerCase();
+  return (
+    normalized.includes("kimi-k2.5") ||
+    normalized.includes("kimi-k2-5") ||
+    normalized.endsWith("/kimi-k2.5")
+  );
+}
+
 function clampTemperature(value: number): number {
   if (!Number.isFinite(value)) return 0.7;
   return Math.min(2, Math.max(0, value));
@@ -55,9 +65,11 @@ export function resolveTemperature(params: {
   configuredTemperature?: number;
 }): number {
   const { provider, model, configuredTemperature } = params;
+  if (isMoonshotK25Model(provider, model)) {
+    return 1.0;
+  }
   if (configuredTemperature === undefined) {
     return getRecommendedTemperature(provider, model);
   }
   return clampTemperature(configuredTemperature);
 }
-
