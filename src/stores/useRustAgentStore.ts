@@ -151,6 +151,15 @@ export interface AgentQueuedTask {
   position: number;
 }
 
+export interface LlmRetryState {
+  requestId: string;
+  attempt: number;
+  maxRetries: number;
+  delayMs: number;
+  reason: string;
+  nextRetryAt: number;
+}
+
 export interface RustAgentSession {
   id: string;
   title: string;
@@ -538,6 +547,7 @@ interface RustAgentState {
   // LLM 请求超时检测（新增）
   llmRequestStartTime: number | null;
   llmRequestId: string | null;
+  llmRetryState: LlmRetryState | null;
   
   // 心跳监控（新增）
   lastHeartbeat: number | null;
@@ -697,6 +707,7 @@ export const useRustAgentStore = create<RustAgentState>()(
       // LLM 请求超时检测初始状态（新增）
       llmRequestStartTime: null,
       llmRequestId: null,
+      llmRetryState: null,
       
       // 心跳监控初始状态（新增）
       lastHeartbeat: null,
@@ -811,7 +822,12 @@ export const useRustAgentStore = create<RustAgentState>()(
       abort: async () => {
         try {
           await invoke("agent_abort");
-          set({ status: "aborted" });
+          set({
+            status: "aborted",
+            llmRequestStartTime: null,
+            llmRequestId: null,
+            llmRetryState: null,
+          });
         } catch (e) {
           console.error("Failed to abort:", e);
         }
@@ -830,6 +846,9 @@ export const useRustAgentStore = create<RustAgentState>()(
           lastTokenUsage: null,
           queuedTasks: [],
           activeTaskPreview: null,
+          llmRequestStartTime: null,
+          llmRequestId: null,
+          llmRetryState: null,
         });
       },
 
@@ -1307,6 +1326,7 @@ export const useRustAgentStore = create<RustAgentState>()(
               status: "running",
               error: null,
               streamingContent: "",
+              llmRetryState: null,
             });
             break;
           }
@@ -1322,7 +1342,12 @@ export const useRustAgentStore = create<RustAgentState>()(
           }
 
           case "run_completed": {
-            set({ status: "completed" });
+            set({
+              status: "completed",
+              llmRequestStartTime: null,
+              llmRequestId: null,
+              llmRetryState: null,
+            });
             void get()._compactSession();
             break;
           }
@@ -1334,6 +1359,9 @@ export const useRustAgentStore = create<RustAgentState>()(
               status: "error",
               error,
               streamingContent: "",
+              llmRequestStartTime: null,
+              llmRequestId: null,
+              llmRetryState: null,
               taskStats: {
                 ...stats,
                 failedTasks: stats.failedTasks + 1,
@@ -1347,6 +1375,9 @@ export const useRustAgentStore = create<RustAgentState>()(
               status: "aborted",
               streamingContent: "",
               pendingTool: null,
+              llmRequestStartTime: null,
+              llmRequestId: null,
+              llmRetryState: null,
             });
             break;
           }
@@ -1722,6 +1753,7 @@ export const useRustAgentStore = create<RustAgentState>()(
             set({
               llmRequestStartTime: timestamp,
               llmRequestId: request_id,
+              llmRetryState: null,
             });
             break;
           }
@@ -1731,6 +1763,29 @@ export const useRustAgentStore = create<RustAgentState>()(
             set({
               llmRequestStartTime: null,
               llmRequestId: null,
+              llmRetryState: null,
+            });
+            break;
+          }
+
+          case "llm_retry_scheduled": {
+            const { request_id, attempt, max_retries, delay_ms, reason, next_retry_at } = event.data as {
+              request_id: string;
+              attempt: number;
+              max_retries: number;
+              delay_ms: number;
+              reason: string;
+              next_retry_at: number;
+            };
+            set({
+              llmRetryState: {
+                requestId: request_id,
+                attempt,
+                maxRetries: max_retries,
+                delayMs: delay_ms,
+                reason,
+                nextRetryAt: next_retry_at,
+              },
             });
             break;
           }
