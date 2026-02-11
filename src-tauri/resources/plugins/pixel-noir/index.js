@@ -7,6 +7,9 @@ module.exports = function setup(api, plugin) {
     name: "Pixel Noir",
     tokens: {
       "--radius": "0px",
+      "--ui-radius-sm": "0px",
+      "--ui-radius-md": "0px",
+      "--ui-radius-lg": "0px",
       "--font-sans": '"IBM Plex Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
       "--font-serif": '"IBM Plex Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
       "--font-mono": '"IBM Plex Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
@@ -71,6 +74,9 @@ module.exports = function setup(api, plugin) {
         --pixel-border: 2px;
         --pixel-shadow-step: 3px;
         --pixel-bg-size: 18px;
+        --ui-radius-sm: 0px;
+        --ui-radius-md: 0px;
+        --ui-radius-lg: 0px;
       }
 
       :root.pixel-noir-mode,
@@ -107,11 +113,17 @@ module.exports = function setup(api, plugin) {
       :root.pixel-noir-mode :where(
         .ui-panel,
         .ui-card,
+        .ui-glass,
         .sidebar,
         .tab-bar,
         .status-bar,
         .reading-view,
         .cm-editor,
+        .tiptap,
+        [role="dialog"],
+        [class*="modal"],
+        [class*="dialog"],
+        [class*="popover"],
         [class*="panel"],
         [class*="sidebar"],
         [class*="toolbar"],
@@ -131,6 +143,24 @@ module.exports = function setup(api, plugin) {
           2px 2px 0 hsl(var(--background)),
           4px 4px 0 hsl(var(--foreground) / 0.25);
         transition: transform 80ms steps(2, end), box-shadow 80ms steps(2, end);
+      }
+
+      :root.pixel-noir-mode :where(
+        [class*="rounded"],
+        .tiptap pre,
+        .tiptap code,
+        .tiptap .code-block,
+        .callout,
+        .katex-display,
+        .wiki-link,
+        .right-ai-mode-toggle,
+        .ai-mode-toggle
+      ) {
+        border-radius: 0 !important;
+      }
+
+      :root.pixel-noir-mode ::-webkit-scrollbar-thumb {
+        border-radius: 0 !important;
       }
 
       :root.pixel-noir-mode :where(button:hover, [role="button"]:hover) {
