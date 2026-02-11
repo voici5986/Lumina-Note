@@ -27,6 +27,24 @@ describe("LLM temperature strategy", () => {
     ).toBe(1.0);
   });
 
+  it("forces kimi-k2.5 instant mode to use temperature=0.6", () => {
+    expect(
+      resolveTemperature({
+        provider: "moonshot",
+        model: "kimi-k2.5",
+        thinkingMode: "instant",
+      })
+    ).toBe(0.6);
+    expect(
+      resolveTemperature({
+        provider: "moonshot",
+        model: "kimi-k2.5",
+        thinkingMode: "instant",
+        configuredTemperature: 1.2,
+      })
+    ).toBe(0.6);
+  });
+
   it("respects user configured temperature for non-fixed models", () => {
     expect(
       resolveTemperature({

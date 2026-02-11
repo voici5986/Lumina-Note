@@ -110,6 +110,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
       provider: this.config.provider,
       model: this.config.model,
       configuredTemperature: options?.temperature ?? this.config.temperature,
+      thinkingMode: this.config.thinkingMode,
     });
   }
 

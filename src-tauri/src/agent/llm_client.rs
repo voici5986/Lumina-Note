@@ -193,9 +193,16 @@ impl LlmClient {
         }
     }
 
-    fn has_fixed_temperature(provider: &str, model: &str) -> bool {
-        provider == "moonshot"
+    fn fixed_temperature(provider: &str, model: &str, thinking_mode: &ThinkingMode) -> Option<f32> {
+        if provider == "moonshot"
             && (Self::model_matches(model, "kimi-k2.5") || Self::model_matches(model, "kimi-k2-5"))
+        {
+            return Some(match thinking_mode {
+                ThinkingMode::Instant => 0.6,
+                _ => 1.0,
+            });
+        }
+        None
     }
 
     fn recommended_temperature(provider: &str, model: &str) -> f32 {
@@ -236,8 +243,12 @@ impl LlmClient {
 
     fn resolved_temperature(&self) -> f32 {
         let resolved_model = self.resolved_model();
-        if Self::has_fixed_temperature(&self.config.provider, &resolved_model) {
-            return 1.0;
+        if let Some(fixed) = Self::fixed_temperature(
+            &self.config.provider,
+            &resolved_model,
+            &self.config.thinking_mode,
+        ) {
+            return fixed;
         }
         let recommended = Self::recommended_temperature(&self.config.provider, &resolved_model);
         let configured = self.config.temperature;

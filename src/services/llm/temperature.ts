@@ -1,4 +1,4 @@
-import type { LLMProviderType } from "./types";
+import type { LLMProviderType, ThinkingMode } from "./types";
 
 function includesAny(text: string, patterns: readonly string[]): boolean {
   return patterns.some((pattern) => text.includes(pattern));
@@ -12,6 +12,17 @@ function isMoonshotK25Model(provider: LLMProviderType, model: string): boolean {
     normalized.includes("kimi-k2-5") ||
     normalized.endsWith("/kimi-k2.5")
   );
+}
+
+function resolveFixedTemperature(params: {
+  provider: LLMProviderType;
+  model: string;
+  thinkingMode?: ThinkingMode;
+}): number | undefined {
+  if (!isMoonshotK25Model(params.provider, params.model)) {
+    return undefined;
+  }
+  return params.thinkingMode === "instant" ? 0.6 : 1.0;
 }
 
 function clampTemperature(value: number): number {
@@ -63,10 +74,12 @@ export function resolveTemperature(params: {
   provider: LLMProviderType;
   model: string;
   configuredTemperature?: number;
+  thinkingMode?: ThinkingMode;
 }): number {
-  const { provider, model, configuredTemperature } = params;
-  if (isMoonshotK25Model(provider, model)) {
-    return 1.0;
+  const { provider, model, configuredTemperature, thinkingMode } = params;
+  const fixedTemperature = resolveFixedTemperature({ provider, model, thinkingMode });
+  if (fixedTemperature !== undefined) {
+    return fixedTemperature;
   }
   if (configuredTemperature === undefined) {
     return getRecommendedTemperature(provider, model);
