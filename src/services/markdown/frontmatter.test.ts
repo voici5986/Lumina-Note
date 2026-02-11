@@ -309,6 +309,11 @@ describe('belongsToDatabase', () => {
     expect(belongsToDatabase(frontmatter, 'my-database')).toBe(true);
   });
 
+  it('should return true if db is numeric in frontmatter and dbId is string', () => {
+    const frontmatter = { db: 12 };
+    expect(belongsToDatabase(frontmatter, '12')).toBe(true);
+  });
+
   it('should return false if db does not match', () => {
     const frontmatter = { db: 'other-db' };
     expect(belongsToDatabase(frontmatter, 'my-database')).toBe(false);

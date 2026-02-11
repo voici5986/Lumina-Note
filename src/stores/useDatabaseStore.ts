@@ -15,7 +15,7 @@ import type {
 } from "@/types/database";
 import { DATABASE_TEMPLATES } from "@/types/database";
 import { readFile, saveFile, exists, createDir } from "@/lib/tauri";
-import { parseFrontmatter, updateFrontmatter, getTitleFromPath } from "@/services/markdown/frontmatter";
+import { parseFrontmatter, updateFrontmatter, getTitleFromPath, belongsToDatabase } from "@/services/markdown/frontmatter";
 import { useFileStore } from "./useFileStore";
 import { useSplitStore } from "./useSplitStore";
 import { getCurrentTranslations } from "@/stores/useLocaleStore";
@@ -312,7 +312,7 @@ export const useDatabaseStore = create<DatabaseState>()(
             const { frontmatter, hasFrontmatter } = parseFrontmatter(content);
             
             // 检查是否属于此数据库
-            if (hasFrontmatter && frontmatter.db === dbId) {
+            if (hasFrontmatter && belongsToDatabase(frontmatter, dbId)) {
               // 构建 cells，使用列 ID 作为键
               const cells: Record<string, CellValue> = {};
               for (const [key, value] of Object.entries(frontmatter)) {
@@ -603,7 +603,7 @@ export const useDatabaseStore = create<DatabaseState>()(
         
         // 构建 YAML 内容（使用列名）
         const yamlLines = [
-          `db: ${dbId}`,
+          `db: ${JSON.stringify(dbId)}`,
           `title: ${finalTitle}`,
           `createdAt: ${now}`,
           `updatedAt: ${now}`,

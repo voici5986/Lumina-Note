@@ -270,5 +270,7 @@ export function belongsToDatabase(
   frontmatter: FrontmatterData,
   dbId: string
 ): boolean {
-  return frontmatter.db === dbId;
+  const dbValue = frontmatter.db;
+  if (dbValue === undefined || dbValue === null) return false;
+  return String(dbValue) === dbId;
 }
