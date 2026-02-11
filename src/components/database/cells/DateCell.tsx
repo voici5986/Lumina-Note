@@ -2,12 +2,13 @@ import { useState, useRef, useEffect } from "react";
 import { Calendar } from "lucide-react";
 import type { DatabaseColumn, DateValue } from "@/types/database";
 import { useLocaleStore } from "@/stores/useLocaleStore";
+import type { CellCommitAction } from "./types";
 
 interface DateCellProps {
   value: DateValue | null;
-  onChange: (value: DateValue | null) => void;
+  onChange: (value: DateValue | null) => Promise<boolean>;
   isEditing: boolean;
-  onBlur: () => void;
+  onBlur: (action?: CellCommitAction) => void;
   column: DatabaseColumn;
 }
 
@@ -26,18 +27,28 @@ export function DateCell({ value, onChange, isEditing, onBlur, column }: DateCel
     setEditValue(value?.start || '');
   }, [value]);
   
-  const handleBlur = () => {
+  const handleCommit = async (action?: CellCommitAction) => {
     if (editValue !== value?.start) {
-      onChange(editValue ? { start: editValue } : null);
+      const ok = await onChange(editValue ? { start: editValue } : null);
+      if (!ok) {
+        inputRef.current?.focus();
+        return;
+      }
     }
-    onBlur();
+    onBlur(action);
   };
   
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleBlur();
+      e.preventDefault();
+      void handleCommit('down');
+    }
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      void handleCommit(e.shiftKey ? 'prev' : 'next');
     }
     if (e.key === 'Escape') {
+      e.preventDefault();
       setEditValue(value?.start || '');
       onBlur();
     }
@@ -69,7 +80,7 @@ export function DateCell({ value, onChange, isEditing, onBlur, column }: DateCel
         type={column.includeTime ? 'datetime-local' : 'date'}
         value={editValue}
         onChange={(e) => setEditValue(e.target.value)}
-        onBlur={handleBlur}
+        onBlur={() => void handleCommit()}
         onKeyDown={handleKeyDown}
         className="db-input h-9 border-transparent bg-transparent px-2 focus-visible:border-transparent focus-visible:shadow-none"
       />

@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import type { DatabaseColumn } from "@/types/database";
+import type { CellCommitAction } from "./types";
 
 interface NumberCellProps {
   value: number | null;
-  onChange: (value: number | null) => void;
+  onChange: (value: number | null) => Promise<boolean>;
   isEditing: boolean;
-  onBlur: () => void;
+  onBlur: (action?: CellCommitAction) => void;
   column: DatabaseColumn;
 }
 
@@ -24,19 +25,30 @@ export function NumberCell({ value, onChange, isEditing, onBlur, column }: Numbe
     setEditValue(value?.toString() || '');
   }, [value]);
   
-  const handleBlur = () => {
+  const handleCommit = async (action?: CellCommitAction) => {
     const numValue = editValue === '' ? null : parseFloat(editValue);
     if (!isNaN(numValue as number) && numValue !== value) {
-      onChange(numValue);
+      const ok = await onChange(numValue);
+      if (!ok) {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+        return;
+      }
     }
-    onBlur();
+    onBlur(action);
   };
   
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleBlur();
+      e.preventDefault();
+      void handleCommit('down');
+    }
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      void handleCommit(e.shiftKey ? 'prev' : 'next');
     }
     if (e.key === 'Escape') {
+      e.preventDefault();
       setEditValue(value?.toString() || '');
       onBlur();
     }
@@ -63,7 +75,7 @@ export function NumberCell({ value, onChange, isEditing, onBlur, column }: Numbe
         type="number"
         value={editValue}
         onChange={(e) => setEditValue(e.target.value)}
-        onBlur={handleBlur}
+        onBlur={() => void handleCommit()}
         onKeyDown={handleKeyDown}
         className="db-input h-9 border-transparent bg-transparent px-2 text-right focus-visible:border-transparent focus-visible:shadow-none"
       />

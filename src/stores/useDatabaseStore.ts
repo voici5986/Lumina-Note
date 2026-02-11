@@ -131,7 +131,7 @@ interface DatabaseState {
   
   // ===== 行操作 (Dataview: 操作笔记 YAML) =====
   addRow: (dbId: string, cells?: Record<string, CellValue>) => Promise<string>;
-  updateCell: (dbId: string, rowId: string, columnId: string, value: CellValue) => Promise<void>;
+  updateCell: (dbId: string, rowId: string, columnId: string, value: CellValue) => Promise<boolean>;
   deleteRow: (dbId: string, rowId: string) => Promise<void>;
   duplicateRow: (dbId: string, rowId: string) => Promise<string>;
   reorderRows: (dbId: string, rowIds: string[]) => void;
@@ -659,10 +659,10 @@ ${yamlLines.join('\n')}
       
       updateCell: async (dbId: string, rowId: string, columnId: string, value: CellValue) => {
         const db = get().databases[dbId];
-        if (!db) return;
+        if (!db) return false;
         
         const row = db.rows.find(r => r.id === rowId);
-        if (!row) return;
+        if (!row) return false;
         
         // 找到列名（YAML 使用列名作为键）
         const column = db.columns.find(c => c.id === columnId);
@@ -707,8 +707,10 @@ ${yamlLines.join('\n')}
               }
             };
           });
+          return true;
         } catch (error) {
           console.error(`Failed to update cell in ${row.notePath}:`, error);
+          return false;
         }
       },
       

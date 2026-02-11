@@ -8,6 +8,7 @@ import { MultiSelectCell } from "./MultiSelectCell";
 import { DateCell } from "./DateCell";
 import { CheckboxCell } from "./CheckboxCell";
 import { UrlCell } from "./UrlCell";
+import type { CellCommitAction } from "./types";
 
 interface DatabaseCellProps {
   dbId: string;
@@ -15,7 +16,8 @@ interface DatabaseCellProps {
   rowId: string;
   value: CellValue;
   isEditing: boolean;
-  onBlur: () => void;
+  onBlur: (action?: CellCommitAction) => void;
+  onSaveStateChange?: (state: "idle" | "saving" | "saved" | "error") => void;
 }
 
 export function DatabaseCell({
@@ -25,12 +27,16 @@ export function DatabaseCell({
   value,
   isEditing,
   onBlur,
+  onSaveStateChange,
 }: DatabaseCellProps) {
   const { updateCell } = useDatabaseStore();
   const { t } = useLocaleStore();
   
-  const handleChange = (newValue: CellValue) => {
-    updateCell(dbId, rowId, column.id, newValue);
+  const handleChange = async (newValue: CellValue): Promise<boolean> => {
+    onSaveStateChange?.("saving");
+    const ok = await updateCell(dbId, rowId, column.id, newValue);
+    onSaveStateChange?.(ok ? "saved" : "error");
+    return ok;
   };
   
   const commonProps = {

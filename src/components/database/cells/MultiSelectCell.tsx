@@ -4,12 +4,13 @@ import type { DatabaseColumn, SelectColor } from "@/types/database";
 import { SELECT_COLORS } from "@/types/database";
 import { ChevronDown, Plus, X, Check } from "lucide-react";
 import { useLocaleStore } from "@/stores/useLocaleStore";
+import type { CellCommitAction } from "./types";
 
 interface MultiSelectCellProps {
   value: string[] | null;
-  onChange: (value: string[]) => void;
+  onChange: (value: string[]) => Promise<boolean>;
   isEditing: boolean;
-  onBlur: () => void;
+  onBlur: (action?: CellCommitAction) => void;
   column: DatabaseColumn;
   dbId: string;
 }
@@ -46,15 +47,15 @@ export function MultiSelectCell({ value, onChange, isEditing, onBlur, column, db
   
   const handleToggle = (optionId: string) => {
     if (selectedIds.includes(optionId)) {
-      onChange(selectedIds.filter(id => id !== optionId));
+      void onChange(selectedIds.filter(id => id !== optionId));
     } else {
-      onChange([...selectedIds, optionId]);
+      void onChange([...selectedIds, optionId]);
     }
   };
   
   const handleRemove = (e: React.MouseEvent, optionId: string) => {
     e.stopPropagation();
-    onChange(selectedIds.filter(id => id !== optionId));
+    void onChange(selectedIds.filter(id => id !== optionId));
   };
   
   const handleAddOption = () => {
@@ -62,7 +63,7 @@ export function MultiSelectCell({ value, onChange, isEditing, onBlur, column, db
       const colors: SelectColor[] = ['gray', 'blue', 'green', 'yellow', 'orange', 'red', 'purple', 'pink'];
       const color = colors[options.length % colors.length];
       const optionId = addSelectOption(dbId, column.id, { name: newOptionName.trim(), color });
-      onChange([...selectedIds, optionId]);
+      void onChange([...selectedIds, optionId]);
       setNewOptionName('');
     }
   };

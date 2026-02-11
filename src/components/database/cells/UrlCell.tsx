@@ -2,12 +2,13 @@ import { useState, useRef, useEffect } from "react";
 import { ExternalLink } from "lucide-react";
 import type { DatabaseColumn } from "@/types/database";
 import { useLocaleStore } from "@/stores/useLocaleStore";
+import type { CellCommitAction } from "./types";
 
 interface UrlCellProps {
   value: string | null;
-  onChange: (value: string) => void;
+  onChange: (value: string) => Promise<boolean>;
   isEditing: boolean;
-  onBlur: () => void;
+  onBlur: (action?: CellCommitAction) => void;
   column: DatabaseColumn;
 }
 
@@ -26,18 +27,29 @@ export function UrlCell({ value, onChange, isEditing, onBlur }: UrlCellProps) {
     setEditValue(value || '');
   }, [value]);
   
-  const handleBlur = () => {
+  const handleCommit = async (action?: CellCommitAction) => {
     if (editValue !== value) {
-      onChange(editValue);
+      const ok = await onChange(editValue);
+      if (!ok) {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+        return;
+      }
     }
-    onBlur();
+    onBlur(action);
   };
   
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleBlur();
+      e.preventDefault();
+      void handleCommit('down');
+    }
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      void handleCommit(e.shiftKey ? 'prev' : 'next');
     }
     if (e.key === 'Escape') {
+      e.preventDefault();
       setEditValue(value || '');
       onBlur();
     }
@@ -57,7 +69,7 @@ export function UrlCell({ value, onChange, isEditing, onBlur }: UrlCellProps) {
         type="url"
         value={editValue}
         onChange={(e) => setEditValue(e.target.value)}
-        onBlur={handleBlur}
+        onBlur={() => void handleCommit()}
         onKeyDown={handleKeyDown}
         placeholder="https://"
         className="db-input h-9 border-transparent bg-transparent px-2 focus-visible:border-transparent focus-visible:shadow-none"

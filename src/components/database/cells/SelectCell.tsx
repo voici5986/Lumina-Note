@@ -4,12 +4,13 @@ import type { DatabaseColumn, SelectColor } from "@/types/database";
 import { SELECT_COLORS } from "@/types/database";
 import { ChevronDown, Plus, X } from "lucide-react";
 import { useLocaleStore } from "@/stores/useLocaleStore";
+import type { CellCommitAction } from "./types";
 
 interface SelectCellProps {
   value: string | null;
-  onChange: (value: string | null) => void;
+  onChange: (value: string | null) => Promise<boolean>;
   isEditing: boolean;
-  onBlur: () => void;
+  onBlur: (action?: CellCommitAction) => void;
   column: DatabaseColumn;
   dbId: string;
 }
@@ -43,15 +44,16 @@ export function SelectCell({ value, onChange, isEditing, onBlur, column, dbId }:
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showDropdown, onBlur]);
   
-  const handleSelect = (optionId: string) => {
-    onChange(optionId);
+  const handleSelect = async (optionId: string) => {
+    const ok = await onChange(optionId);
+    if (!ok) return;
     setShowDropdown(false);
     onBlur();
   };
   
-  const handleClear = (e: React.MouseEvent) => {
+  const handleClear = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    onChange(null);
+    await onChange(null);
   };
   
   const handleAddOption = () => {
@@ -59,7 +61,7 @@ export function SelectCell({ value, onChange, isEditing, onBlur, column, dbId }:
       const colors: SelectColor[] = ['gray', 'blue', 'green', 'yellow', 'orange', 'red', 'purple', 'pink'];
       const color = colors[options.length % colors.length];
       const optionId = addSelectOption(dbId, column.id, { name: newOptionName.trim(), color });
-      onChange(optionId);
+      void onChange(optionId);
       setNewOptionName('');
       setShowDropdown(false);
       onBlur();

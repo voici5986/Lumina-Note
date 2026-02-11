@@ -1,11 +1,13 @@
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { useDatabaseStore } from "@/stores/useDatabaseStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { useSplitStore } from "@/stores/useSplitStore";
 import { DatabaseCell } from "./cells/DatabaseCell";
 import { ColumnHeader } from "./ColumnHeader";
+import type { CellCommitAction } from "./cells/types";
+import { resolveCellMove } from "./tableKeyboard";
 import { DatabaseIconButton, DatabaseMenuSurface } from "./primitives";
-import { Plus, MoreHorizontal, Trash2, Copy, FileText } from "lucide-react";
+import { Plus, MoreHorizontal, Trash2, Copy, FileText, Loader2, Check, AlertCircle } from "lucide-react";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 
 interface TableViewProps {
@@ -35,8 +37,11 @@ export function TableView({ dbId }: TableViewProps) {
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [rowMenuOpen, setRowMenuOpen] = useState<string | null>(null);
   const [, setDraggedColumn] = useState<string | null>(null);
+  const [cellStatus, setCellStatus] = useState<Record<string, "saving" | "saved" | "error">>({});
   
   const tableRef = useRef<HTMLDivElement>(null);
+  const cellRefs = useRef<Record<string, HTMLTableCellElement | null>>({});
+  const statusTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   
   const handleAddColumn = useCallback(() => {
     addColumn(dbId, { name: t.database.newColumn, type: 'text' });
@@ -45,10 +50,130 @@ export function TableView({ dbId }: TableViewProps) {
   const handleCellClick = useCallback((rowId: string, columnId: string) => {
     setEditingCell({ rowId, columnId });
   }, [setEditingCell]);
-  
-  const handleCellBlur = useCallback(() => {
+
+  const getCellKey = useCallback((rowId: string, columnId: string) => `${rowId}::${columnId}`, []);
+
+  const columns = db?.columns || [];
+
+  useEffect(() => {
+    return () => {
+      Object.values(statusTimersRef.current).forEach((timer) => clearTimeout(timer));
+    };
+  }, []);
+
+  const handleCellSaveState = useCallback((rowId: string, columnId: string, state: "idle" | "saving" | "saved" | "error") => {
+    const cellKey = getCellKey(rowId, columnId);
+    const timers = statusTimersRef.current;
+
+    if (timers[cellKey]) {
+      clearTimeout(timers[cellKey]);
+      delete timers[cellKey];
+    }
+
+    if (state === "idle") {
+      setCellStatus((prev) => {
+        const { [cellKey]: _, ...rest } = prev;
+        return rest;
+      });
+      return;
+    }
+
+    setCellStatus((prev) => ({ ...prev, [cellKey]: state }));
+
+    if (state === "saved" || state === "error") {
+      timers[cellKey] = setTimeout(() => {
+        setCellStatus((prev) => {
+          const { [cellKey]: _, ...rest } = prev;
+          return rest;
+        });
+        delete timers[cellKey];
+      }, state === "saved" ? 1200 : 2000);
+    }
+  }, [getCellKey]);
+
+  const focusCell = useCallback((rowIndex: number, columnIndex: number, startEditing = false) => {
+    const row = rows[rowIndex];
+    const column = columns[columnIndex];
+    if (!row || !column) return;
+
+    const key = getCellKey(row.id, column.id);
+    const target = cellRefs.current[key];
+    target?.focus();
+
+    if (startEditing) {
+      setEditingCell({ rowId: row.id, columnId: column.id });
+    }
+  }, [columns, getCellKey, rows, setEditingCell]);
+
+  const handleCellBlur = useCallback((rowIndex: number, colIndex: number, action?: CellCommitAction) => {
     setEditingCell(null);
-  }, [setEditingCell]);
+
+    if (!action) return;
+
+    const target = resolveCellMove(
+      { rowIndex, columnIndex: colIndex },
+      action,
+      rows.length,
+      columns.length,
+    );
+    if (!target) return;
+
+    requestAnimationFrame(() => {
+      focusCell(target.rowIndex, target.columnIndex, true);
+    });
+  }, [columns.length, focusCell, rows.length, setEditingCell]);
+
+  const handleCellKeyDown = useCallback((
+    e: React.KeyboardEvent<HTMLTableCellElement>,
+    rowIndex: number,
+    columnIndex: number,
+    rowId: string,
+    columnId: string,
+  ) => {
+    const isCellEditing = editingCell?.rowId === rowId && editingCell?.columnId === columnId;
+    if (isCellEditing) return;
+
+    if (e.key === "Enter" || e.key === "F2") {
+      e.preventDefault();
+      setEditingCell({ rowId, columnId });
+      return;
+    }
+
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const target = resolveCellMove(
+        { rowIndex, columnIndex },
+        e.shiftKey ? "prev" : "next",
+        rows.length,
+        columns.length,
+      );
+      if (target) {
+        focusCell(target.rowIndex, target.columnIndex, false);
+      }
+      return;
+    }
+
+    if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      e.preventDefault();
+      const action = e.key === "ArrowUp"
+        ? "up"
+        : e.key === "ArrowDown"
+          ? "down"
+          : e.key === "ArrowLeft"
+            ? "left"
+            : "right";
+      const target = resolveCellMove(
+        { rowIndex, columnIndex },
+        action,
+        rows.length,
+        columns.length,
+      );
+      if (target) {
+        focusCell(target.rowIndex, target.columnIndex, false);
+      }
+      return;
+    }
+  }, [columns.length, editingCell?.columnId, editingCell?.rowId, focusCell, rows.length, setEditingCell]);
   
   // 在分栏中打开笔记
   const handleOpenInSplit = useCallback((notePath: string) => {
@@ -60,11 +185,9 @@ export function TableView({ dbId }: TableViewProps) {
   
   if (!db) return null;
   
-  const columns = db.columns;
-  
   return (
     <div className="h-full overflow-x-auto overflow-y-auto bg-background/20" ref={tableRef}>
-      <table className="border-collapse min-w-max">
+      <table className="border-collapse min-w-max" role="grid" aria-label={db.name}>
         {/* 表头 */}
         <thead className="sticky top-0 z-10 bg-background/70 backdrop-blur-md">
           <tr>
@@ -150,14 +273,41 @@ export function TableView({ dbId }: TableViewProps) {
               {columns.map((column, colIndex) => (
                 <td
                   key={column.id}
-                  className={`p-0 border-b border-r border-border ${
+                  ref={(el) => {
+                    cellRefs.current[getCellKey(row.id, column.id)] = el;
+                  }}
+                  className={`db-focus-ring relative p-0 border-b border-r border-border ${
                     editingCell?.rowId === row.id && editingCell?.columnId === column.id
-                      ? 'ring-2 ring-primary ring-inset'
-                      : ''
+                      ? 'ring-2 ring-primary ring-inset bg-primary/[0.06]'
+                      : cellStatus[getCellKey(row.id, column.id)] === "saving"
+                        ? 'ring-1 ring-primary/50 ring-inset bg-primary/[0.07]'
+                        : cellStatus[getCellKey(row.id, column.id)] === "saved"
+                          ? 'bg-primary/[0.1]'
+                          : cellStatus[getCellKey(row.id, column.id)] === "error"
+                            ? 'ring-1 ring-red-500/55 ring-inset bg-red-500/[0.08]'
+                            : ''
                   }`}
                   style={{ width: column.width || 180, minWidth: 100 }}
                   onClick={() => handleCellClick(row.id, column.id)}
+                  onKeyDown={(e) => handleCellKeyDown(e, rowIndex, colIndex, row.id, column.id)}
+                  tabIndex={editingCell?.rowId === row.id && editingCell?.columnId === column.id ? -1 : 0}
+                  aria-label={`${rowIndex + 1}, ${column.name}`}
                 >
+                  {cellStatus[getCellKey(row.id, column.id)] === "saving" && (
+                    <span className="pointer-events-none absolute right-1 top-1 text-primary" aria-hidden>
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    </span>
+                  )}
+                  {cellStatus[getCellKey(row.id, column.id)] === "saved" && (
+                    <span className="pointer-events-none absolute right-1 top-1 text-primary" aria-hidden>
+                      <Check className="w-3 h-3" />
+                    </span>
+                  )}
+                  {cellStatus[getCellKey(row.id, column.id)] === "error" && (
+                    <span className="pointer-events-none absolute right-1 top-1 text-red-500" aria-hidden>
+                      <AlertCircle className="w-3 h-3" />
+                    </span>
+                  )}
                   <div className="flex items-center">
                     <div className="flex-1">
                       <DatabaseCell
@@ -166,7 +316,8 @@ export function TableView({ dbId }: TableViewProps) {
                         rowId={row.id}
                         value={row.cells[column.id]}
                         isEditing={editingCell?.rowId === row.id && editingCell?.columnId === column.id}
-                        onBlur={handleCellBlur}
+                        onBlur={(action) => handleCellBlur(rowIndex, colIndex, action)}
+                        onSaveStateChange={(state) => handleCellSaveState(row.id, column.id, state)}
                       />
                     </div>
                     {/* 第一列显示打开笔记按钮 */}
