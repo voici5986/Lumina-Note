@@ -117,6 +117,7 @@ export interface DatabaseView {
   
   // 日历视图日期列
   dateColumn?: string;
+  calendarEmptyDateStrategy?: 'show' | 'hide';
 }
 
 export interface SortRule {

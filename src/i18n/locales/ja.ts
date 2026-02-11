@@ -766,6 +766,20 @@ export default {
     kanbanMissingGroupDesc: 'カンバンビューにはグループ化用の Select 列が必要です',
     newCard: '新規',
     ungrouped: '未分類',
+    calendar: {
+      dateColumn: '日付列',
+      noDateColumnOption: '日付列なし',
+      emptyDateStrategy: '空の日付',
+      emptyDateShow: '表示',
+      emptyDateHide: '非表示',
+      noDateColumnTitle: 'まず日付列を追加してください',
+      noDateColumnDesc: 'カレンダービューには日付列のマッピングが必要です。',
+      prevMonth: '前の月',
+      nextMonth: '次の月',
+      today: '今日',
+      noDateBucket: '日付なし',
+      more: '件',
+    },
   },
 
   // 音声入力

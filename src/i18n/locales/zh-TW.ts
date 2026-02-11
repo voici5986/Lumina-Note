@@ -766,6 +766,20 @@ export default {
     kanbanMissingGroupDesc: '看板視圖需要一個 Select 類型的欄位作為分組依據',
     newCard: '新增',
     ungrouped: '未分組',
+    calendar: {
+      dateColumn: '日期欄位',
+      noDateColumnOption: '無日期欄位',
+      emptyDateStrategy: '空白日期',
+      emptyDateShow: '顯示分組',
+      emptyDateHide: '隱藏分組',
+      noDateColumnTitle: '請先新增日期欄位',
+      noDateColumnDesc: '日曆視圖需要先對應一個日期欄位。',
+      prevMonth: '上個月',
+      nextMonth: '下個月',
+      today: '今天',
+      noDateBucket: '無日期',
+      more: '更多',
+    },
   },
 
   // 語音輸入

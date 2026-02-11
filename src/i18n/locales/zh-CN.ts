@@ -766,6 +766,20 @@ export default {
     kanbanMissingGroupDesc: '看板视图需要一个 Select 类型的列作为分组依据',
     newCard: '新建',
     ungrouped: '未分组',
+    calendar: {
+      dateColumn: '日期列',
+      noDateColumnOption: '无日期列',
+      emptyDateStrategy: '空日期',
+      emptyDateShow: '显示分组',
+      emptyDateHide: '隐藏分组',
+      noDateColumnTitle: '请先添加日期列',
+      noDateColumnDesc: '日历视图需要先映射一个日期列。',
+      prevMonth: '上个月',
+      nextMonth: '下个月',
+      today: '今天',
+      noDateBucket: '无日期',
+      more: '更多',
+    },
   },
 
   // 语音输入

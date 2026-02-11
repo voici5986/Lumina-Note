@@ -23,6 +23,7 @@ import {
   DatabaseMenuSurface,
   DatabaseTextInput,
 } from "./primitives";
+import { resolveCalendarDateColumnId } from "./calendarUtils";
 
 interface DatabaseToolbarProps {
   dbId: string;
@@ -81,7 +82,7 @@ function getDefaultFilterValue(column: DatabaseColumn | undefined, operator: Fil
 
 export function DatabaseToolbar({ dbId }: DatabaseToolbarProps) {
   const { t } = useLocaleStore();
-  const { databases, addView, setActiveView, addRow, setSorts, setFilters } = useDatabaseStore();
+  const { databases, addView, setActiveView, addRow, setSorts, setFilters, updateView } = useDatabaseStore();
   const db = databases[dbId];
 
   const [showViewMenu, setShowViewMenu] = useState(false);
@@ -114,6 +115,8 @@ export function DatabaseToolbar({ dbId }: DatabaseToolbarProps) {
 
   const activeView = db.views.find((v) => v.id === db.activeViewId);
   const sorts = activeView?.sorts || [];
+  const dateColumns = db.columns.filter((column) => column.type === "date");
+  const activeCalendarDateColumnId = resolveCalendarDateColumnId(db.columns, activeView?.dateColumn);
   const filterGroup: FilterGroup = activeView?.filters || { type: "and", rules: [] };
   const filterRules = filterGroup.rules.filter((rule): rule is FilterRule => !("type" in rule));
   const hasFilters = filterRules.length > 0;
@@ -132,7 +135,16 @@ export function DatabaseToolbar({ dbId }: DatabaseToolbarProps) {
       calendar: t.database.view.calendar,
       gallery: t.database.view.gallery,
     };
-    addView(dbId, { type, name: names[type] });
+    addView(dbId, {
+      type,
+      name: names[type],
+      ...(type === "calendar"
+        ? {
+            dateColumn: resolveCalendarDateColumnId(db.columns) || undefined,
+            calendarEmptyDateStrategy: "show" as const,
+          }
+        : {}),
+    });
     setShowViewMenu(false);
   };
 
@@ -154,6 +166,20 @@ export function DatabaseToolbar({ dbId }: DatabaseToolbarProps) {
       i === index ? { ...s, direction: s.direction === "asc" ? ("desc" as const) : ("asc" as const) } : s,
     );
     setSorts(dbId, activeView.id, newSorts);
+  };
+
+  const handleCalendarDateColumnChange = (columnId: string) => {
+    if (!activeView || activeView.type !== "calendar") return;
+    updateView(dbId, activeView.id, {
+      dateColumn: columnId || undefined,
+    });
+  };
+
+  const handleCalendarEmptyDateStrategyChange = (strategy: "show" | "hide") => {
+    if (!activeView || activeView.type !== "calendar") return;
+    updateView(dbId, activeView.id, {
+      calendarEmptyDateStrategy: strategy,
+    });
   };
 
   const applyFilterRules = (nextRules: FilterRule[]) => {
@@ -318,8 +344,7 @@ export function DatabaseToolbar({ dbId }: DatabaseToolbarProps) {
             </button>
             <button
               onClick={() => handleAddView("calendar")}
-              className="db-menu-item opacity-60 cursor-not-allowed"
-              disabled
+              className="db-menu-item"
             >
               <Calendar className="w-4 h-4" /> {t.database.viewMenu.calendar}
             </button>
@@ -516,6 +541,39 @@ export function DatabaseToolbar({ dbId }: DatabaseToolbarProps) {
       </div>
 
       {/* 搜索 */}
+      {activeView?.type === "calendar" && (
+        <div className="db-panel flex items-center gap-2 px-2 py-1">
+          <span className="text-xs text-muted-foreground">{t.database.calendar.dateColumn}</span>
+          <select
+            value={activeCalendarDateColumnId ?? ""}
+            onChange={(e) => handleCalendarDateColumnChange(e.target.value)}
+            className="db-input h-8 min-w-[132px] px-2"
+            aria-label={t.database.calendar.dateColumn}
+          >
+            {dateColumns.length === 0 ? (
+              <option value="">{t.database.calendar.noDateColumnOption}</option>
+            ) : (
+              dateColumns.map((column) => (
+                <option key={column.id} value={column.id}>
+                  {column.name}
+                </option>
+              ))
+            )}
+          </select>
+
+          <span className="text-xs text-muted-foreground">{t.database.calendar.emptyDateStrategy}</span>
+          <select
+            value={activeView.calendarEmptyDateStrategy ?? "show"}
+            onChange={(e) => handleCalendarEmptyDateStrategyChange(e.target.value as "show" | "hide")}
+            className="db-input h-8 min-w-[100px] px-2"
+            aria-label={t.database.calendar.emptyDateStrategy}
+          >
+            <option value="show">{t.database.calendar.emptyDateShow}</option>
+            <option value="hide">{t.database.calendar.emptyDateHide}</option>
+          </select>
+        </div>
+      )}
+
       <div className="db-panel flex items-center gap-1.5 px-2 py-0.5">
         <Search className="w-4 h-4 text-muted-foreground" />
         <DatabaseTextInput

@@ -3,6 +3,7 @@ import { useDatabaseStore } from "@/stores/useDatabaseStore";
 import { useFileStore } from "@/stores/useFileStore";
 import { TableView } from "./TableView";
 import { KanbanView } from "./KanbanView";
+import { CalendarView } from "./CalendarView";
 import { DatabaseToolbar } from "./DatabaseToolbar";
 import { DatabaseIconButton } from "./primitives";
 import { Database, RefreshCw } from "lucide-react";
@@ -94,9 +95,7 @@ export function DatabaseView({ dbId, className = "" }: DatabaseViewProps) {
           <KanbanView dbId={dbId} />
         )}
         {activeView?.type === 'calendar' && (
-          <div className="flex items-center justify-center h-full p-6">
-            <div className="db-empty-state w-full max-w-lg">{t.database.calendarComingSoon}</div>
-          </div>
+          <CalendarView dbId={dbId} />
         )}
         {activeView?.type === 'gallery' && (
           <div className="flex items-center justify-center h-full p-6">

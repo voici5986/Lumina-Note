@@ -766,6 +766,20 @@ export default {
     kanbanMissingGroupDesc: 'Kanban view requires a Select column for grouping',
     newCard: 'New',
     ungrouped: 'Ungrouped',
+    calendar: {
+      dateColumn: 'Date column',
+      noDateColumnOption: 'No date column',
+      emptyDateStrategy: 'Empty dates',
+      emptyDateShow: 'Show bucket',
+      emptyDateHide: 'Hide bucket',
+      noDateColumnTitle: 'Add a Date column to use calendar view',
+      noDateColumnDesc: 'Calendar needs a mapped Date column first.',
+      prevMonth: 'Previous month',
+      nextMonth: 'Next month',
+      today: 'Today',
+      noDateBucket: 'No date',
+      more: 'more',
+    },
   },
 
   // Speech / Voice input
