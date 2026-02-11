@@ -4,7 +4,14 @@ import { useAIStore } from "@/stores/useAIStore";
 import { useRustAgentStore } from "@/stores/useRustAgentStore";
 import { useRAGStore } from "@/stores/useRAGStore";
 import { useBrowserStore } from "@/stores/useBrowserStore";
-import { PROVIDER_REGISTRY, type LLMProviderType, createProvider } from "@/services/llm";
+import {
+  PROVIDER_REGISTRY,
+  type LLMProviderType,
+  type ThinkingMode,
+  createProvider,
+  normalizeThinkingMode,
+  supportsThinkingModeSwitch,
+} from "@/services/llm";
 import { getRecommendedTemperature } from "@/services/llm/temperature";
 import { Settings, Tag, Loader2, Check, X, Zap, AlertTriangle } from "lucide-react";
 import { useLocaleStore } from "@/stores/useLocaleStore";
@@ -60,6 +67,11 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
     effectiveModelForTemp
   );
   const displayTemperature = config.temperature ?? recommendedTemperature;
+  const supportsThinkingMode = supportsThinkingModeSwitch(
+    config.provider as LLMProviderType,
+    effectiveModelForTemp
+  );
+  const displayThinkingMode = normalizeThinkingMode(config.thinkingMode);
 
   // 测试连接状态
   const [testResult, setTestResult] = useState<TestResult>({ status: "idle" });
@@ -309,6 +321,22 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                 ))}
               </select>
             </div>
+
+            {supportsThinkingMode && (
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">{t.aiSettings.thinkingMode}</label>
+                <select
+                  value={displayThinkingMode}
+                  onChange={(e) => setConfig({ thinkingMode: e.target.value as ThinkingMode })}
+                  className="w-full text-xs p-2 rounded border border-border bg-background"
+                >
+                  <option value="auto">{t.aiSettings.thinkingModeAuto}</option>
+                  <option value="thinking">{t.aiSettings.thinkingModeThinking}</option>
+                  <option value="instant">{t.aiSettings.thinkingModeInstant}</option>
+                </select>
+                <p className="text-[10px] text-muted-foreground mt-1">{t.aiSettings.thinkingModeHint}</p>
+              </div>
+            )}
 
             {config.model === "custom" && (
               <div>
