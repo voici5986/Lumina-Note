@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DatabaseColumn, DatabaseRow } from "@/types/database";
-import { buildMonthGrid, resolveCalendarDateColumnId, splitRowsByCalendarDate } from "./calendarUtils";
+import { buildMonthGrid, extractDateKey, resolveCalendarDateColumnId, splitRowsByCalendarDate } from "./calendarUtils";
 
 describe("calendarUtils", () => {
   it("resolves date-column mapping with fallback", () => {
@@ -45,5 +45,11 @@ describe("calendarUtils", () => {
     const { grouped, undated } = splitRowsByCalendarDate(rows, "due");
     expect(grouped["2026-02-08"]).toHaveLength(1);
     expect(undated).toHaveLength(1);
+  });
+
+  it("extracts stable date keys from date-like values", () => {
+    expect(extractDateKey({ start: "2026-02-18T08:45:00.000Z" })).toBe("2026-02-18");
+    expect(extractDateKey("2026-02-19")).toBe("2026-02-19");
+    expect(extractDateKey("invalid-date")).toBeNull();
   });
 });
