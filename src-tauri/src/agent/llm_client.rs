@@ -142,6 +142,7 @@ impl LlmClient {
             "openai" => "https://api.openai.com/v1".to_string(),
             "deepseek" => "https://api.deepseek.com/v1".to_string(),
             "moonshot" => "https://api.moonshot.cn/v1".to_string(),
+            "zai" => "https://open.bigmodel.cn/api/paas/v4".to_string(),
             "groq" => "https://api.groq.com/openai/v1".to_string(),
             _ => "https://api.openai.com/v1".to_string(),
         }
@@ -150,7 +151,14 @@ impl LlmClient {
     /// 判断当前 provider 是否支持 Function Calling
     pub fn supports_fc(&self) -> bool {
         match self.config.provider.as_str() {
-            "openai" | "anthropic" | "deepseek" | "moonshot" | "gemini" | "groq" | "openrouter" => {
+            "openai"
+            | "anthropic"
+            | "deepseek"
+            | "moonshot"
+            | "zai"
+            | "gemini"
+            | "groq"
+            | "openrouter" => {
                 true
             }
             "ollama" => false, // 本地模型 FC 支持不稳定，使用 XML 模式

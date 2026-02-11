@@ -686,7 +686,7 @@ fn base_system_prompt(provider: &str) -> &'static str {
         "anthropic" => PROMPT_ANTHROPIC,
         "gemini" => PROMPT_GEMINI,
         "ollama" => PROMPT_OLLAMA,
-        "deepseek" | "moonshot" | "groq" => PROMPT_OPENAI,
+        "deepseek" | "moonshot" | "zai" | "groq" => PROMPT_OPENAI,
         _ => PROMPT_DEFAULT,
     }
 }
