@@ -684,10 +684,12 @@ export const useAIStore = create<AIState>()(
               // chat 流式阶段只渲染最终回答文本，避免 reasoning 与正文来回覆盖造成“像两次回复”。
               set((state) => ({
                 streamingContent: finalContent,
-                streamingReasoningStatus:
-                  state.streamingReasoningStatus === "streaming" && reasoningContent.trim().length > 0
-                    ? "done"
-                    : state.streamingReasoningStatus,
+                streamingReasoningStatus: (() => {
+                  if (state.streamingReasoningStatus !== "streaming") {
+                    return state.streamingReasoningStatus;
+                  }
+                  return reasoningContent.trim().length > 0 ? "done" : "idle";
+                })(),
               }));
             } else if (chunk.type === "reasoning") {
               reasoningContent += chunk.text;

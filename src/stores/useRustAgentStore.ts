@@ -1416,10 +1416,12 @@ export const useRustAgentStore = create<RustAgentState>()(
             const { delta } = event.data as { delta: string };
             set({
               streamingContent: state.streamingContent + delta,
-              streamingReasoningStatus:
-                state.streamingReasoningStatus === "streaming" && state.streamingReasoning.trim().length > 0
-                  ? "done"
-                  : state.streamingReasoningStatus,
+              streamingReasoningStatus: (() => {
+                if (state.streamingReasoningStatus !== "streaming") {
+                  return state.streamingReasoningStatus;
+                }
+                return state.streamingReasoning.trim().length > 0 ? "done" : "idle";
+              })(),
               streamingAgent: "coordinator",
             });
             break;
@@ -1653,10 +1655,12 @@ export const useRustAgentStore = create<RustAgentState>()(
               // 直接累积内容
               set({
                 streamingContent: state.streamingContent + content,
-                streamingReasoningStatus:
-                  state.streamingReasoningStatus === "streaming" && state.streamingReasoning.trim().length > 0
-                    ? "done"
-                    : state.streamingReasoningStatus,
+                streamingReasoningStatus: (() => {
+                  if (state.streamingReasoningStatus !== "streaming") {
+                    return state.streamingReasoningStatus;
+                  }
+                  return state.streamingReasoning.trim().length > 0 ? "done" : "idle";
+                })(),
                 streamingAgent: agent,
               });
             }
