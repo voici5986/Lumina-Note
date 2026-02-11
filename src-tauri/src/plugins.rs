@@ -539,7 +539,7 @@ fn write_example_plugin(plugin_dir: &Path) -> Result<(), String> {
     "workspace:panel",
     "workspace:tab"
   ],
-  "enabled_by_default": true,
+  "enabled_by_default": false,
   "is_desktop_only": false
 }
 "#,
@@ -572,13 +572,6 @@ fn write_example_plugin(plugin_dir: &Path) -> Result<(), String> {
 
   const cleanupTheme = api.ui.setThemeVariables({
     "--lumina-plugin-accent": "#0ea5e9"
-  });
-  const removeRibbon = api.ui.registerRibbonItem({
-    id: "hello-ribbon",
-    title: "Hello Ribbon",
-    icon: "🌈",
-    section: "top",
-    run: () => api.ui.notify("hello-lumina ribbon clicked")
   });
   const removeStatus = api.ui.registerStatusBarItem({
     id: "hello-status",
@@ -649,7 +642,6 @@ fn write_example_plugin(plugin_dir: &Path) -> Result<(), String> {
     removePanel();
     removeShellSlot();
     removeLayoutPreset();
-    removeRibbon();
     removeStatus();
     removeSettings();
     removeContextMenu();
@@ -683,7 +675,7 @@ fn write_theme_plugin(plugin_dir: &Path) -> Result<(), String> {
   "version": "0.1.0",
   "entry": "index.js",
   "permissions": ["ui:theme", "ui:decorate"],
-  "enabled_by_default": true
+  "enabled_by_default": false
 }
 "#,
         )
@@ -737,7 +729,7 @@ fn write_ui_overhaul_plugin(plugin_dir: &Path) -> Result<(), String> {
   "version": "0.1.0",
   "entry": "index.js",
   "permissions": ["commands:*", "ui:*", "workspace:panel", "workspace:tab"],
-  "enabled_by_default": true
+  "enabled_by_default": false
 }
 "#,
         )

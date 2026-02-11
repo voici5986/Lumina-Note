@@ -20,9 +20,7 @@ export function PluginSection() {
     reloadPlugins,
     setPluginEnabled,
     ensureWorkspacePluginDir,
-    scaffoldExamplePlugin,
     scaffoldThemePlugin,
-    scaffoldUiOverhaulPlugin,
     appearanceSafeMode,
     setAppearanceSafeMode,
     isolatePluginStyles,
@@ -64,30 +62,10 @@ export function PluginSection() {
     }
   };
 
-  const handleScaffold = async () => {
-    try {
-      setBusyAction("scaffold");
-      const dir = await scaffoldExamplePlugin();
-      await showInExplorer(dir);
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
   const handleScaffoldTheme = async () => {
     try {
       setBusyAction("scaffold-theme");
       const dir = await scaffoldThemePlugin();
-      await showInExplorer(dir);
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  const handleScaffoldUiOverhaul = async () => {
-    try {
-      setBusyAction("scaffold-ui-overhaul");
-      const dir = await scaffoldUiOverhaulPlugin();
       await showInExplorer(dir);
     } finally {
       setBusyAction(null);
@@ -149,27 +127,11 @@ export function PluginSection() {
         </button>
         <button
           type="button"
-          onClick={handleScaffold}
-          disabled={busyAction === "scaffold"}
-          className="h-9 px-3 rounded-lg text-sm font-medium border border-border bg-background/60 hover:bg-muted disabled:opacity-50"
-        >
-          {t.plugins.scaffoldExample}
-        </button>
-        <button
-          type="button"
           onClick={handleScaffoldTheme}
           disabled={busyAction === "scaffold-theme"}
           className="h-9 px-3 rounded-lg text-sm font-medium border border-border bg-background/60 hover:bg-muted disabled:opacity-50"
         >
           {t.plugins.scaffoldTheme}
-        </button>
-        <button
-          type="button"
-          onClick={handleScaffoldUiOverhaul}
-          disabled={busyAction === "scaffold-ui-overhaul"}
-          className="h-9 px-3 rounded-lg text-sm font-medium border border-border bg-background/60 hover:bg-muted disabled:opacity-50"
-        >
-          {t.plugins.scaffoldUiOverhaul}
         </button>
       </div>
 
