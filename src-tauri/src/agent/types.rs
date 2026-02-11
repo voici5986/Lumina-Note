@@ -219,6 +219,9 @@ pub struct AgentConfig {
     /// 温度
     #[serde(default = "default_temperature")]
     pub temperature: f32,
+    /// 思考模式
+    #[serde(default = "default_thinking_mode")]
+    pub thinking_mode: ThinkingMode,
     /// 最大 tokens
     #[serde(default = "default_max_tokens")]
     pub max_tokens: usize,
@@ -239,6 +242,9 @@ pub struct AgentConfig {
 fn default_temperature() -> f32 {
     0.7
 }
+fn default_thinking_mode() -> ThinkingMode {
+    ThinkingMode::Auto
+}
 fn default_max_tokens() -> usize {
     4096
 }
@@ -253,6 +259,20 @@ fn default_locale() -> String {
     "zh-CN".to_string()
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ThinkingMode {
+    Auto,
+    Thinking,
+    Instant,
+}
+
+impl Default for ThinkingMode {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
 impl Default for AgentConfig {
     fn default() -> Self {
         Self {
@@ -261,6 +281,7 @@ impl Default for AgentConfig {
             api_key: String::new(),
             base_url: None,
             temperature: default_temperature(),
+            thinking_mode: default_thinking_mode(),
             max_tokens: default_max_tokens(),
             max_plan_iterations: default_max_plan_iterations(),
             max_steps: default_max_steps(),

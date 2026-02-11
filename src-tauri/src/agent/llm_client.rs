@@ -158,6 +158,41 @@ impl LlmClient {
         }
     }
 
+    fn model_matches(model: &str, target: &str) -> bool {
+        let normalized_model = model.trim().to_ascii_lowercase();
+        let normalized_target = target.trim().to_ascii_lowercase();
+        normalized_model == normalized_target
+            || normalized_model.ends_with(&format!("/{}", normalized_target))
+    }
+
+    fn resolved_model(&self) -> String {
+        let model = self.config.model.clone();
+        if self.config.provider != "deepseek" {
+            return model;
+        }
+
+        let is_deepseek_pair = Self::model_matches(&model, "deepseek-chat")
+            || Self::model_matches(&model, "deepseek-reasoner");
+        if !is_deepseek_pair {
+            return model;
+        }
+
+        match self.config.thinking_mode {
+            ThinkingMode::Thinking => "deepseek-reasoner".to_string(),
+            ThinkingMode::Instant => "deepseek-chat".to_string(),
+            ThinkingMode::Auto => model,
+        }
+    }
+
+    fn apply_thinking_controls(&self, body: &mut Value, model: &str) {
+        if self.config.provider == "moonshot"
+            && Self::model_matches(model, "kimi-k2.5")
+            && self.config.thinking_mode == ThinkingMode::Instant
+        {
+            body["thinking"] = json!({ "type": "disabled" });
+        }
+    }
+
     fn recommended_temperature(provider: &str, model: &str) -> f32 {
         let normalized = model.to_ascii_lowercase();
         if normalized.contains("thinking")
@@ -195,7 +230,8 @@ impl LlmClient {
     }
 
     fn resolved_temperature(&self) -> f32 {
-        let recommended = Self::recommended_temperature(&self.config.provider, &self.config.model);
+        let resolved_model = self.resolved_model();
+        let recommended = Self::recommended_temperature(&self.config.provider, &resolved_model);
         let configured = self.config.temperature;
         if configured.is_finite() {
             configured.clamp(0.0, 2.0)
@@ -253,15 +289,17 @@ impl LlmClient {
         let headers = self.build_headers();
 
         let chat_messages = self.convert_messages(messages);
+        let resolved_model = self.resolved_model();
         let temperature = self.resolved_temperature();
 
         let mut body = json!({
-            "model": self.config.model,
+            "model": resolved_model,
             "messages": chat_messages,
             "temperature": temperature,
             "max_tokens": self.config.max_tokens,
             "stream": false,
         });
+        self.apply_thinking_controls(&mut body, &resolved_model);
 
         let has_tools = tools.is_some();
         if let Some(tools) = tools {
@@ -271,7 +309,7 @@ impl LlmClient {
         println!("[LlmClient] 📤 发送请求到: {}", url);
         println!(
             "[LlmClient] 📤 模型: {}, 消息数: {}, 工具: {}",
-            self.config.model,
+            resolved_model,
             chat_messages.len(),
             has_tools
         );
@@ -540,15 +578,17 @@ impl LlmClient {
         let headers = self.build_headers();
 
         let chat_messages = self.convert_messages(messages);
+        let resolved_model = self.resolved_model();
         let temperature = self.resolved_temperature();
 
         let mut body = json!({
-            "model": self.config.model,
+            "model": resolved_model,
             "messages": chat_messages,
             "temperature": temperature,
             "max_tokens": self.config.max_tokens,
             "stream": true,
         });
+        self.apply_thinking_controls(&mut body, &resolved_model);
 
         if let Some(tools) = tools {
             body["tools"] = json!(tools);
@@ -975,15 +1015,17 @@ impl LlmClient {
         let headers = self.build_headers();
 
         let chat_messages = self.convert_messages(messages);
+        let resolved_model = self.resolved_model();
         let temperature = self.resolved_temperature();
 
         let mut body = json!({
-            "model": self.config.model,
+            "model": resolved_model,
             "messages": chat_messages,
             "temperature": temperature,
             "max_tokens": self.config.max_tokens,
             "stream": true,
         });
+        self.apply_thinking_controls(&mut body, &resolved_model);
 
         if let Some(tools) = tools {
             body["tools"] = json!(tools);
@@ -1210,8 +1252,9 @@ impl LlmClient {
             prompt_chars.chars().count()
         );
 
-        let body = json!({
-            "model": self.config.model,
+        let resolved_model = self.resolved_model();
+        let mut body = json!({
+            "model": resolved_model,
             "messages": [{
                 "role": "user",
                 "content": prompt_chars
@@ -1220,6 +1263,7 @@ impl LlmClient {
             "max_tokens": self.config.max_tokens,
             "stream": true,
         });
+        self.apply_thinking_controls(&mut body, &resolved_model);
 
         let mut req = self.client.post(&url);
         for (key, value) in headers {

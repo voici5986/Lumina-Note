@@ -230,6 +230,7 @@ export interface AgentConfig {
   api_key: string;
   base_url?: string;
   temperature?: number;
+  thinking_mode?: "auto" | "thinking" | "instant";
   max_tokens?: number;
   max_plan_iterations?: number;
   max_steps?: number;
@@ -641,6 +642,7 @@ const buildAgentConfig = (aiConfig: AIConfig, autoApprove: boolean): AgentConfig
     temperature:
       aiConfig.temperature ??
       getRecommendedTemperature(resolvedProvider, resolvedModel),
+    thinking_mode: aiConfig.thinkingMode ?? "auto",
     max_tokens: 4096,
     // 0 means unlimited
     max_plan_iterations: 0,
