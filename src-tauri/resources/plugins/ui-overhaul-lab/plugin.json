@@ -1,0 +1,8 @@
+{
+  "id": "ui-overhaul-lab",
+  "name": "UI Overhaul Lab",
+  "version": "0.1.0",
+  "entry": "index.js",
+  "permissions": ["commands:*", "ui:*", "workspace:panel", "workspace:tab"],
+  "enabled_by_default": true
+}
