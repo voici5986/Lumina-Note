@@ -25,7 +25,7 @@ export function PDFViewer({ filePath, className }: PDFViewerProps) {
   const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showOutline, setShowOutline] = useState(true);
+  const [showOutline, setShowOutline] = useState(false);
   const [interactiveMode, setInteractiveMode] = useState(false);
   const { currentPage, scale, setCurrentPage, setScale } = usePDFStore();
   const { t } = useLocaleStore();

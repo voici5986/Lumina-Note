@@ -24,7 +24,7 @@ interface OutlineNodeProps {
 }
 
 function OutlineNode({ item, level, onNavigate }: OutlineNodeProps) {
-  const [expanded, setExpanded] = useState(level < 2);
+  const [expanded, setExpanded] = useState(false);
   const hasChildren = item.items && item.items.length > 0;
 
   return (
