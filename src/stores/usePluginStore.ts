@@ -65,6 +65,19 @@ const toEffectiveEnabledById = (
     }
   }
 
+  // Guardrail: non-builtin appearance plugins can override core theme tokens/colors.
+  // They must be explicitly enabled by user action, even if manifest sets enabled_by_default=true.
+  // This prevents "cold start unexpectedly changes dark theme tint" regressions.
+  for (const plugin of plugins) {
+    if (
+      plugin.source !== "builtin" &&
+      isAppearancePlugin(plugin.permissions || []) &&
+      !Object.prototype.hasOwnProperty.call(next, plugin.id)
+    ) {
+      next[plugin.id] = false;
+    }
+  }
+
   if (!appearanceSafeMode) {
     return next;
   }
