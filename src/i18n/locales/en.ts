@@ -769,6 +769,10 @@ export default {
     },
     kanbanMissingGroupTitle: 'Set a group column first',
     kanbanMissingGroupDesc: 'Kanban view requires a Select column for grouping',
+    kanban: {
+      groupBy: 'Group column',
+      noGroupByOption: 'No group column',
+    },
     newCard: 'New',
     ungrouped: 'Ungrouped',
     calendar: {

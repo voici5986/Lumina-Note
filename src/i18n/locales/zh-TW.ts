@@ -769,6 +769,10 @@ export default {
     },
     kanbanMissingGroupTitle: '請先設定分組欄位',
     kanbanMissingGroupDesc: '看板視圖需要一個 Select 類型的欄位作為分組依據',
+    kanban: {
+      groupBy: '分組欄位',
+      noGroupByOption: '無分組欄位',
+    },
     newCard: '新增',
     ungrouped: '未分組',
     calendar: {

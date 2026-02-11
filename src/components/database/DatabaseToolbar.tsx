@@ -24,6 +24,7 @@ import {
   DatabaseTextInput,
 } from "./primitives";
 import { resolveCalendarDateColumnId } from "./calendarUtils";
+import { resolveKanbanGroupColumnId } from "./kanbanUtils";
 
 interface DatabaseToolbarProps {
   dbId: string;
@@ -116,7 +117,12 @@ export function DatabaseToolbar({ dbId }: DatabaseToolbarProps) {
   const activeView = db.views.find((v) => v.id === db.activeViewId);
   const sorts = activeView?.sorts || [];
   const dateColumns = db.columns.filter((column) => column.type === "date");
+  const kanbanGroupColumns = db.columns.filter((column) => column.type === "select" || column.type === "multi-select");
   const activeCalendarDateColumnId = resolveCalendarDateColumnId(db.columns, activeView?.dateColumn);
+  const activeKanbanGroupColumnId =
+    activeView?.type === "kanban"
+      ? resolveKanbanGroupColumnId(db.columns, activeView.groupBy)
+      : null;
   const filterGroup: FilterGroup = activeView?.filters || { type: "and", rules: [] };
   const filterRules = filterGroup.rules.filter((rule): rule is FilterRule => !("type" in rule));
   const hasFilters = filterRules.length > 0;
@@ -143,6 +149,10 @@ export function DatabaseToolbar({ dbId }: DatabaseToolbarProps) {
             dateColumn: resolveCalendarDateColumnId(db.columns) || undefined,
             calendarEmptyDateStrategy: "show" as const,
           }
+        : type === "kanban"
+          ? {
+              groupBy: resolveKanbanGroupColumnId(db.columns) || undefined,
+            }
         : {}),
     });
     setShowViewMenu(false);
@@ -179,6 +189,13 @@ export function DatabaseToolbar({ dbId }: DatabaseToolbarProps) {
     if (!activeView || activeView.type !== "calendar") return;
     updateView(dbId, activeView.id, {
       calendarEmptyDateStrategy: strategy,
+    });
+  };
+
+  const handleKanbanGroupColumnChange = (columnId: string) => {
+    if (!activeView || activeView.type !== "kanban") return;
+    updateView(dbId, activeView.id, {
+      groupBy: columnId || undefined,
     });
   };
 
@@ -541,6 +558,28 @@ export function DatabaseToolbar({ dbId }: DatabaseToolbarProps) {
       </div>
 
       {/* 搜索 */}
+      {activeView?.type === "kanban" && (
+        <div className="db-panel flex items-center gap-2 px-2 py-1">
+          <span className="text-xs text-muted-foreground">{t.database.kanban.groupBy}</span>
+          <select
+            value={activeKanbanGroupColumnId ?? ""}
+            onChange={(e) => handleKanbanGroupColumnChange(e.target.value)}
+            className="db-input h-8 min-w-[132px] px-2"
+            aria-label={t.database.kanban.groupBy}
+          >
+            {kanbanGroupColumns.length === 0 ? (
+              <option value="">{t.database.kanban.noGroupByOption}</option>
+            ) : (
+              kanbanGroupColumns.map((column) => (
+                <option key={column.id} value={column.id}>
+                  {column.name}
+                </option>
+              ))
+            )}
+          </select>
+        </div>
+      )}
+
       {activeView?.type === "calendar" && (
         <div className="db-panel flex items-center gap-2 px-2 py-1">
           <span className="text-xs text-muted-foreground">{t.database.calendar.dateColumn}</span>

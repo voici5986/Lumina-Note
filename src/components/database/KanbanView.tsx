@@ -1,10 +1,11 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDatabaseStore } from "@/stores/useDatabaseStore";
 import type { DatabaseRow } from "@/types/database";
 import { SELECT_COLORS } from "@/types/database";
 import { DatabaseIconButton, DatabasePanel } from "./primitives";
 import { Plus, MoreHorizontal, GripVertical } from "lucide-react";
 import { useLocaleStore } from "@/stores/useLocaleStore";
+import { resolveKanbanGroupColumnId } from "./kanbanUtils";
 
 interface KanbanViewProps {
   dbId: string;
@@ -16,6 +17,7 @@ export function KanbanView({ dbId }: KanbanViewProps) {
     databases,
     addRow,
     updateCell,
+    updateView,
     getFilteredSortedRows,
   } = useDatabaseStore();
   
@@ -28,7 +30,14 @@ export function KanbanView({ dbId }: KanbanViewProps) {
   if (!db) return null;
   
   const activeView = db.views.find(v => v.id === db.activeViewId);
-  const groupByColumnId = activeView?.groupBy;
+  const groupByColumnId = activeView ? resolveKanbanGroupColumnId(db.columns, activeView.groupBy) : null;
+  
+  useEffect(() => {
+    if (!activeView || activeView.type !== "kanban") return;
+    if (!groupByColumnId) return;
+    if (activeView.groupBy === groupByColumnId) return;
+    updateView(dbId, activeView.id, { groupBy: groupByColumnId });
+  }, [activeView, dbId, groupByColumnId, updateView]);
   
   // 找到分组列
   const groupColumn = db.columns.find(c => c.id === groupByColumnId);

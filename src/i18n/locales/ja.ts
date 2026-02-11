@@ -769,6 +769,10 @@ export default {
     },
     kanbanMissingGroupTitle: 'グループ列を設定してください',
     kanbanMissingGroupDesc: 'カンバンビューにはグループ化用の Select 列が必要です',
+    kanban: {
+      groupBy: 'グループ列',
+      noGroupByOption: 'グループ列なし',
+    },
     newCard: '新規',
     ungrouped: '未分類',
     calendar: {

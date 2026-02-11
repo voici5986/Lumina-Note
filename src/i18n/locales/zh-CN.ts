@@ -769,6 +769,10 @@ export default {
     },
     kanbanMissingGroupTitle: '请先设置分组列',
     kanbanMissingGroupDesc: '看板视图需要一个 Select 类型的列作为分组依据',
+    kanban: {
+      groupBy: '分组列',
+      noGroupByOption: '无分组列',
+    },
     newCard: '新建',
     ungrouped: '未分组',
     calendar: {
