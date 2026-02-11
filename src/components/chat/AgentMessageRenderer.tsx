@@ -402,7 +402,7 @@ function cleanUserMessage(content: string): string {
 /**
  * 思考块折叠组件
  */
-const ThinkingCollapsible = memo(function ThinkingCollapsible({ thinking, t }: { thinking: string, t: any }) {
+export const ThinkingCollapsible = memo(function ThinkingCollapsible({ thinking, t }: { thinking: string, t: any }) {
   const [expanded, setExpanded] = useState(false);
 
   return (

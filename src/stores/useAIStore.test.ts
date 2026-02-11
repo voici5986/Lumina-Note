@@ -93,8 +93,11 @@ describe("useAIStore sendMessageStream", () => {
     const messages = useAIStore.getState().messages;
     expect(messages[messages.length - 1]).toMatchObject({
       role: "assistant",
-      content: "pong",
     });
+    const assistantContent = String(messages[messages.length - 1].content);
+    expect(assistantContent).toContain("<thinking>");
+    expect(assistantContent).toContain("thinking...");
+    expect(assistantContent).toContain("pong");
   });
 
   it("should ignore duplicate stream requests while streaming", async () => {

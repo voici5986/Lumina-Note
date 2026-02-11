@@ -669,15 +669,18 @@ export const useAIStore = create<AIState>()(
             }
           }
           
-          // chat 消息正文保持单一答案内容，不把中间 reasoning 注入最终消息，
-          // 否则用户会看到一次流式正文后又被 thinking 块“替换成另一版”。
+          // chat 流式阶段仍只渲染最终正文，避免 reasoning 与正文来回覆盖造成“像两次回复”。
+          // 流结束后再把 reasoning 作为 <thinking> 折叠块写入消息，供 UI 按需展开查看。
+          const assistantContent = reasoningContent.trim().length > 0
+            ? `<thinking>\n${reasoningContent.trim()}\n</thinking>\n\n${finalContent}`
+            : finalContent;
           
           // Parse edit suggestions from content
           const edits = parseEditSuggestions(finalContent);
 
           // 结束流式状态并添加消息（合并为一次更新，避免切换闪烁）
           set((state) => {
-            const assistantMessage: Message = { role: "assistant", content: finalContent };
+            const assistantMessage: Message = { role: "assistant", content: assistantContent };
             const newMessages = [...state.messages, assistantMessage];
             const newTitle = generateTitleFromAssistantContent(finalContent, t.common.newConversation);
             return {

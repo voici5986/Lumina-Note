@@ -40,7 +40,7 @@ import {
   Bug,
   Download,
 } from "lucide-react";
-import { AgentMessageRenderer } from "../chat/AgentMessageRenderer";
+import { AgentMessageRenderer, ThinkingCollapsible } from "../chat/AgentMessageRenderer";
 import { PlanCard } from "../chat/PlanCard";
 import { StreamingOutput } from "../chat/StreamingMessage";
 import { SelectableConversationList } from "../chat/SelectableConversationList";
@@ -88,6 +88,39 @@ function getQuickActions(t: ReturnType<typeof useLocaleStore.getState>['t']) {
     { icon: Zap, label: t.ai.writeArticle, desc: t.ai.writeArticleDesc, mode: "agent" as const, prompt: t.ai.quickPrompts.writeArticle },
     { icon: Bot, label: t.ai.studyNotes, desc: t.ai.studyNotesDesc, mode: "agent" as const, prompt: t.ai.quickPrompts.studyNotes },
   ];
+}
+
+type ChatAssistantPart =
+  | { type: "text"; content: string }
+  | { type: "thinking"; content: string };
+
+function parseChatAssistantParts(content: string): ChatAssistantPart[] {
+  const parts: ChatAssistantPart[] = [];
+  const normalized = content.replace(/<\|end_of_thinking\|>/g, "");
+  const tagRegex = /<thinking>([\s\S]*?)<\/thinking>/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = tagRegex.exec(normalized)) !== null) {
+    const text = normalized.slice(lastIndex, match.index);
+    if (text.trim().length > 0) {
+      parts.push({ type: "text", content: text });
+    }
+
+    const thinking = (match[1] || "").trim();
+    if (thinking.length > 0) {
+      parts.push({ type: "thinking", content: thinking });
+    }
+
+    lastIndex = tagRegex.lastIndex;
+  }
+
+  const trailing = normalized.slice(lastIndex);
+  if (trailing.trim().length > 0 || parts.length === 0) {
+    parts.push({ type: "text", content: trailing || normalized });
+  }
+
+  return parts;
 }
 
 // 建议卡片组件
@@ -1565,10 +1598,32 @@ export function MainAIChatShell() {
                               );
                             })()
                           ) : (
-                            <div
-                              className="prose prose-sm dark:prose-invert max-w-none leading-relaxed"
-                              dangerouslySetInnerHTML={{ __html: parseMarkdown(getTextFromContent(msg.content)) }}
-                            />
+                            (() => {
+                              const assistantParts = parseChatAssistantParts(getTextFromContent(msg.content));
+                              return (
+                                <div className="space-y-2">
+                                  {assistantParts.map((part, partIdx) => {
+                                    if (part.type === "thinking") {
+                                      return (
+                                        <ThinkingCollapsible
+                                          key={`${idx}-thinking-${partIdx}`}
+                                          thinking={part.content}
+                                          t={t}
+                                        />
+                                      );
+                                    }
+
+                                    return (
+                                      <div
+                                        key={`${idx}-text-${partIdx}`}
+                                        className="prose prose-sm dark:prose-invert max-w-none leading-relaxed"
+                                        dangerouslySetInnerHTML={{ __html: parseMarkdown(part.content) }}
+                                      />
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })()
                           )}
                         </div>
                       </motion.div>

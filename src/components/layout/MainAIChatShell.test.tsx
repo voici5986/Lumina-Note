@@ -99,4 +99,23 @@ describe("MainAIChatShell", () => {
     const { t } = useLocaleStore.getState();
     expect(screen.queryByText(t.aiSettings.thinkingMode)).toBeNull();
   });
+
+  it("renders assistant thinking as collapsed block and expands on click", () => {
+    useUIStore.setState({ chatMode: "chat" });
+    useAIStore.setState({
+      messages: [
+        { role: "user", content: "hello" },
+        { role: "assistant", content: "<thinking>step by step</thinking>\n\nfinal answer" },
+      ],
+    });
+
+    render(<MainAIChatShell />);
+
+    const { t } = useLocaleStore.getState();
+    const thinkingToggle = screen.getByText(t.agentMessage.thinking);
+    expect(screen.queryByText("step by step")).toBeNull();
+    fireEvent.click(thinkingToggle);
+    expect(screen.getByText("step by step")).toBeTruthy();
+    expect(screen.getByText("final answer")).toBeTruthy();
+  });
 });
