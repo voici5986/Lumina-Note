@@ -182,7 +182,7 @@ let lastUserEditTime = 0;
 const MAX_UNDO_HISTORY = 50;
 
 const isDocxPath = (path: string) => path.toLowerCase().endsWith(".docx");
-const DIAGRAM_FILE_SUFFIXES = [".excalidraw.json", ".diagram.json"] as const;
+const DIAGRAM_FILE_SUFFIXES = [".excalidraw.json", ".diagram.json", ".drawio.json"] as const;
 
 const isDiagramPath = (path: string) => {
   const normalized = path.toLowerCase();

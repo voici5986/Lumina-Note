@@ -492,7 +492,9 @@ export function Sidebar() {
         ? `${creating.parentPath}${sep}${trimmed}`
         : creating.type === "diagram"
           ? `${creating.parentPath}${sep}${trimmed}${
-              trimmed.endsWith(".diagram.json") || trimmed.endsWith(".excalidraw.json")
+              trimmed.endsWith(".diagram.json") ||
+              trimmed.endsWith(".excalidraw.json") ||
+              trimmed.endsWith(".drawio.json")
                 ? ""
                 : ".diagram.json"
             }`
@@ -596,7 +598,7 @@ export function Sidebar() {
         const dbId = entry.name.replace('.db.json', '');
         const dbName = dbId; // 可以后续从文件内容读取真实名称
         openDatabaseTab(dbId, dbName);
-      } else if (name.endsWith(".excalidraw.json") || name.endsWith(".diagram.json")) {
+      } else if (name.endsWith(".excalidraw.json") || name.endsWith(".diagram.json") || name.endsWith(".drawio.json")) {
         openDiagramTab(entry.path);
       } else if (name.endsWith('.pdf')) {
         // PDF 文件 - 根据活动面板打开
@@ -1356,7 +1358,7 @@ function FileTreeItem({
     if (name.endsWith('.db.json')) {
       return <Database className="w-4 h-4 text-slate-500 shrink-0" />;
     }
-    if (name.endsWith(".excalidraw.json") || name.endsWith(".diagram.json")) {
+    if (name.endsWith(".excalidraw.json") || name.endsWith(".diagram.json") || name.endsWith(".drawio.json")) {
       return <Shapes className="w-4 h-4 text-cyan-500 shrink-0" />;
     }
     if (name.endsWith('.pdf')) {
