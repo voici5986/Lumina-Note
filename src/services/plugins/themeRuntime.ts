@@ -40,7 +40,7 @@ const appendTokenMap = (source: TokenMap | undefined, target: TokenMap) => {
 class ThemeRuntime {
   private presets = new Map<string, ThemePresetRecord>();
   private overrides: TokenOverride[] = [];
-  private baseline = new Map<string, string>();
+  private lightStyleEl: HTMLStyleElement | null = null;
   private darkStyleEl: HTMLStyleElement | null = null;
 
   registerPreset(pluginId: string, input: ThemePresetInput): () => void {
@@ -140,7 +140,6 @@ class ThemeRuntime {
   }
 
   private recompute() {
-    const root = document.documentElement;
     const light = new Map<string, string>();
     const dark = new Map<string, string>();
 
@@ -153,40 +152,42 @@ class ThemeRuntime {
       }
     }
 
-    const touched = new Set<string>([
-      ...Array.from(light.keys()),
-      ...Array.from(dark.keys()),
-      ...Array.from(this.baseline.keys()),
-    ]);
+    this.lightStyleEl = this.renderModeStyle(
+      this.lightStyleEl,
+      "data-lumina-plugin-theme-light",
+      ":root:not(.dark)",
+      light,
+    );
+    this.darkStyleEl = this.renderModeStyle(
+      this.darkStyleEl,
+      "data-lumina-plugin-theme-dark",
+      ":root.dark",
+      dark,
+    );
+  }
 
-    for (const token of touched) {
-      if (!this.baseline.has(token)) {
-        this.baseline.set(token, root.style.getPropertyValue(token));
-      }
-      if (light.has(token)) {
-        root.style.setProperty(token, light.get(token) || "");
-      } else {
-        const previous = this.baseline.get(token);
-        if (previous) root.style.setProperty(token, previous);
-        else root.style.removeProperty(token);
-      }
+  private renderModeStyle(
+    existing: HTMLStyleElement | null,
+    attr: string,
+    selector: string,
+    tokens: Map<string, string>,
+  ): HTMLStyleElement | null {
+    if (existing) {
+      existing.remove();
     }
 
-    if (this.darkStyleEl) {
-      this.darkStyleEl.remove();
-      this.darkStyleEl = null;
+    if (tokens.size === 0) {
+      return null;
     }
 
-    if (dark.size > 0) {
-      const style = document.createElement("style");
-      style.setAttribute("data-lumina-plugin-theme-dark", "true");
-      const tokens = Array.from(dark.entries())
-        .map(([token, value]) => `${token}: ${value};`)
-        .join(" ");
-      style.textContent = `.dark { ${tokens} }`;
-      document.head.appendChild(style);
-      this.darkStyleEl = style;
-    }
+    const style = document.createElement("style");
+    style.setAttribute(attr, "true");
+    const serialized = Array.from(tokens.entries())
+      .map(([token, value]) => `${token}: ${value};`)
+      .join(" ");
+    style.textContent = `${selector} { ${serialized} }`;
+    document.head.appendChild(style);
+    return style;
   }
 }
 
