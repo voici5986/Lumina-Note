@@ -1365,7 +1365,8 @@ mod tests {
     #[test]
     fn to_http_error_marks_retryable_status() {
         let headers = HeaderMap::new();
-        let retryable = LlmClient::to_http_error(StatusCode::TOO_MANY_REQUESTS, "rate limited", &headers);
+        let retryable =
+            LlmClient::to_http_error(StatusCode::TOO_MANY_REQUESTS, "rate limited", &headers);
         assert!(retryable.retryable);
 
         let fatal = LlmClient::to_http_error(StatusCode::BAD_REQUEST, "bad request", &headers);
