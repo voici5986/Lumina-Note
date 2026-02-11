@@ -230,20 +230,6 @@ module.exports = function setup(api, plugin) {
     render: ({ code }) => `<pre class="pixel-noir-codeblock"><code>${escapeHtml(code)}</code></pre>`
   });
 
-  const removeRibbon = api.ui.registerRibbonItem({
-    id: "pixel-noir-toggle-scanlines",
-    title: "Toggle Pixel Scanlines",
-    icon: "◩",
-    section: "top",
-    order: 120,
-    run: () => {
-      const enabled = api.storage.get("scanlines") !== "off";
-      api.storage.set("scanlines", enabled ? "off" : "on");
-      syncScanlines();
-      api.ui.notify(`Pixel Noir scanlines ${enabled ? "OFF" : "ON"}`);
-    }
-  });
-
   const removeStatus = api.ui.registerStatusBarItem({
     id: "pixel-noir-status",
     text: "PIXEL/NOIR",
@@ -304,7 +290,6 @@ module.exports = function setup(api, plugin) {
     removePaletteGroup();
     removeSettings();
     removeStatus();
-    removeRibbon();
     removeCodeRenderer();
     removeMarkdownPost();
     removeEditorSkin();

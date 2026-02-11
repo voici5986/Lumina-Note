@@ -70,6 +70,12 @@ const HOST_APP_VERSION =
   typeof __LUMINA_APP_VERSION__ === "string" && __LUMINA_APP_VERSION__.trim().length > 0
     ? __LUMINA_APP_VERSION__
     : "0.0.0";
+const DEFAULT_PLUGIN_RIBBON_BLOCKLIST = new Set<string>([
+  "hello-lumina",
+  "pixel-noir",
+  "ui-overhaul-lab",
+  "theme-oceanic",
+]);
 
 interface LuminaPluginApi {
   meta: {
@@ -733,6 +739,12 @@ return exported(api, plugin);
       requirePermission("ui:decorate");
       const itemId = input.id.trim();
       if (!itemId) throw new Error("Ribbon item id cannot be empty");
+      if (DEFAULT_PLUGIN_RIBBON_BLOCKLIST.has(info.id)) {
+        console.info(
+          `[PluginRuntime:${info.id}] skip ribbon item registration for default plugin item ${itemId}`,
+        );
+        return () => {};
+      }
       usePluginUiStore.getState().registerRibbonItem({
         pluginId: info.id,
         itemId,

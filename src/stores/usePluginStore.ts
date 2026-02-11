@@ -42,15 +42,31 @@ const isAppearancePlugin = (permissions: string[]) =>
     ].includes(perm),
   );
 
+const DEFAULT_DISABLED_SAMPLE_PLUGIN_IDS = new Set<string>([
+  "hello-lumina",
+  "ui-overhaul-lab",
+]);
+
 const toEffectiveEnabledById = (
   plugins: PluginInfo[],
   enabledById: Record<string, boolean>,
   appearanceSafeMode: boolean,
 ) => {
-  if (!appearanceSafeMode) {
-    return { ...enabledById };
-  }
   const next = { ...enabledById };
+
+  // Sample plugins should stay opt-in unless user explicitly toggles them.
+  for (const plugin of plugins) {
+    if (
+      DEFAULT_DISABLED_SAMPLE_PLUGIN_IDS.has(plugin.id) &&
+      !Object.prototype.hasOwnProperty.call(next, plugin.id)
+    ) {
+      next[plugin.id] = false;
+    }
+  }
+
+  if (!appearanceSafeMode) {
+    return next;
+  }
   for (const plugin of plugins) {
     if (isAppearancePlugin(plugin.permissions || [])) {
       next[plugin.id] = false;
