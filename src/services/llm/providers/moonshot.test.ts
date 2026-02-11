@@ -1,21 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { requiresMoonshotTemperatureOne } from "./moonshot";
+import { getRecommendedTemperature } from "../temperature";
 
-describe("requiresMoonshotTemperatureOne", () => {
-  it("returns true for thinking models", () => {
-    expect(requiresMoonshotTemperatureOne("kimi-k2-thinking")).toBe(true);
-    expect(requiresMoonshotTemperatureOne("KIMI-K2-THINKING-TURBO")).toBe(true);
+describe("Moonshot temperature strategy", () => {
+  it("uses high default temperature for thinking models", () => {
+    expect(getRecommendedTemperature("moonshot", "kimi-k2-thinking")).toBe(1.0);
+    expect(getRecommendedTemperature("moonshot", "KIMI-K2-THINKING-TURBO")).toBe(1.0);
   });
 
-  it("returns true for k2.5 models", () => {
-    expect(requiresMoonshotTemperatureOne("kimi-k2.5")).toBe(true);
-    expect(requiresMoonshotTemperatureOne("moonshotai/kimi-k2.5")).toBe(true);
-    expect(requiresMoonshotTemperatureOne("kimi-k2-5")).toBe(true);
+  it("uses high default temperature for k2.5 models", () => {
+    expect(getRecommendedTemperature("moonshot", "kimi-k2.5")).toBe(1.0);
+    expect(getRecommendedTemperature("moonshot", "moonshotai/kimi-k2.5")).toBe(1.0);
+    expect(getRecommendedTemperature("moonshot", "kimi-k2-5")).toBe(1.0);
   });
 
-  it("returns false for non-fixed-temperature models", () => {
-    expect(requiresMoonshotTemperatureOne("moonshot-v1-128k")).toBe(false);
-    expect(requiresMoonshotTemperatureOne("kimi-k2-turbo-preview")).toBe(false);
+  it("uses moderate defaults for non-thinking models", () => {
+    expect(getRecommendedTemperature("moonshot", "moonshot-v1-128k")).toBe(0.7);
+    expect(getRecommendedTemperature("moonshot", "kimi-k2-turbo-preview")).toBe(0.6);
   });
 });

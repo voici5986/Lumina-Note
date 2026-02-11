@@ -5,6 +5,7 @@ import { useRustAgentStore } from "@/stores/useRustAgentStore";
 import { useRAGStore } from "@/stores/useRAGStore";
 import { useBrowserStore } from "@/stores/useBrowserStore";
 import { PROVIDER_REGISTRY, type LLMProviderType, createProvider } from "@/services/llm";
+import { getRecommendedTemperature } from "@/services/llm/temperature";
 import { Settings, Tag, Loader2, Check, X, Zap, AlertTriangle } from "lucide-react";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 import { ThinkingModelIcon } from "@/components/ai/ThinkingModelIcon";
@@ -52,6 +53,13 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
   const intentModelMeta = getModelMeta(intentProvider, config.routing?.intentModel);
   const chatProvider = config.routing?.chatProvider as LLMProviderType | undefined;
   const chatModelMeta = chatProvider ? getModelMeta(chatProvider, config.routing?.chatModel) : undefined;
+  const effectiveModelForTemp =
+    config.model === "custom" ? (config.customModelId || "custom") : config.model;
+  const recommendedTemperature = getRecommendedTemperature(
+    config.provider as LLMProviderType,
+    effectiveModelForTemp
+  );
+  const displayTemperature = config.temperature ?? recommendedTemperature;
 
   // 测试连接状态
   const [testResult, setTestResult] = useState<TestResult>({ status: "idle" });
@@ -183,7 +191,11 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                   const provider = e.target.value as LLMProviderType;
                   const providerMeta = PROVIDER_REGISTRY[provider];
                   const defaultModel = providerMeta?.models[0]?.id || "";
-                  setConfig({ provider, model: defaultModel });
+                  setConfig({
+                    provider,
+                    model: defaultModel,
+                    temperature: getRecommendedTemperature(provider, defaultModel),
+                  });
                 }}
                 className="w-full text-xs p-2 rounded border border-border bg-background"
               >
@@ -276,9 +288,16 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
                 onChange={(e) => {
                   const newModel = e.target.value;
                   if (newModel === "custom") {
-                    setConfig({ model: newModel, customModelId: "" });
+                    setConfig({
+                      model: newModel,
+                      customModelId: "",
+                      temperature: getRecommendedTemperature(config.provider as LLMProviderType, "custom"),
+                    });
                   } else {
-                    setConfig({ model: newModel });
+                    setConfig({
+                      model: newModel,
+                      temperature: getRecommendedTemperature(config.provider as LLMProviderType, newModel),
+                    });
                   }
                 }}
                 className="w-full text-xs p-2 rounded border border-border bg-background"
@@ -322,14 +341,14 @@ export function AISettingsModal({ isOpen, onClose }: AISettingsModalProps) {
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="text-xs text-muted-foreground">{t.aiSettings.temperature}</label>
-                <span className="text-xs text-muted-foreground">{config.temperature ?? 0.3}</span>
+                <span className="text-xs text-muted-foreground">{displayTemperature.toFixed(1)}</span>
               </div>
               <input
                 type="range"
                 min="0"
                 max="2"
                 step="0.1"
-                value={config.temperature ?? 0.3}
+                value={displayTemperature}
                 onChange={(e) => setConfig({ temperature: parseFloat(e.target.value) })}
                 className="w-full accent-primary h-1 bg-muted rounded-lg appearance-none cursor-pointer"
               />

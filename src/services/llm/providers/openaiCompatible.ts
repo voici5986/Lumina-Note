@@ -17,6 +17,7 @@ import type {
 } from "../types";
 import { llmFetchJson, llmFetchStream, HttpRequest } from "../httpClient";
 import { getCurrentTranslations } from "@/stores/useLocaleStore";
+import { resolveTemperature } from "../temperature";
 
 // ============ 消息格式转换 ============
 
@@ -56,8 +57,6 @@ export interface OpenAICompatibleConfig {
   supportsReasoning?: boolean;
   /** reasoning 字段名（默认 reasoning_content，OpenRouter 用 reasoning） */
   reasoningField?: string;
-  /** 是否是 thinking 模型（强制 temperature=1.0） */
-  isThinkingModel?: (model: string) => boolean;
   /** 自定义请求体字段 */
   customBodyFields?: Record<string, unknown>;
 }
@@ -103,13 +102,14 @@ export class OpenAICompatibleProvider implements LLMProvider {
   }
 
   /**
-   * 获取 temperature（thinking 模型强制 1.0）
+   * 获取 temperature（用户配置优先；未配置时使用模型推荐默认值）
    */
   protected getTemperature(options?: LLMOptions): number | undefined {
-    const isThinking = this.providerConfig.isThinkingModel?.(this.config.model);
-    if (isThinking) return 1.0;
-    if (options?.useDefaultTemperature) return undefined;
-    return options?.temperature ?? 0.7;
+    return resolveTemperature({
+      provider: this.config.provider,
+      model: this.config.model,
+      configuredTemperature: options?.temperature ?? this.config.temperature,
+    });
   }
 
   /**

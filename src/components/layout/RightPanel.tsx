@@ -8,6 +8,7 @@ import { useRAGStore } from "@/stores/useRAGStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 import { getFileName } from "@/lib/utils";
 import { PROVIDER_REGISTRY, type LLMProviderType } from "@/services/llm";
+import { getRecommendedTemperature } from "@/services/llm/temperature";
 import {
   BrainCircuit,
   FileText,
@@ -374,6 +375,13 @@ export function RightPanel() {
     setConfig,
     checkFirstLoad: checkChatFirstLoad,
   } = useAIStore();
+  const effectiveModelForTemp =
+    config.model === "custom" ? (config.customModelId || "custom") : config.model;
+  const recommendedTemperature = getRecommendedTemperature(
+    config.provider as LLMProviderType,
+    effectiveModelForTemp
+  );
+  const displayTemperature = config.temperature ?? recommendedTemperature;
   const { 
     config: ragConfig, 
     setConfig: setRAGConfig, 
@@ -694,7 +702,11 @@ export function RightPanel() {
                       const provider = e.target.value as LLMProviderType;
                       const providerMeta = PROVIDER_REGISTRY[provider];
                       const defaultModel = providerMeta?.models[0]?.id || "";
-                      setConfig({ provider, model: defaultModel });
+                      setConfig({
+                        provider,
+                        model: defaultModel,
+                        temperature: getRecommendedTemperature(provider, defaultModel),
+                      });
                     }}
                     className="ui-input h-9 text-xs"
                   >
@@ -736,9 +748,16 @@ export function RightPanel() {
                       const newModel = e.target.value;
                       if (newModel === "custom") {
                         // 选择自定义模型时，清空 customModelId
-                        setConfig({ model: newModel, customModelId: "" });
+                        setConfig({
+                          model: newModel,
+                          customModelId: "",
+                          temperature: getRecommendedTemperature(config.provider as LLMProviderType, "custom"),
+                        });
                       } else {
-                        setConfig({ model: newModel });
+                        setConfig({
+                          model: newModel,
+                          temperature: getRecommendedTemperature(config.provider as LLMProviderType, newModel),
+                        });
                       }
                     }}
                     className="ui-input h-9 text-xs"
@@ -789,7 +808,7 @@ export function RightPanel() {
                       {t.settingsPanel.temperature}
                     </label>
                     <span className="text-xs text-muted-foreground">
-                      {config.temperature ?? 0.3}
+                      {displayTemperature.toFixed(1)}
                     </span>
                   </div>
                   <input
@@ -797,7 +816,7 @@ export function RightPanel() {
                     min="0"
                     max="2"
                     step="0.1"
-                    value={config.temperature ?? 0.3}
+                    value={displayTemperature}
                     onChange={(e) => setConfig({ temperature: parseFloat(e.target.value) })}
                     className="w-full accent-primary h-1 bg-muted rounded-lg appearance-none cursor-pointer"
                   />

@@ -14,6 +14,7 @@ import { useFileStore } from "@/stores/useFileStore";
 import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import { useAgentProfileStore } from "@/stores/useAgentProfileStore";
 import { callLLM, PROVIDER_REGISTRY, type Message as LLMMessage } from "@/services/llm";
+import { getRecommendedTemperature } from "@/services/llm/temperature";
 import type { MessageAttachment } from "@/services/llm";
 import { getCurrentTranslations } from "@/stores/useLocaleStore";
 import type { SelectedSkill } from "@/types/skills";
@@ -637,7 +638,9 @@ const buildAgentConfig = (aiConfig: AIConfig, autoApprove: boolean): AgentConfig
     model: resolvedModel,
     api_key: resolvedApiKey || "",
     base_url: resolvedBaseUrl,
-    temperature: aiConfig.temperature ?? 0.7,
+    temperature:
+      aiConfig.temperature ??
+      getRecommendedTemperature(resolvedProvider, resolvedModel),
     max_tokens: 4096,
     // 0 means unlimited
     max_plan_iterations: 0,

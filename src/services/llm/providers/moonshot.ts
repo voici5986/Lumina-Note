@@ -6,13 +6,9 @@
 import type { LLMConfig, LLMOptions, Message } from "../types";
 import { OpenAICompatibleProvider } from "./openaiCompatible";
 
-export function requiresMoonshotTemperatureOne(model: string): boolean {
+function isMoonshotThinkingModel(model: string): boolean {
   const normalized = model.toLowerCase();
   return normalized.includes("thinking") || normalized.includes("k2.5") || normalized.includes("k2-5");
-}
-
-function isMoonshotThinkingModel(model: string): boolean {
-  return model.toLowerCase().includes("thinking");
 }
 
 export class MoonshotProvider extends OpenAICompatibleProvider {
@@ -21,7 +17,6 @@ export class MoonshotProvider extends OpenAICompatibleProvider {
       defaultBaseUrl: "https://api.moonshot.cn/v1",
       supportsReasoning: true,
       reasoningField: "reasoning_content",
-      isThinkingModel: requiresMoonshotTemperatureOne,
     });
   }
 

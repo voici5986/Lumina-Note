@@ -8,6 +8,7 @@
 import type { Message, MessageContent, LLMConfig, LLMOptions, LLMResponse, LLMProvider } from "../types";
 import { llmFetchJson } from "../httpClient";
 import { getCurrentTranslations } from "@/stores/useLocaleStore";
+import { resolveTemperature } from "../temperature";
 
 // Gemini 消息部分的类型
 type GeminiPart = { text: string } | { inline_data: { mime_type: string; data: string } };
@@ -29,9 +30,11 @@ export class GeminiProvider implements LLMProvider {
     const generationConfig: Record<string, unknown> = {
       maxOutputTokens: options?.maxTokens || 8192,
     };
-    if (!options?.useDefaultTemperature) {
-      generationConfig.temperature = options?.temperature ?? 0.7;
-    }
+    generationConfig.temperature = resolveTemperature({
+      provider: this.config.provider,
+      model: this.config.model,
+      configuredTemperature: options?.temperature ?? this.config.temperature,
+    });
 
     const result = await llmFetchJson<{
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;

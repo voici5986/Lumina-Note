@@ -12,7 +12,6 @@ export class DeepSeekProvider extends OpenAICompatibleProvider {
       defaultBaseUrl: "https://api.deepseek.com/v1",
       supportsReasoning: true,
       reasoningField: "reasoning_content",
-      isThinkingModel: (model) => model.includes("reasoner"),
     });
   }
 
