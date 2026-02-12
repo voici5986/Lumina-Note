@@ -263,8 +263,14 @@ pub async fn run_forge_loop(
                             break;
                         }
 
-                        let tool_calls_payload =
-                            serde_json::to_string(&tool_calls).unwrap_or_else(|_| "[]".to_string());
+                        let (reasoning_content, assistant_content) =
+                            split_reasoning_block(&response.content);
+                        let tool_calls_payload = serde_json::to_string(&json!({
+                            "tool_calls": &tool_calls,
+                            "content": assistant_content,
+                            "reasoning_content": reasoning_content,
+                        }))
+                        .unwrap_or_else(|_| "[]".to_string());
                         state.messages.push(Message {
                             role: MessageRole::Assistant,
                             content: tool_calls_payload,
@@ -382,6 +388,28 @@ fn summarize_tool_batch(calls: &[ToolCall]) -> String {
         .map(|call| call.name.as_str())
         .collect::<Vec<_>>()
         .join(", ")
+}
+
+fn split_reasoning_block(content: &str) -> (Option<String>, String) {
+    let trimmed = content.trim();
+    if !trimmed.starts_with("<thinking>") {
+        return (None, content.to_string());
+    }
+    let Some(end_idx) = trimmed.find("</thinking>") else {
+        return (None, content.to_string());
+    };
+    let reasoning_start = "<thinking>".len();
+    let reasoning = trimmed[reasoning_start..end_idx].trim().to_string();
+    let remaining = trimmed[end_idx + "</thinking>".len()..]
+        .trim_start_matches('\n')
+        .trim_start()
+        .to_string();
+    let reasoning_opt = if reasoning.is_empty() {
+        None
+    } else {
+        Some(reasoning)
+    };
+    (reasoning_opt, remaining)
 }
 
 fn wrap_event(event: Event) -> Value {

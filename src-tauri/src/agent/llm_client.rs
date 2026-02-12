@@ -49,6 +49,8 @@ struct ChatMessage {
     tool_call_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_calls: Option<Vec<ChatToolCall>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reasoning_content: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -62,6 +64,16 @@ struct ChatToolCall {
 struct ChatToolCallFunction {
     name: String,
     arguments: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ToolCallsAssistantPayload {
+    #[serde(default)]
+    tool_calls: Vec<ToolCall>,
+    #[serde(default)]
+    content: String,
+    #[serde(default)]
+    reasoning_content: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -342,8 +354,24 @@ impl LlmClient {
 
                 if m.role == MessageRole::Assistant && m.name.as_deref() == Some(TOOL_CALLS_MESSAGE_NAME)
                 {
-                    let parsed: Vec<ToolCall> = serde_json::from_str(&m.content).unwrap_or_default();
-                    let tool_calls = parsed
+                    let payload = serde_json::from_str::<ToolCallsAssistantPayload>(&m.content)
+                        .ok()
+                        .or_else(|| {
+                            serde_json::from_str::<Vec<ToolCall>>(&m.content)
+                                .ok()
+                                .map(|tool_calls| ToolCallsAssistantPayload {
+                                    tool_calls,
+                                    content: String::new(),
+                                    reasoning_content: None,
+                                })
+                        })
+                        .unwrap_or(ToolCallsAssistantPayload {
+                            tool_calls: Vec::new(),
+                            content: String::new(),
+                            reasoning_content: None,
+                        });
+                    let tool_calls = payload
+                        .tool_calls
                         .into_iter()
                         .map(|call| ChatToolCall {
                             id: call.id,
@@ -357,7 +385,7 @@ impl LlmClient {
                         .collect::<Vec<_>>();
                     return ChatMessage {
                         role,
-                        content: String::new(),
+                        content: payload.content,
                         name: None,
                         tool_call_id: None,
                         tool_calls: if tool_calls.is_empty() {
@@ -365,6 +393,7 @@ impl LlmClient {
                         } else {
                             Some(tool_calls)
                         },
+                        reasoning_content: payload.reasoning_content.filter(|v| !v.trim().is_empty()),
                     };
                 }
 
@@ -374,6 +403,7 @@ impl LlmClient {
                     name: m.name.clone(),
                     tool_call_id: m.tool_call_id.clone(),
                     tool_calls: None,
+                    reasoning_content: None,
                 }
             })
             .collect()
