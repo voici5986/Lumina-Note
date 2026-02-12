@@ -158,6 +158,9 @@ export function MainAIChatShell() {
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [referencedFiles, setReferencedFiles] = useState<ReferencedFile[]>([]);
+  const [showMention, setShowMention] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionIndex, setMentionIndex] = useState(0);
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<SelectedSkill[]>([]);
   const [skillQuery, setSkillQuery] = useState("");
@@ -170,6 +173,7 @@ export function MainAIChatShell() {
   const [isExportingConversation, setIsExportingConversation] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mentionRef = useRef<HTMLDivElement>(null);
   const autoSendMessageRef = useRef<string | null>(null);
   const reduceMotion = useReducedMotion();
 
@@ -383,11 +387,12 @@ export function MainAIChatShell() {
     return chatMode === "chat" && chatSessionId === id;
   }, [chatMode, rustSessionId, chatSessionId, researchSelectedId]);
 
-  const { vaultPath, currentFile, currentContent, openFile, refreshFileTree } = useFileStore(
+  const { vaultPath, currentFile, currentContent, fileTree, openFile, refreshFileTree } = useFileStore(
     useShallow((state) => ({
       vaultPath: state.vaultPath,
       currentFile: state.currentFile,
       currentContent: state.currentContent,
+      fileTree: state.fileTree,
       openFile: state.openFile,
       refreshFileTree: state.refreshFileTree,
     })),
@@ -665,10 +670,19 @@ export function MainAIChatShell() {
       if (!target.closest('[data-skill-menu]') && !target.closest('textarea')) {
         setShowSkillMenu(false);
       }
+      if (!target.closest('[data-mention-menu]') && !target.closest('textarea')) {
+        setShowMention(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!showMention || !mentionRef.current) return;
+    const selected = mentionRef.current.querySelector('[data-selected="true"]');
+    selected?.scrollIntoView({ block: "nearest" });
+  }, [showMention, mentionIndex]);
 
   // 监听文件拖拽事件，支持从文件树拖拽文件引用到 AI 对话框
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -767,6 +781,33 @@ export function MainAIChatShell() {
       .slice(0, 8);
   }, [skills, skillQuery]);
 
+  // 扁平化文件树（用于 @ 引用文件）
+  const flattenFileTree = useCallback((entries: any[], result: ReferencedFile[] = []): ReferencedFile[] => {
+    for (const entry of entries) {
+      result.push({
+        path: entry.path,
+        name: entry.name,
+        isFolder: entry.is_dir,
+      });
+      if (entry.is_dir && entry.children) {
+        flattenFileTree(entry.children, result);
+      }
+    }
+    return result;
+  }, []);
+
+  const allFiles = useMemo(() => flattenFileTree(fileTree), [fileTree, flattenFileTree]);
+
+  const filteredMentionFiles = useMemo(() => {
+    if (!mentionQuery) {
+      return allFiles.filter((f) => !f.isFolder).slice(0, 10);
+    }
+    const query = mentionQuery.toLowerCase();
+    return allFiles
+      .filter((f) => !f.isFolder && f.name.toLowerCase().includes(query))
+      .slice(0, 10);
+  }, [allFiles, mentionQuery]);
+
   const [showMessages, setShowMessages] = useState(hasStarted);
   useEffect(() => {
     if (!hasStarted) {
@@ -783,14 +824,31 @@ export function MainAIChatShell() {
     return () => cancelAnimationFrame(id);
   }, [hasStarted, reduceMotion]);
 
-  const handleInputChange = useCallback((value: string) => {
+  const handleInputChange = useCallback((value: string, cursorPos?: number) => {
     setInput(value);
+    const effectiveCursor = cursorPos ?? value.length;
+    const textBeforeCursor = value.slice(0, effectiveCursor);
+
+    const atMatch = textBeforeCursor.match(/@([^\s@]*)$/);
+    if (atMatch) {
+      setShowMention(true);
+      setMentionQuery(atMatch[1] ?? "");
+      setMentionIndex(0);
+      setShowSkillMenu(false);
+      setSkillQuery("");
+      return;
+    }
+
+    setShowMention(false);
+    setMentionQuery("");
+    setMentionIndex(0);
+
     if (chatMode !== "agent") {
       setSkillQuery("");
       setShowSkillMenu(false);
       return;
     }
-    const match = value.match(/(?:^|\s)\/([^\s]*)$/);
+    const match = textBeforeCursor.match(/(?:^|\s)\/([^\s]*)$/);
     if (match) {
       setSkillQuery(match[1] ?? "");
       setShowSkillMenu(true);
@@ -799,6 +857,29 @@ export function MainAIChatShell() {
       setShowSkillMenu(false);
     }
   }, [chatMode]);
+
+  const handleSelectMention = useCallback((file: ReferencedFile) => {
+    if (!textareaRef.current) return;
+
+    const cursorPos = textareaRef.current.selectionStart;
+    const textBeforeCursor = input.slice(0, cursorPos);
+    const textAfterCursor = input.slice(cursorPos);
+    const atMatch = textBeforeCursor.match(/@([^\s@]*)$/);
+    if (!atMatch) return;
+
+    const atPos = cursorPos - atMatch[0].length;
+    const nextValue = input.slice(0, atPos) + textAfterCursor;
+    setInput(nextValue);
+    setShowMention(false);
+    setMentionQuery("");
+    setMentionIndex(0);
+
+    setReferencedFiles((prev) => (
+      prev.some((f) => f.path === file.path) ? prev : [...prev, file]
+    ));
+
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  }, [input]);
 
   const handleSelectSkill = useCallback(async (skill: SkillInfo) => {
     if (selectedSkills.some((s) => s.name === skill.name)) {
@@ -905,6 +986,9 @@ export function MainAIChatShell() {
     const quotedSelections = [...textSelections];
     setReferencedFiles([]);
     clearTextSelections();
+    setShowMention(false);
+    setMentionQuery("");
+    setMentionIndex(0);
     setShowSkillMenu(false);
 
     const { displayMessage, fullMessage, attachments } = await processMessageWithFiles(message, files, quotedSelections);
@@ -1006,6 +1090,37 @@ export function MainAIChatShell() {
 
   // 键盘事件
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showMention) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (filteredMentionFiles.length > 0) {
+          setMentionIndex((idx) => (idx + 1) % filteredMentionFiles.length);
+        }
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (filteredMentionFiles.length > 0) {
+          setMentionIndex((idx) => (idx - 1 + filteredMentionFiles.length) % filteredMentionFiles.length);
+        }
+        return;
+      }
+      if ((e.key === "Enter" || e.key === "Tab") && filteredMentionFiles.length > 0) {
+        e.preventDefault();
+        handleSelectMention(filteredMentionFiles[mentionIndex] ?? filteredMentionFiles[0]);
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setShowMention(false);
+        return;
+      }
+    }
+
     if (showSkillMenu && chatMode === "agent") {
       if (e.key === "Enter") {
         e.preventDefault();
@@ -1795,10 +1910,39 @@ export function MainAIChatShell() {
                       </div>
                     </div>
                   )}
+                  {showMention && (
+                    <div
+                      ref={mentionRef}
+                      data-mention-menu
+                      className="absolute left-4 w-72 bottom-full mb-2 bg-background border border-border rounded-lg shadow-lg z-50 overflow-hidden"
+                    >
+                      <div className="max-h-56 overflow-y-auto">
+                        {filteredMentionFiles.length === 0 ? (
+                          <div className="px-3 py-3 text-xs text-muted-foreground text-center">
+                            {t.ai.noFilesFound}
+                          </div>
+                        ) : (
+                          filteredMentionFiles.map((file, index) => (
+                            <button
+                              key={file.path}
+                              data-selected={index === mentionIndex}
+                              onClick={() => handleSelectMention(file)}
+                              className={`w-full px-3 py-2 text-sm text-left flex items-center gap-2 hover:bg-accent transition-colors ${
+                                index === mentionIndex ? "bg-accent" : ""
+                              }`}
+                            >
+                              <FileText size={14} className="text-slate-500 shrink-0" />
+                              <span className="truncate">{file.name}</span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
                   <textarea
                     ref={textareaRef}
                     value={input}
-                    onChange={(e) => handleInputChange(e.target.value)}
+                    onChange={(e) => handleInputChange(e.target.value, e.target.selectionStart)}
                     onKeyDown={handleKeyDown}
                     placeholder={chatMode === "research" ? researchPlaceholder : chatMode === "agent" ? t.ai.agentInputPlaceholder : t.ai.chatInputPlaceholder}
                     className="w-full resize-none outline-none text-foreground placeholder:text-muted-foreground min-h-[40px] max-h-[200px] bg-transparent text-base leading-relaxed"
