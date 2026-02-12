@@ -17,7 +17,7 @@ export function OverviewDashboard() {
           className="space-y-4 w-full"
         >
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-            <Card className="md:col-span-7 ui-card-hover">
+            <Card className="md:col-span-7 shadow-none">
               <CardHeader className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-primary" />
                 <CardTitle>{t.overview.title}</CardTitle>
@@ -36,7 +36,7 @@ export function OverviewDashboard() {
               </CardContent>
             </Card>
 
-            <Card className="md:col-span-5 ui-card-hover">
+            <Card className="md:col-span-5 shadow-none">
               <CardHeader className="flex items-center gap-2">
                 <Keyboard className="w-4 h-4 text-primary" />
                 <CardTitle>{t.overview.shortcutsTitle}</CardTitle>
