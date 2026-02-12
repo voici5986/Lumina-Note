@@ -16,6 +16,8 @@ use std::sync::{Arc, Mutex};
 use tauri::AppHandle;
 use uuid::Uuid;
 
+const DOOM_LOOP_THRESHOLD: usize = 3;
+
 #[derive(Clone)]
 pub struct ForgeRuntime {
     pub registry: Arc<ToolRegistry>,
@@ -132,6 +134,7 @@ pub async fn run_forge_loop(
                 };
                 let mut iteration = 0usize;
                 let max_iterations = config.max_steps;
+                let mut recent_tool_batches: Vec<String> = Vec::new();
 
                 loop {
                     if cancel.is_cancelled() {
@@ -224,6 +227,28 @@ pub async fn run_forge_loop(
                                 text: content.clone(),
                             })?;
                             state.final_result = Some(content);
+                            break;
+                        }
+
+                        let batch_signature = tool_batch_signature(&tool_calls);
+                        recent_tool_batches.push(batch_signature.clone());
+                        if recent_tool_batches.len() > DOOM_LOOP_THRESHOLD {
+                            recent_tool_batches.remove(0);
+                        }
+                        if recent_tool_batches.len() == DOOM_LOOP_THRESHOLD
+                            && recent_tool_batches.iter().all(|sig| sig == &batch_signature)
+                        {
+                            let summary = summarize_tool_batch(&tool_calls);
+                            let message = format!(
+                                "检测到重复工具调用（连续 {} 次）：{}。请调整输入或提供更多约束后重试。",
+                                DOOM_LOOP_THRESHOLD, summary
+                            );
+                            ctx.emit(Event::TextFinal {
+                                session_id: session_id.clone(),
+                                message_id: message_id.clone(),
+                                text: message.clone(),
+                            })?;
+                            state.final_result = Some(message);
                             break;
                         }
 
@@ -320,6 +345,24 @@ fn tool_output_text(output: &ToolOutput) -> String {
         return text.to_string();
     }
     serde_json::to_string_pretty(&output.content).unwrap_or_else(|_| output.content.to_string())
+}
+
+fn tool_batch_signature(calls: &[ToolCall]) -> String {
+    serde_json::to_string(calls).unwrap_or_else(|_| {
+        calls
+            .iter()
+            .map(|call| call.name.as_str())
+            .collect::<Vec<_>>()
+            .join(",")
+    })
+}
+
+fn summarize_tool_batch(calls: &[ToolCall]) -> String {
+    calls
+        .iter()
+        .map(|call| call.name.as_str())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn wrap_event(event: Event) -> Value {
