@@ -457,7 +457,10 @@ impl LlmClient {
                         serde_json::from_str(args_str).unwrap_or_default();
 
                     parsed_calls.push(ToolCall {
-                        id: format!("call_{}", idx),
+                        id: tc["id"]
+                            .as_str()
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| format!("call_{}", idx)),
                         name,
                         params,
                     });

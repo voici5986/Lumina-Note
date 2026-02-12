@@ -295,10 +295,10 @@ fn handle_tool_success(state: &mut GraphState, call: &ToolCall, output: ToolOutp
         .observations
         .push(format!("[{}] {}", call.name, content));
     state.messages.push(Message {
-        role: MessageRole::User,
-        content: format!("Tool {} result:\n{}", call.name, content),
-        name: None,
-        tool_call_id: None,
+        role: MessageRole::Tool,
+        content,
+        name: Some(call.name.clone()),
+        tool_call_id: Some(call.id.clone()),
     });
 }
 
@@ -308,10 +308,10 @@ fn handle_tool_error(state: &mut GraphState, call: &ToolCall, err: &GraphError) 
         .observations
         .push(format!("[{}] {}", call.name, message));
     state.messages.push(Message {
-        role: MessageRole::User,
+        role: MessageRole::Tool,
         content: message,
-        name: None,
-        tool_call_id: None,
+        name: Some(call.name.clone()),
+        tool_call_id: Some(call.id.clone()),
     });
 }
 
