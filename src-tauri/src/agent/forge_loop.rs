@@ -12,6 +12,7 @@ use forge::runtime::session_state::SessionState;
 use forge::runtime::tool::{ToolCall as ForgeToolCall, ToolOutput, ToolRegistry};
 use serde_json::{json, Value};
 use std::path::PathBuf;
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use tauri::AppHandle;
 use uuid::Uuid;
@@ -100,6 +101,7 @@ pub async fn run_forge_loop(
     cancel: CancellationToken,
 ) -> Result<ForgeRunResult, String> {
     let tool_defs = Arc::new(build_tool_definitions(&runtime.registry));
+    let available_tools = Arc::new(collect_available_tools(&tool_defs));
     let llm = Arc::new(LlmClient::new(config.clone()));
     let pending = Arc::new(Mutex::new(None::<ForgePending>));
     let pending_calls = Arc::new(Mutex::new(pending_tool_calls));
@@ -115,6 +117,7 @@ pub async fn run_forge_loop(
         let pending_calls = pending_calls.clone();
         let llm = llm.clone();
         let tool_defs = tool_defs.clone();
+        let available_tools = available_tools.clone();
         let session_id = session_id.clone();
         let message_id = message_id.clone();
         let cancel = cancel.clone();
@@ -124,6 +127,7 @@ pub async fn run_forge_loop(
             let pending_calls = pending_calls.clone();
             let llm = llm.clone();
             let tool_defs = tool_defs.clone();
+            let available_tools = available_tools.clone();
             let session_id = session_id.clone();
             let message_id = message_id.clone();
             let cancel = cancel.clone();
@@ -212,7 +216,22 @@ pub async fn run_forge_loop(
                         })?;
 
                         let finish_reason = response.finish_reason.clone();
-                        let tool_calls = response.tool_calls.unwrap_or_default();
+                        let raw_tool_calls = response.tool_calls.unwrap_or_default();
+                        let (tool_calls, invalid_calls) =
+                            repair_tool_calls(raw_tool_calls, &available_tools);
+                        if !invalid_calls.is_empty() {
+                            let warning = format!(
+                                "模型请求了不可用工具：{}。请调整请求或切换模型后重试。",
+                                invalid_calls.join(", ")
+                            );
+                            ctx.emit(Event::TextFinal {
+                                session_id: session_id.clone(),
+                                message_id: message_id.clone(),
+                                text: warning.clone(),
+                            })?;
+                            state.final_result = Some(warning);
+                            break;
+                        }
                         if tool_calls.is_empty() {
                             let content = response.content;
                             let final_text = if matches!(finish_reason.as_deref(), Some("tool_calls")) {
@@ -388,6 +407,42 @@ fn summarize_tool_batch(calls: &[ToolCall]) -> String {
         .map(|call| call.name.as_str())
         .collect::<Vec<_>>()
         .join(", ")
+}
+
+fn collect_available_tools(tool_defs: &[Value]) -> HashSet<String> {
+    tool_defs
+        .iter()
+        .filter_map(|def| {
+            def.get("function")
+                .and_then(|func| func.get("name"))
+                .and_then(|name| name.as_str())
+                .map(|name| name.to_string())
+        })
+        .collect()
+}
+
+fn repair_tool_calls(
+    calls: Vec<ToolCall>,
+    available_tools: &HashSet<String>,
+) -> (Vec<ToolCall>, Vec<String>) {
+    let mut repaired = Vec::with_capacity(calls.len());
+    let mut invalid = Vec::new();
+
+    for mut call in calls {
+        if available_tools.contains(&call.name) {
+            repaired.push(call);
+            continue;
+        }
+        let lower = call.name.to_lowercase();
+        if available_tools.contains(&lower) {
+            call.name = lower;
+            repaired.push(call);
+            continue;
+        }
+        invalid.push(call.name);
+    }
+
+    (repaired, invalid)
 }
 
 fn split_reasoning_block(content: &str) -> (Option<String>, String) {
