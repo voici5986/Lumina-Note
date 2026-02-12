@@ -69,9 +69,11 @@ jobs:
         with:
           name: signatures-${{ matrix.platform }}-${{ matrix.rust_target || 'x64' }}
           path: |
+            src-tauri/target/*/release/bundle/macos/*.sig
             src-tauri/target/release/bundle/macos/*.sig
             src-tauri/target/release/bundle/nsis/*.sig
             src-tauri/target/release/bundle/msi/*.sig
+          if-no-files-found: error
 
   updater:
     needs: release
