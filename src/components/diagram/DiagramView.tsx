@@ -143,6 +143,7 @@ export function DiagramView({ filePath, externalContent, className }: DiagramVie
   const latestElementsRef = useRef<readonly OrderedExcalidrawElement[]>([]);
   const selectedElementIdsRef = useRef<string[]>([]);
   const excalidrawApiRef = useRef<ExcalidrawImperativeAPI | null>(null);
+  const lastAppliedExternalContentRef = useRef<string | null>(null);
 
   const applySceneSnapshot = useCallback(
     (snapshot: ExcalidrawInitialDataState, serialized: string, selectedIds: string[]) => {
@@ -244,18 +245,27 @@ export function DiagramView({ filePath, externalContent, className }: DiagramVie
   useEffect(() => {
     if (loading) return;
     if (typeof externalContent !== "string") return;
+    if (externalContent === lastAppliedExternalContentRef.current) return;
 
     const pending = pendingSerializedRef.current;
     if (pending && pending !== lastSavedSerializedRef.current) {
       return;
     }
 
+    // `tab.content` for diagram tabs may start as an empty placeholder before any real reload.
+    // Ignore it to avoid overriding an already loaded canvas with an empty scene.
+    if (externalContent.trim().length === 0) {
+      return;
+    }
+
     try {
       const { normalizedState, serialized, selectedIds } = normalizeSceneFromRaw(externalContent);
       if (serialized === lastSavedSerializedRef.current) {
+        lastAppliedExternalContentRef.current = externalContent;
         return;
       }
       applySceneSnapshot(normalizedState, serialized, selectedIds);
+      lastAppliedExternalContentRef.current = externalContent;
       setLastSavedAt(Date.now());
       setError(null);
     } catch (err) {

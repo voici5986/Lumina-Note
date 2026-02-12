@@ -877,7 +877,7 @@ function App() {
                 <DiagramView
                   key={activeTab.path}
                   filePath={activeTab.path}
-                  externalContent={activeTab.content}
+                  externalContent={activeTab.content || undefined}
                   className="flex-1"
                 />
               </Suspense>
