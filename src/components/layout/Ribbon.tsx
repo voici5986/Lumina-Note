@@ -16,7 +16,9 @@ import {
   Globe,
   Brain,
   LayoutGrid,
+  Star,
 } from "lucide-react";
+import { open as openExternal } from "@tauri-apps/plugin-shell";
 
 import { cn } from "@/lib/utils";
 import { exists } from "@/lib/tauri";
@@ -25,6 +27,7 @@ import { usePluginUiStore } from "@/stores/usePluginUiStore";
 import { InstalledPluginsModal } from "@/components/plugins/InstalledPluginsModal";
 
 export function Ribbon() {
+  const REPO_URL = "https://github.com/blueberrycongee/Lumina-Note";
   const [showSettings, setShowSettings] = useState(false);
   const [showPlugins, setShowPlugins] = useState(false);
   const closeSettings = useCallback(() => setShowSettings(false), []);
@@ -114,6 +117,15 @@ export function Ribbon() {
       openFile(firstFile);
     }
   };
+
+  const handleOpenRepository = useCallback(async () => {
+    try {
+      await openExternal(REPO_URL);
+    } catch (error) {
+      console.warn("Failed to open repository link with shell plugin:", error);
+      window.open(REPO_URL, "_blank", "noopener,noreferrer");
+    }
+  }, []);
 
   return (
     <div className="w-11 h-full bg-background/55 backdrop-blur-md border-r border-border/60 shadow-[inset_-1px_0_0_hsl(var(--border)/0.6)] flex flex-col items-center py-2 gap-0.5">
@@ -287,6 +299,18 @@ export function Ribbon() {
 
       {/* Bottom icons */}
       <div className="flex flex-col items-center gap-0.5">
+        {/* Star on GitHub */}
+        <button
+          onClick={() => {
+            void handleOpenRepository();
+          }}
+          className="w-8 h-8 ui-icon-btn"
+          title={t.ribbon.starProject}
+          aria-label={t.ribbon.starProject}
+        >
+          <Star size={18} />
+        </button>
+
         {ribbonItems
           .filter((item) => item.section === "bottom")
           .sort((a, b) => a.order - b.order)

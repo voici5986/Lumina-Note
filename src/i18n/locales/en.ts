@@ -490,6 +490,7 @@ export default {
     flashcardReview: 'Flashcard Review',
     browser: 'Browser',
     plugins: 'Plugins',
+    starProject: 'Star Lumina Note on GitHub',
     switchToLight: 'Switch to light mode',
     switchToDark: 'Switch to dark mode',
     settings: 'Settings',

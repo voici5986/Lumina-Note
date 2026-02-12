@@ -490,6 +490,7 @@ export default {
     flashcardReview: 'フラッシュカード復習',
     browser: 'ブラウザ',
     plugins: 'プラグイン',
+    starProject: 'Lumina Note に GitHub Star',
     switchToLight: 'ライトモードに切替',
     switchToDark: 'ダークモードに切替',
     settings: '設定',

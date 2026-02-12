@@ -490,6 +490,7 @@ export default {
     flashcardReview: '閃卡複習',
     browser: '瀏覽器',
     plugins: '插件',
+    starProject: '為 Lumina Note 點個 Star',
     switchToLight: '切換到亮色模式',
     switchToDark: '切換到暗色模式',
     settings: '設定',
