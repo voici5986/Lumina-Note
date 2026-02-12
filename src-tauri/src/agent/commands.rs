@@ -526,20 +526,55 @@ pub async fn agent_get_queue_status(
 #[tauri::command]
 pub async fn agent_continue_with_answer(
     app: AppHandle,
-    _state: State<'_, AgentState>,
+    state: State<'_, AgentState>,
     answer: String,
 ) -> Result<(), String> {
-    // TODO: 实现用户回答后继续执行
-    // 这需要在状态机中支持暂停和恢复
+    let runtime_state = {
+        state
+            .runtime
+            .lock()
+            .await
+            .clone()
+            .ok_or("No active Forge runtime")?
+    };
 
-    emit_agent_event(
-        &app,
-        AgentEvent::MessageChunk {
-            content: format!("用户回答: {}", answer),
-            agent: AgentType::Coordinator,
-        },
-    );
+    let resumed_state = {
+        let mut current_state = state.current_state.lock().await;
+        let graph = current_state
+            .as_mut()
+            .ok_or("No active graph state to continue")?;
+        graph.messages.push(Message {
+            role: MessageRole::User,
+            content: answer,
+            name: None,
+            tool_call_id: None,
+        });
+        graph.status = AgentStatus::Running;
+        graph.clone()
+    };
 
+    {
+        let mut is_running = state.is_running.lock().await;
+        *is_running = true;
+    }
+    emit_queue_updated(&app, &state).await;
+
+    let result = run_forge_loop(
+        app.clone(),
+        runtime_state.config.clone(),
+        resumed_state,
+        runtime_state.runtime.clone(),
+        Vec::new(),
+        runtime_state.session_id.clone(),
+        runtime_state.message_id.clone(),
+        runtime_state.cancel.clone(),
+    )
+    .await;
+
+    let handled = handle_forge_result(app.clone(), &state, runtime_state, result).await?;
+    if handled {
+        drain_queued_tasks(app, &state).await;
+    }
     Ok(())
 }
 
