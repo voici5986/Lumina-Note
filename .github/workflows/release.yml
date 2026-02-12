@@ -11,6 +11,7 @@ jobs:
       contents: write
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         include:
           - platform: 'macos-latest'
@@ -58,7 +59,7 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'Lumina Note ${{ github.ref_name }}'
           releaseBody: 'See the assets to download and install this version.'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           tauriScript: npm run tauri
           args: ${{ matrix.args }}
