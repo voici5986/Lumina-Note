@@ -210,9 +210,19 @@ pub async fn run_forge_loop(
                             cost: 0.0,
                         })?;
 
+                        let finish_reason = response.finish_reason.clone();
                         let tool_calls = response.tool_calls.unwrap_or_default();
                         if tool_calls.is_empty() {
                             let content = response.content;
+                            let final_text = if matches!(finish_reason.as_deref(), Some("tool_calls")) {
+                                "模型返回了 tool_calls 结束原因，但没有提供可执行的工具调用，已停止以避免循环。".to_string()
+                            } else if matches!(finish_reason.as_deref(), Some("length"))
+                                && content.trim().is_empty()
+                            {
+                                "模型因长度限制结束且未返回内容，请重试或提高 max_tokens。".to_string()
+                            } else {
+                                content.clone()
+                            };
                             if !content.trim().is_empty() {
                                 state.messages.push(Message {
                                     role: MessageRole::Assistant,
@@ -224,9 +234,9 @@ pub async fn run_forge_loop(
                             ctx.emit(Event::TextFinal {
                                 session_id: session_id.clone(),
                                 message_id: message_id.clone(),
-                                text: content.clone(),
+                                text: final_text.clone(),
                             })?;
-                            state.final_result = Some(content);
+                            state.final_result = Some(final_text);
                             break;
                         }
 

@@ -66,6 +66,7 @@ struct FunctionDefinition {
 pub struct LlmResponse {
     pub content: String,
     pub tool_calls: Option<Vec<ToolCall>>, // FC 模式下直接返回解析后的工具调用
+    pub finish_reason: Option<String>,
     pub prompt_tokens: usize,
     pub completion_tokens: usize,
     pub total_tokens: usize,
@@ -440,6 +441,9 @@ impl LlmClient {
             .unwrap_or(prompt_tokens + completion_tokens);
 
         let message = &json["choices"][0]["message"];
+        let finish_reason = json["choices"][0]["finish_reason"]
+            .as_str()
+            .map(|s| s.to_string());
 
         let reasoning = Self::extract_reasoning_content(message);
 
@@ -473,6 +477,7 @@ impl LlmClient {
                 return Ok(LlmResponse {
                     content,
                     tool_calls: Some(parsed_calls),
+                    finish_reason,
                     prompt_tokens,
                     completion_tokens,
                     total_tokens,
@@ -501,6 +506,7 @@ impl LlmClient {
                 return Ok(LlmResponse {
                     content: xml_output,
                     tool_calls: None,
+                    finish_reason,
                     prompt_tokens,
                     completion_tokens,
                     total_tokens,
@@ -515,6 +521,7 @@ impl LlmClient {
         Ok(LlmResponse {
             content,
             tool_calls: None,
+            finish_reason,
             prompt_tokens,
             completion_tokens,
             total_tokens,
@@ -679,6 +686,7 @@ impl LlmClient {
         let mut prompt_tokens = 0usize;
         let mut completion_tokens = 0usize;
         let mut total_tokens = 0usize;
+        let mut finish_reason: Option<String> = None;
 
         let heartbeat_interval = Duration::from_secs(15);
         let stream_timeout = Duration::from_secs(60);
@@ -720,6 +728,7 @@ impl LlmClient {
                                             reasoning_content,
                                             full_content,
                                             tool_calls,
+                                            finish_reason,
                                             prompt_tokens,
                                             completion_tokens,
                                             total_tokens,
@@ -738,6 +747,9 @@ impl LlmClient {
                                         }
 
                                         let delta = &json["choices"][0]["delta"];
+                                        if let Some(reason) = json["choices"][0]["finish_reason"].as_str() {
+                                            finish_reason = Some(reason.to_string());
+                                        }
 
                                         if let Some(reasoning) = Self::extract_reasoning_content(delta) {
                                             if let Some(app) = &app {
@@ -800,6 +812,7 @@ impl LlmClient {
                                 reasoning_content,
                                 full_content,
                                 tool_calls,
+                                finish_reason,
                                 prompt_tokens,
                                 completion_tokens,
                                 total_tokens,
@@ -950,6 +963,7 @@ impl LlmClient {
         reasoning_content: String,
         full_content: String,
         tool_calls: Vec<StreamToolCall>,
+        finish_reason: Option<String>,
         prompt_tokens: usize,
         completion_tokens: usize,
         total_tokens: usize,
@@ -968,6 +982,7 @@ impl LlmClient {
             } else {
                 Some(parsed_calls)
             },
+            finish_reason,
             prompt_tokens,
             completion_tokens,
             total_tokens,
