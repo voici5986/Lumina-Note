@@ -799,13 +799,14 @@ export function MainAIChatShell() {
   const allFiles = useMemo(() => flattenFileTree(fileTree), [fileTree, flattenFileTree]);
 
   const filteredMentionFiles = useMemo(() => {
+    const filesOnly = allFiles.filter((f) => !f.isFolder);
     if (!mentionQuery) {
-      return allFiles.filter((f) => !f.isFolder).slice(0, 10);
+      return filesOnly;
     }
-    const query = mentionQuery.toLowerCase();
-    return allFiles
-      .filter((f) => !f.isFolder && f.name.toLowerCase().includes(query))
-      .slice(0, 10);
+    const query = mentionQuery.trim().toLowerCase();
+    return filesOnly.filter((f) =>
+      f.name.toLowerCase().includes(query) || f.path.toLowerCase().includes(query)
+    );
   }, [allFiles, mentionQuery]);
 
   const [showMessages, setShowMessages] = useState(hasStarted);
