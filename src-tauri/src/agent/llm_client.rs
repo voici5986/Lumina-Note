@@ -51,6 +51,8 @@ struct ChatMessage {
     tool_calls: Option<Vec<ChatToolCall>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     reasoning_content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reasoning_details: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,6 +76,14 @@ struct ToolCallsAssistantPayload {
     content: String,
     #[serde(default)]
     reasoning_content: Option<String>,
+    #[serde(default)]
+    reasoning_details: Option<Value>,
+}
+
+enum InterleavedReasoningField {
+    None,
+    ReasoningContent,
+    ReasoningDetails,
 }
 
 #[derive(Debug, Serialize)]
@@ -408,12 +418,14 @@ impl LlmClient {
                                     tool_calls,
                                     content: String::new(),
                                     reasoning_content: None,
+                                    reasoning_details: None,
                                 })
                         })
                         .unwrap_or(ToolCallsAssistantPayload {
                             tool_calls: Vec::new(),
                             content: String::new(),
                             reasoning_content: None,
+                            reasoning_details: None,
                         });
                     let tool_calls = payload
                         .tool_calls
@@ -439,6 +451,7 @@ impl LlmClient {
                             Some(tool_calls)
                         },
                         reasoning_content: payload.reasoning_content.filter(|v| !v.trim().is_empty()),
+                        reasoning_details: payload.reasoning_details,
                     };
                 }
 
@@ -449,9 +462,30 @@ impl LlmClient {
                     tool_call_id: m.tool_call_id.clone(),
                     tool_calls: None,
                     reasoning_content: None,
+                    reasoning_details: None,
                 }
             })
             .collect()
+    }
+
+    fn interleaved_reasoning_field(&self, model: &str) -> InterleavedReasoningField {
+        let provider = self.config.provider.to_ascii_lowercase();
+        let model = model.to_ascii_lowercase();
+
+        if provider == "moonshot"
+            || provider == "zai"
+            || model.contains("kimi")
+            || model.contains("k2.5")
+            || model.contains("k2p5")
+        {
+            return InterleavedReasoningField::ReasoningContent;
+        }
+
+        if model.contains("qwen") && (model.contains("thinking") || model.contains("reasoner")) {
+            return InterleavedReasoningField::ReasoningDetails;
+        }
+
+        InterleavedReasoningField::None
     }
 
     fn normalize_tool_call_id_for_claude(id: &str) -> String {
@@ -506,6 +540,31 @@ impl LlmClient {
                         }
                     }
                 }
+
+                match self.interleaved_reasoning_field(&model) {
+                    InterleavedReasoningField::ReasoningContent => {
+                        if msg.reasoning_content.is_none() {
+                            msg.reasoning_content = msg
+                                .reasoning_details
+                                .as_ref()
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string());
+                        }
+                        msg.reasoning_details = None;
+                    }
+                    InterleavedReasoningField::ReasoningDetails => {
+                        if msg.reasoning_details.is_none() {
+                            if let Some(content) = msg.reasoning_content.as_ref() {
+                                msg.reasoning_details = Some(Value::String(content.clone()));
+                            }
+                        }
+                        msg.reasoning_content = None;
+                    }
+                    InterleavedReasoningField::None => {
+                        msg.reasoning_content = None;
+                        msg.reasoning_details = None;
+                    }
+                }
                 msg
             })
             .collect::<Vec<_>>();
@@ -525,6 +584,7 @@ impl LlmClient {
                                 tool_call_id: None,
                                 tool_calls: None,
                                 reasoning_content: None,
+                                reasoning_details: None,
                             });
                         }
                     }
