@@ -437,10 +437,10 @@ pub async fn agent_approve_tool(
     if matches!(reply, PermissionReply::Reject) {
         if let Some(rejected) = pending_calls.first() {
             resumed_state.messages.push(Message {
-                role: MessageRole::User,
-                content: format!("用户拒绝授权工具 {}。", rejected.name),
-                name: None,
-                tool_call_id: None,
+                role: MessageRole::Tool,
+                content: format!("Tool {} rejected by user approval.", rejected.name),
+                name: Some(rejected.name.clone()),
+                tool_call_id: Some(rejected.id.clone()),
             });
         }
         if !pending_calls.is_empty() {
