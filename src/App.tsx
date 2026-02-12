@@ -870,7 +870,7 @@ function App() {
               <Suspense
                 fallback={
                   <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-                    Loading diagram editor...
+                    {t.diagramView.loadingEditor}
                   </div>
                 }
               >

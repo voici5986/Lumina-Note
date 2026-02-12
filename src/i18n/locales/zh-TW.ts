@@ -1403,6 +1403,7 @@ export default {
   // 圖表編輯器
   diagramView: {
     loading: '載入圖表中...',
+    loadingEditor: '載入圖表編輯器中...',
     loadFailed: '圖表載入失敗，已改用空白畫布：{message}',
     saveFailed: '圖表儲存失敗：{message}',
     autoSavedAt: '已自動儲存於 {time}',
@@ -1415,6 +1416,13 @@ export default {
     canvasSummary: '圖表畫布（{count} 個元素）',
     selectionLocator: '選取 {count}',
     canvasLocator: '畫布 {count}',
+    quoteReferenceHeader: '[圖表引用]',
+    quotePathLabel: '路徑',
+    quoteElementsLabel: '元素',
+    quoteTypeBreakdownLabel: '類型分佈',
+    quoteItemsLabel: '明細',
+    quoteNoneLabel: '無',
+    quoteOmittedSuffix: '個元素已省略',
   },
 
   // AI 設定彈窗

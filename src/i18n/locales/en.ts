@@ -1402,6 +1402,7 @@ export default {
   // Diagram editor
   diagramView: {
     loading: 'Loading diagram...',
+    loadingEditor: 'Loading diagram editor...',
     loadFailed: 'Failed to load diagram, started with a blank canvas: {message}',
     saveFailed: 'Failed to save diagram: {message}',
     autoSavedAt: 'Auto-saved {time}',
@@ -1414,6 +1415,13 @@ export default {
     canvasSummary: 'Diagram canvas ({count} elements)',
     selectionLocator: 'Selection {count}',
     canvasLocator: 'Canvas {count}',
+    quoteReferenceHeader: '[DIAGRAM REFERENCE]',
+    quotePathLabel: 'path',
+    quoteElementsLabel: 'elements',
+    quoteTypeBreakdownLabel: 'type_breakdown',
+    quoteItemsLabel: 'items',
+    quoteNoneLabel: 'none',
+    quoteOmittedSuffix: 'more elements omitted',
   },
 
   // AI Settings Modal

@@ -46,6 +46,15 @@ function buildDiagramQuoteText(
   filePath: string,
   elements: readonly OrderedExcalidrawElement[],
   cappedCount: number,
+  labels: {
+    referenceHeader: string;
+    pathLabel: string;
+    elementsLabel: string;
+    typeBreakdownLabel: string;
+    itemsLabel: string;
+    noneLabel: string;
+    omittedSuffix: string;
+  },
 ): string {
   const typeCounts = new Map<string, number>();
   for (const element of elements) {
@@ -58,14 +67,14 @@ function buildDiagramQuoteText(
           .sort((a, b) => a[0].localeCompare(b[0]))
           .map(([type, count]) => `${type}:${count}`)
           .join(", ")
-      : "none";
+      : labels.noneLabel;
 
   const lines = [
-    `[DIAGRAM REFERENCE]`,
-    `path: ${filePath}`,
-    `elements: ${elements.length}`,
-    `type_breakdown: ${typeSummary}`,
-    "items:",
+    labels.referenceHeader,
+    `${labels.pathLabel}: ${filePath}`,
+    `${labels.elementsLabel}: ${elements.length}`,
+    `${labels.typeBreakdownLabel}: ${typeSummary}`,
+    `${labels.itemsLabel}:`,
   ];
 
   elements.slice(0, cappedCount).forEach((element, index) => {
@@ -82,7 +91,7 @@ function buildDiagramQuoteText(
   });
 
   if (elements.length > cappedCount) {
-    lines.push(`... ${elements.length - cappedCount} more elements omitted`);
+    lines.push(`... ${elements.length - cappedCount} ${labels.omittedSuffix}`);
   }
 
   return lines.join("\n");
@@ -207,7 +216,15 @@ export function DiagramView({ filePath, className }: DiagramViewProps) {
     const targetElements = selectedElements.length > 0 ? selectedElements : allElements;
     const isSelectionReference = selectedElements.length > 0;
     const referenceCount = targetElements.length;
-    const referenceText = buildDiagramQuoteText(filePath, targetElements, MAX_QUOTED_ELEMENTS);
+    const referenceText = buildDiagramQuoteText(filePath, targetElements, MAX_QUOTED_ELEMENTS, {
+      referenceHeader: t.diagramView.quoteReferenceHeader,
+      pathLabel: t.diagramView.quotePathLabel,
+      elementsLabel: t.diagramView.quoteElementsLabel,
+      typeBreakdownLabel: t.diagramView.quoteTypeBreakdownLabel,
+      itemsLabel: t.diagramView.quoteItemsLabel,
+      noneLabel: t.diagramView.quoteNoneLabel,
+      omittedSuffix: t.diagramView.quoteOmittedSuffix,
+    });
     const sourceName = filePath.split(/[/\\]/).pop() || t.diagramView.defaultSource;
     const summaryTemplate = isSelectionReference
       ? t.diagramView.selectionSummary

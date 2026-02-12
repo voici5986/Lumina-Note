@@ -1403,6 +1403,7 @@ export default {
   // 图表编辑器
   diagramView: {
     loading: '加载图表中...',
+    loadingEditor: '加载图表编辑器中...',
     loadFailed: '图表加载失败，已切换为空白画布：{message}',
     saveFailed: '图表保存失败：{message}',
     autoSavedAt: '自动保存于 {time}',
@@ -1415,6 +1416,13 @@ export default {
     canvasSummary: '图表画布（{count} 个元素）',
     selectionLocator: '图选 {count}',
     canvasLocator: '画布 {count}',
+    quoteReferenceHeader: '[图表引用]',
+    quotePathLabel: '路径',
+    quoteElementsLabel: '元素',
+    quoteTypeBreakdownLabel: '类型分布',
+    quoteItemsLabel: '明细',
+    quoteNoneLabel: '无',
+    quoteOmittedSuffix: '个元素已省略',
   },
 
   // AI 设置弹窗

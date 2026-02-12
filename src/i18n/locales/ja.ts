@@ -1403,6 +1403,7 @@ export default {
   // 図エディタ
   diagramView: {
     loading: '図を読み込み中...',
+    loadingEditor: '図エディタを読み込み中...',
     loadFailed: '図の読み込みに失敗したため、空のキャンバスで開始しました: {message}',
     saveFailed: '図の保存に失敗しました: {message}',
     autoSavedAt: '{time} に自動保存',
@@ -1415,6 +1416,13 @@ export default {
     canvasSummary: '図のキャンバス（{count} 要素）',
     selectionLocator: '選択 {count}',
     canvasLocator: 'キャンバス {count}',
+    quoteReferenceHeader: '[図の参照]',
+    quotePathLabel: 'パス',
+    quoteElementsLabel: '要素',
+    quoteTypeBreakdownLabel: 'タイプ内訳',
+    quoteItemsLabel: '項目',
+    quoteNoneLabel: 'なし',
+    quoteOmittedSuffix: '件の要素を省略',
   },
 
   // AI 設定ダイアログ

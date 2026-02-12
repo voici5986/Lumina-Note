@@ -217,11 +217,12 @@ const isDiagramPath = (path: string) => {
 };
 
 const getDiagramDisplayName = (path: string) => {
-  const fileName = path.split(/[/\\]/).pop() || "diagram";
+  const t = getCurrentTranslations();
+  const fileName = path.split(/[/\\]/).pop() || t.diagramView.defaultSource;
   const lower = fileName.toLowerCase();
   for (const suffix of DIAGRAM_FILE_SUFFIXES) {
     if (lower.endsWith(suffix)) {
-      return fileName.slice(0, fileName.length - suffix.length) || "diagram";
+      return fileName.slice(0, fileName.length - suffix.length) || t.diagramView.defaultSource;
     }
   }
   return fileName;
