@@ -309,7 +309,7 @@ export function TableView({ dbId }: TableViewProps) {
                     </span>
                   )}
                   <div className="flex items-center">
-                    <div className="flex-1">
+                    <div className="min-w-0 flex-1">
                       <DatabaseCell
                         dbId={dbId}
                         column={column}
@@ -320,19 +320,26 @@ export function TableView({ dbId }: TableViewProps) {
                         onSaveStateChange={(state) => handleCellSaveState(row.id, column.id, state)}
                       />
                     </div>
-                    {/* 第一列显示打开笔记按钮 */}
-                    {colIndex === 0 && hoveredRow === row.id && row.notePath && (
-                      <DatabaseIconButton
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenInSplit(row.notePath);
-                        }}
-                        className="mr-1"
-                        aria-label={t.database.openInSplit}
-                        title={t.database.openInSplit}
-                      >
-                        <FileText className="w-4 h-4" />
-                      </DatabaseIconButton>
+                    {/* 第一列预留打开笔记按钮位置，避免 hover 时内容宽度跳变 */}
+                    {colIndex === 0 && (
+                      <div className="mr-1 h-8 w-8 flex-shrink-0">
+                        <DatabaseIconButton
+                          onClick={(e) => {
+                            if (!row.notePath) return;
+                            e.stopPropagation();
+                            handleOpenInSplit(row.notePath);
+                          }}
+                          className={`h-8 w-8 transition-opacity duration-120 ease-out ${
+                            hoveredRow === row.id && row.notePath ? "opacity-100" : "pointer-events-none opacity-0"
+                          }`}
+                          tabIndex={hoveredRow === row.id && row.notePath ? 0 : -1}
+                          aria-hidden={hoveredRow === row.id && row.notePath ? undefined : true}
+                          aria-label={t.database.openInSplit}
+                          title={t.database.openInSplit}
+                        >
+                          <FileText className="w-4 h-4" />
+                        </DatabaseIconButton>
+                      </div>
                     )}
                   </div>
                 </td>
