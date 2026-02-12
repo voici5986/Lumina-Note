@@ -23,6 +23,7 @@ const STREAM_MAX_RETRIES: u32 = 3;
 const STREAM_RETRY_BASE_DELAY_MS: u64 = 1_000;
 const STREAM_RETRY_MAX_DELAY_MS: u64 = 30_000;
 const STREAM_RETRY_JITTER_MS: u64 = 500;
+const TOOL_CALLS_MESSAGE_NAME: &str = "__lumina_tool_calls__";
 
 /// OpenAI 格式的请求
 #[derive(Debug, Serialize)]
@@ -46,6 +47,21 @@ struct ChatMessage {
     name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_call_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_calls: Option<Vec<ChatToolCall>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ChatToolCall {
+    id: String,
+    r#type: String,
+    function: ChatToolCallFunction,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ChatToolCallFunction {
+    name: String,
+    arguments: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -316,16 +332,49 @@ impl LlmClient {
     fn convert_messages(&self, messages: &[Message]) -> Vec<ChatMessage> {
         messages
             .iter()
-            .map(|m| ChatMessage {
-                role: match m.role {
+            .map(|m| {
+                let role = match m.role {
                     MessageRole::System => "system".to_string(),
                     MessageRole::User => "user".to_string(),
                     MessageRole::Assistant => "assistant".to_string(),
                     MessageRole::Tool => "tool".to_string(),
-                },
-                content: m.content.clone(),
-                name: m.name.clone(),
-                tool_call_id: m.tool_call_id.clone(),
+                };
+
+                if m.role == MessageRole::Assistant && m.name.as_deref() == Some(TOOL_CALLS_MESSAGE_NAME)
+                {
+                    let parsed: Vec<ToolCall> = serde_json::from_str(&m.content).unwrap_or_default();
+                    let tool_calls = parsed
+                        .into_iter()
+                        .map(|call| ChatToolCall {
+                            id: call.id,
+                            r#type: "function".to_string(),
+                            function: ChatToolCallFunction {
+                                name: call.name,
+                                arguments: serde_json::to_string(&call.params)
+                                    .unwrap_or_else(|_| "{}".to_string()),
+                            },
+                        })
+                        .collect::<Vec<_>>();
+                    return ChatMessage {
+                        role,
+                        content: String::new(),
+                        name: None,
+                        tool_call_id: None,
+                        tool_calls: if tool_calls.is_empty() {
+                            None
+                        } else {
+                            Some(tool_calls)
+                        },
+                    };
+                }
+
+                ChatMessage {
+                    role,
+                    content: m.content.clone(),
+                    name: m.name.clone(),
+                    tool_call_id: m.tool_call_id.clone(),
+                    tool_calls: None,
+                }
             })
             .collect()
     }

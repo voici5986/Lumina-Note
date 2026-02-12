@@ -17,6 +17,7 @@ use tauri::AppHandle;
 use uuid::Uuid;
 
 const DOOM_LOOP_THRESHOLD: usize = 3;
+const TOOL_CALLS_MESSAGE_NAME: &str = "__lumina_tool_calls__";
 
 #[derive(Clone)]
 pub struct ForgeRuntime {
@@ -262,6 +263,14 @@ pub async fn run_forge_loop(
                             break;
                         }
 
+                        let tool_calls_payload =
+                            serde_json::to_string(&tool_calls).unwrap_or_else(|_| "[]".to_string());
+                        state.messages.push(Message {
+                            role: MessageRole::Assistant,
+                            content: tool_calls_payload,
+                            name: Some(TOOL_CALLS_MESSAGE_NAME.to_string()),
+                            tool_call_id: None,
+                        });
                         queued_calls = tool_calls;
                     }
 
