@@ -362,7 +362,11 @@ impl LlmClient {
         })
     }
 
-    fn resolve_tools_payload(&self, messages: &[Message], tools: Option<&[Value]>) -> Option<Value> {
+    fn resolve_tools_payload(
+        &self,
+        messages: &[Message],
+        tools: Option<&[Value]>,
+    ) -> Option<Value> {
         if let Some(tools) = tools {
             if !tools.is_empty() {
                 return Some(json!(tools));
@@ -407,19 +411,20 @@ impl LlmClient {
                     MessageRole::Tool => "tool".to_string(),
                 };
 
-                if m.role == MessageRole::Assistant && m.name.as_deref() == Some(TOOL_CALLS_MESSAGE_NAME)
+                if m.role == MessageRole::Assistant
+                    && m.name.as_deref() == Some(TOOL_CALLS_MESSAGE_NAME)
                 {
                     let payload = serde_json::from_str::<ToolCallsAssistantPayload>(&m.content)
                         .ok()
                         .or_else(|| {
-                            serde_json::from_str::<Vec<ToolCall>>(&m.content)
-                                .ok()
-                                .map(|tool_calls| ToolCallsAssistantPayload {
+                            serde_json::from_str::<Vec<ToolCall>>(&m.content).ok().map(
+                                |tool_calls| ToolCallsAssistantPayload {
                                     tool_calls,
                                     content: String::new(),
                                     reasoning_content: None,
                                     reasoning_details: None,
-                                })
+                                },
+                            )
                         })
                         .unwrap_or(ToolCallsAssistantPayload {
                             tool_calls: Vec::new(),
@@ -450,7 +455,9 @@ impl LlmClient {
                         } else {
                             Some(tool_calls)
                         },
-                        reasoning_content: payload.reasoning_content.filter(|v| !v.trim().is_empty()),
+                        reasoning_content: payload
+                            .reasoning_content
+                            .filter(|v| !v.trim().is_empty()),
                         reasoning_details: payload.reasoning_details,
                     };
                 }
@@ -606,7 +613,8 @@ impl LlmClient {
         let headers = self.build_headers();
 
         let resolved_model = self.resolved_model();
-        let chat_messages = self.normalize_chat_messages(self.convert_messages(messages), &resolved_model);
+        let chat_messages =
+            self.normalize_chat_messages(self.convert_messages(messages), &resolved_model);
         let temperature = self.resolved_temperature();
 
         let mut body = json!({
@@ -910,7 +918,8 @@ impl LlmClient {
         let headers = self.build_headers();
 
         let resolved_model = self.resolved_model();
-        let chat_messages = self.normalize_chat_messages(self.convert_messages(messages), &resolved_model);
+        let chat_messages =
+            self.normalize_chat_messages(self.convert_messages(messages), &resolved_model);
         let temperature = self.resolved_temperature();
 
         let mut body = json!({
@@ -1421,7 +1430,8 @@ impl LlmClient {
         let headers = self.build_headers();
 
         let resolved_model = self.resolved_model();
-        let chat_messages = self.normalize_chat_messages(self.convert_messages(messages), &resolved_model);
+        let chat_messages =
+            self.normalize_chat_messages(self.convert_messages(messages), &resolved_model);
         let temperature = self.resolved_temperature();
 
         let mut body = json!({
