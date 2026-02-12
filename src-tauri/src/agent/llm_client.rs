@@ -319,6 +319,51 @@ impl LlmClient {
         }
     }
 
+    fn is_litellm_proxy(&self) -> bool {
+        let provider = self.config.provider.to_ascii_lowercase();
+        let base = self
+            .config
+            .base_url
+            .as_deref()
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        provider.contains("litellm") || base.contains("litellm")
+    }
+
+    fn has_tool_interactions(messages: &[Message]) -> bool {
+        messages.iter().any(|m| {
+            m.role == MessageRole::Tool
+                || (m.role == MessageRole::Assistant
+                    && m.name.as_deref() == Some(TOOL_CALLS_MESSAGE_NAME))
+        })
+    }
+
+    fn noop_tool_definition() -> Value {
+        json!({
+            "type": "function",
+            "function": {
+                "name": "_noop",
+                "description": "Compatibility placeholder tool. Do not call.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {}
+                }
+            }
+        })
+    }
+
+    fn resolve_tools_payload(&self, messages: &[Message], tools: Option<&[Value]>) -> Option<Value> {
+        if let Some(tools) = tools {
+            if !tools.is_empty() {
+                return Some(json!(tools));
+            }
+        }
+        if self.is_litellm_proxy() && Self::has_tool_interactions(messages) {
+            return Some(json!([Self::noop_tool_definition()]));
+        }
+        None
+    }
+
     /// 构建请求头
     fn build_headers(&self) -> HashMap<String, String> {
         let mut headers = HashMap::new();
@@ -514,9 +559,10 @@ impl LlmClient {
         self.apply_thinking_controls(&mut body, &resolved_model);
         self.apply_moonshot_k25_constraints(&mut body, &resolved_model);
 
-        let has_tools = tools.is_some();
-        if let Some(tools) = tools {
-            body["tools"] = json!(tools);
+        let tools_payload = self.resolve_tools_payload(messages, tools);
+        let has_tools = tools_payload.is_some();
+        if let Some(tools) = tools_payload {
+            body["tools"] = tools;
         }
 
         println!("[LlmClient] 📤 发送请求到: {}", url);
@@ -817,8 +863,8 @@ impl LlmClient {
         self.apply_thinking_controls(&mut body, &resolved_model);
         self.apply_moonshot_k25_constraints(&mut body, &resolved_model);
 
-        if let Some(tools) = tools {
-            body["tools"] = json!(tools);
+        if let Some(tools) = self.resolve_tools_payload(messages, tools) {
+            body["tools"] = tools;
         }
 
         let mut req = self.client.post(&url);
@@ -1328,8 +1374,8 @@ impl LlmClient {
         self.apply_thinking_controls(&mut body, &resolved_model);
         self.apply_moonshot_k25_constraints(&mut body, &resolved_model);
 
-        if let Some(tools) = tools {
-            body["tools"] = json!(tools);
+        if let Some(tools) = self.resolve_tools_payload(messages, tools) {
+            body["tools"] = tools;
         }
 
         let mut req = self.client.post(&url);
