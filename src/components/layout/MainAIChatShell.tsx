@@ -143,9 +143,9 @@ function SuggestionCard({
       whileHover={{ scale: 1.02, y: -2 }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className="bg-background/50 hover:bg-accent/60 p-4 rounded-ui-lg cursor-pointer border border-border/50 shadow-ui-card transition-colors flex flex-col items-start gap-1 text-left"
+      className="bg-background/50 hover:bg-accent/60 p-4 rounded-ui-lg cursor-pointer border border-border/50 transition-colors flex flex-col items-start gap-1 text-left"
     >
-      <div className="p-2 bg-background rounded-lg shadow-sm text-muted-foreground mb-1">
+      <div className="p-2 bg-background rounded-lg text-muted-foreground mb-1">
         <Icon size={18} />
       </div>
       <span className="text-sm font-medium text-foreground">{title}</span>
