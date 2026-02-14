@@ -1416,6 +1416,7 @@ export default {
     openInteractive: 'Interactive edit',
     closeInteractive: 'Close editor',
     inlineEditorTitle: 'Diagram draft editor (manual save)',
+    assistantLiveTitle: 'Assistant live diagram',
     reset: 'Reset',
     sendToChat: 'Send to Chat',
     sendToChatHint: 'Send selected elements (or the whole canvas) to chat as references',

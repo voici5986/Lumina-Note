@@ -1417,6 +1417,7 @@ export default {
     openInteractive: 'インタラクティブ編集',
     closeInteractive: 'エディタを閉じる',
     inlineEditorTitle: '図の下書き編集（手動保存）',
+    assistantLiveTitle: 'アシスタント側ライブ図',
     reset: 'リセット',
     sendToChat: 'チャットへ送信',
     sendToChatHint: '選択中の要素（またはキャンバス全体）を参照としてチャットへ送信',

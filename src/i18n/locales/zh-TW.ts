@@ -1417,6 +1417,7 @@ export default {
     openInteractive: '互動編輯',
     closeInteractive: '收起編輯',
     inlineEditorTitle: '圖表草稿編輯（手動儲存）',
+    assistantLiveTitle: '助手側即時圖表',
     reset: '重設',
     sendToChat: '發送到對話',
     sendToChatHint: '將目前選取元素（或整個畫布）作為引用發送到 AI 對話',

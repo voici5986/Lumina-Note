@@ -39,10 +39,12 @@ import {
   Download,
 } from "lucide-react";
 import { AgentMessageRenderer, ThinkingCollapsible } from "../chat/AgentMessageRenderer";
+import { AssistantDiagramPanels } from "../chat/AssistantDiagramPanels";
 import { PlanCard } from "../chat/PlanCard";
 import { StreamingOutput } from "../chat/StreamingMessage";
 import { SelectableConversationList } from "../chat/SelectableConversationList";
 import { UserMessageBubbleContent } from "../chat/UserMessageBubbleContent";
+import { getDiagramAttachmentFilePaths } from "../chat/diagramAttachmentUtils";
 import { getImagesFromContent, getTextFromContent, getUserMessageDisplay } from "../chat/messageContentUtils";
 import {
   filterMentionFiles,
@@ -479,6 +481,27 @@ export function MainAIChatShell() {
   const agentQueueCount = rustQueuedTasks.length;
 
   const isConversationMode = chatMode === "chat" || chatMode === "agent";
+  const chatAssistantDiagramPathsByIndex = useMemo(() => {
+    const mapping = new Map<number, string[]>();
+    let pendingDiagramPaths: string[] = [];
+
+    chatMessages.forEach((message, index) => {
+      if (message.role === "user") {
+        const normalized = getUserMessageDisplay(message.content, message.attachments);
+        pendingDiagramPaths = getDiagramAttachmentFilePaths(normalized.attachments);
+        return;
+      }
+
+      if (message.role === "assistant") {
+        if (pendingDiagramPaths.length > 0) {
+          mapping.set(index, pendingDiagramPaths);
+        }
+        pendingDiagramPaths = [];
+      }
+    });
+
+    return mapping;
+  }, [chatMessages]);
 
   const exportCandidates = useMemo<ExportMessage[]>(() => {
     if (chatMode === "chat") {
@@ -1597,6 +1620,7 @@ export function MainAIChatShell() {
                   /* Chat 模式：原有的消息渲染 */
                   chatMessages.map((msg, idx) => {
                     const isUser = msg.role === "user";
+                    const assistantDiagramPaths = isUser ? [] : (chatAssistantDiagramPathsByIndex.get(idx) || []);
                     return (
                       <motion.div
                         key={idx}
@@ -1630,6 +1654,9 @@ export function MainAIChatShell() {
                               const assistantParts = parseChatAssistantParts(getTextFromContent(msg.content));
                               return (
                                 <div className="space-y-2">
+                                  {assistantDiagramPaths.length > 0 && (
+                                    <AssistantDiagramPanels filePaths={assistantDiagramPaths} className="mb-3" />
+                                  )}
                                   {assistantParts.map((part, partIdx) => {
                                     if (part.type === "thinking") {
                                       return (

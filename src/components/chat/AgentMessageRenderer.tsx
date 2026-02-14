@@ -18,6 +18,8 @@ import { useAIStore, type PendingDiff } from "@/stores/useAIStore";
 import { useFileStore } from "@/stores/useFileStore";
 import { saveFile } from "@/lib/tauri";
 import { getImagesFromContent, getTextFromContent, getUserMessageDisplay } from "./messageContentUtils";
+import { AssistantDiagramPanels } from "./AssistantDiagramPanels";
+import { getDiagramAttachmentFilePaths } from "./diagramAttachmentUtils";
 import { UserMessageBubbleContent } from "./UserMessageBubbleContent";
 import {
   ChevronRight,
@@ -581,6 +583,7 @@ export const AgentMessageRenderer = memo(function AgentMessageRenderer({
       userContent: string;
       userAttachments: MessageAttachment[];
       userImages: ImageContent[];
+      diagramPaths: string[];
       parts: TimelinePart[];
       roundKey: string;
       hasAIContent: boolean;
@@ -666,6 +669,7 @@ export const AgentMessageRenderer = memo(function AgentMessageRenderer({
         userContent: displayContent,
         userAttachments: normalizedUserMessage.attachments,
         userImages,
+        diagramPaths: getDiagramAttachmentFilePaths(normalizedUserMessage.attachments),
         parts,
         roundKey,
         hasAIContent,
@@ -697,6 +701,9 @@ export const AgentMessageRenderer = memo(function AgentMessageRenderer({
                 <Bot size={16} className="text-muted-foreground" />
               </div>
               <div className="flex-1 min-w-0 space-y-2">
+                {round.diagramPaths.length > 0 && (
+                  <AssistantDiagramPanels filePaths={round.diagramPaths} />
+                )}
                 {(() => {
                   let lastTextIndex = -1;
                   for (let i = 0; i < round.parts.length; i++) {

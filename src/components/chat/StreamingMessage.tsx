@@ -6,7 +6,7 @@
  * - Chat 模式：从 useAIStore 获取 streamingContent
  */
 
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import { Bot } from "lucide-react";
 import { parseMarkdown } from "@/services/markdown/markdown";
 import { useAIStore } from "@/stores/useAIStore";
@@ -14,12 +14,17 @@ import { useRustAgentStore } from "@/stores/useRustAgentStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 import { ThinkingCollapsible } from "./AgentMessageRenderer";
+import { AssistantDiagramPanels } from "./AssistantDiagramPanels";
+import { getDiagramAttachmentFilePaths } from "./diagramAttachmentUtils";
+import { getUserMessageDisplay } from "./messageContentUtils";
 
 interface StreamingMessageProps {
   /** 强制指定模式，不指定则自动从 UIStore 获取 */
   mode?: "agent" | "chat";
   /** 自定义类名 */
   className?: string;
+  /** 可选：直接传入流式阶段要展示的图文件列表 */
+  diagramPaths?: string[];
 }
 
 /**
@@ -30,6 +35,7 @@ interface StreamingMessageProps {
 export const StreamingMessage = memo(function StreamingMessage({ 
   mode,
   className = "",
+  diagramPaths,
 }: StreamingMessageProps) {
   const { t } = useLocaleStore();
   const chatMode = useUIStore((state) => state.chatMode);
@@ -44,10 +50,12 @@ export const StreamingMessage = memo(function StreamingMessage({
   const chatStreaming = useAIStore((state) => state.isStreaming);
   const chatReasoning = useAIStore((state) => state.streamingReasoning);
   const chatReasoningStatus = useAIStore((state) => state.streamingReasoningStatus);
+  const chatMessages = useAIStore((state) => state.messages);
 
   // Agent 思考流
   const agentReasoning = useRustAgentStore((state) => state.streamingReasoning);
   const agentReasoningStatus = useRustAgentStore((state) => state.streamingReasoningStatus);
+  const agentMessages = useRustAgentStore((state) => state.messages);
   
   // 根据模式选择数据
   const content = currentMode === "agent" ? agentContent : chatContent;
@@ -57,6 +65,20 @@ export const StreamingMessage = memo(function StreamingMessage({
   const isStreaming = currentMode === "agent"
     ? agentStatus === "running" && (agentContent.length > 0 || hasReasoningPanel)
     : chatStreaming && (chatContent.length > 0 || hasReasoningPanel);
+  const resolvedDiagramPaths = useMemo(() => {
+    if (diagramPaths && diagramPaths.length > 0) {
+      return diagramPaths;
+    }
+
+    const sourceMessages = currentMode === "agent" ? agentMessages : chatMessages;
+    for (let i = sourceMessages.length - 1; i >= 0; i -= 1) {
+      const message = sourceMessages[i];
+      if (message.role !== "user") continue;
+      const { attachments } = getUserMessageDisplay(message.content, message.attachments);
+      return getDiagramAttachmentFilePaths(attachments);
+    }
+    return [];
+  }, [agentMessages, chatMessages, currentMode, diagramPaths]);
 
   // 不在流式状态或没有内容时不渲染
   if (!isStreaming || (!content && !hasReasoningPanel)) {
@@ -69,6 +91,9 @@ export const StreamingMessage = memo(function StreamingMessage({
         <Bot size={16} className="text-muted-foreground" />
       </div>
       <div className="max-w-[80%] text-foreground">
+        {resolvedDiagramPaths.length > 0 && (
+          <AssistantDiagramPanels filePaths={resolvedDiagramPaths} className="mb-2" />
+        )}
         {hasReasoningPanel && (
           <ThinkingCollapsible
             thinking={reasoning}
@@ -98,6 +123,8 @@ interface TypingIndicatorProps {
   mode?: "agent" | "chat";
   /** 自定义类名 */
   className?: string;
+  /** 可选：直接传入流式阶段要展示的图文件列表 */
+  diagramPaths?: string[];
 }
 
 /**
@@ -108,6 +135,7 @@ interface TypingIndicatorProps {
 export const TypingIndicator = memo(function TypingIndicator({
   mode,
   className = "",
+  diagramPaths,
 }: TypingIndicatorProps) {
   const chatMode = useUIStore((state) => state.chatMode);
   const currentMode = mode ?? chatMode;
@@ -121,18 +149,34 @@ export const TypingIndicator = memo(function TypingIndicator({
   const chatStreaming = useAIStore((state) => state.isStreaming);
   const chatLoading = useAIStore((state) => state.isLoading);
   const chatReasoningStatus = useAIStore((state) => state.streamingReasoningStatus);
+  const chatMessages = useAIStore((state) => state.messages);
   const isChatWaiting =
     (chatStreaming || chatLoading) &&
     chatContent.length === 0 &&
     chatReasoningStatus === "idle";
 
   const agentReasoningStatus = useRustAgentStore((state) => state.streamingReasoningStatus);
+  const agentMessages = useRustAgentStore((state) => state.messages);
   const isAgentWaiting =
     agentStatus === "running" &&
     agentContent.length === 0 &&
     agentReasoningStatus === "idle";
   // 根据模式选择
   const isWaiting = currentMode === "agent" ? isAgentWaiting : isChatWaiting;
+  const resolvedDiagramPaths = useMemo(() => {
+    if (diagramPaths && diagramPaths.length > 0) {
+      return diagramPaths;
+    }
+
+    const sourceMessages = currentMode === "agent" ? agentMessages : chatMessages;
+    for (let i = sourceMessages.length - 1; i >= 0; i -= 1) {
+      const message = sourceMessages[i];
+      if (message.role !== "user") continue;
+      const { attachments } = getUserMessageDisplay(message.content, message.attachments);
+      return getDiagramAttachmentFilePaths(attachments);
+    }
+    return [];
+  }, [agentMessages, chatMessages, currentMode, diagramPaths]);
 
   if (!isWaiting) {
     return null;
@@ -143,10 +187,15 @@ export const TypingIndicator = memo(function TypingIndicator({
       <div className="w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center shrink-0">
         <Bot size={16} className="text-muted-foreground" />
       </div>
-      <div className="flex items-center gap-1.5 h-8 streaming-content-enter" aria-hidden>
-        <span className="streaming-dot" style={{ animationDelay: "0ms" }} />
-        <span className="streaming-dot" style={{ animationDelay: "160ms" }} />
-        <span className="streaming-dot" style={{ animationDelay: "320ms" }} />
+      <div className="max-w-[80%] text-foreground">
+        {resolvedDiagramPaths.length > 0 && (
+          <AssistantDiagramPanels filePaths={resolvedDiagramPaths} className="mb-2" />
+        )}
+        <div className="flex items-center gap-1.5 h-8 streaming-content-enter" aria-hidden>
+          <span className="streaming-dot" style={{ animationDelay: "0ms" }} />
+          <span className="streaming-dot" style={{ animationDelay: "160ms" }} />
+          <span className="streaming-dot" style={{ animationDelay: "320ms" }} />
+        </div>
       </div>
     </div>
   );
@@ -160,11 +209,12 @@ export const TypingIndicator = memo(function TypingIndicator({
 export const StreamingOutput = memo(function StreamingOutput({
   mode,
   className = "",
+  diagramPaths,
 }: StreamingMessageProps) {
   return (
     <>
-      <TypingIndicator mode={mode} className={className} />
-      <StreamingMessage mode={mode} className={className} />
+      <TypingIndicator mode={mode} className={className} diagramPaths={diagramPaths} />
+      <StreamingMessage mode={mode} className={className} diagramPaths={diagramPaths} />
     </>
   );
 });

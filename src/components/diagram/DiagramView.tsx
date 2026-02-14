@@ -5,6 +5,7 @@ import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/ty
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, MessageSquareQuote, RotateCcw, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getFsChangePath, type FsChangePayload } from "@/lib/fsChange";
 import { readFile, saveFile } from "@/lib/tauri";
 import { useAIStore } from "@/stores/useAIStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
@@ -16,6 +17,8 @@ interface DiagramViewProps {
   className?: string;
   saveMode?: "auto" | "manual";
   showSendToChatButton?: boolean;
+  liveSync?: boolean;
+  viewModeEnabled?: boolean;
 }
 
 const SAVE_DEBOUNCE_MS = 700;
@@ -131,12 +134,18 @@ function normalizeSceneFromRaw(raw: string): {
   return { normalizedState, serialized, selectedIds };
 }
 
+function normalizeFsPath(path: string): string {
+  return path.replace(/\\/g, "/").replace(/\/+$/g, "").toLowerCase();
+}
+
 export function DiagramView({
   filePath,
   externalContent,
   className,
   saveMode = "auto",
   showSendToChatButton = true,
+  liveSync = false,
+  viewModeEnabled = false,
 }: DiagramViewProps) {
   const { t } = useLocaleStore();
   const isDarkMode = useUIStore((state) => state.isDarkMode);
@@ -156,6 +165,13 @@ export function DiagramView({
   const selectedElementIdsRef = useRef<string[]>([]);
   const excalidrawApiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const lastAppliedExternalContentRef = useRef<string | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const applySceneSnapshot = useCallback(
     (snapshot: ExcalidrawInitialDataState, serialized: string, selectedIds: string[]) => {
@@ -236,30 +252,51 @@ export function DiagramView({
     }
   }, [isSaving, saveNow, t]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
+  const loadSceneFromDisk = useCallback(
+    async (options?: { showLoading?: boolean; resetOnError?: boolean }) => {
+      const showLoading = options?.showLoading ?? false;
+      const resetOnError = options?.resetOnError ?? false;
       try {
-        setLoading(true);
+        if (showLoading) {
+          setLoading(true);
+        }
         setError(null);
         const raw = await readFile(filePath);
         const { normalizedState, serialized, selectedIds } = normalizeSceneFromRaw(raw);
-        if (cancelled) return;
+        if (!isMountedRef.current) {
+          return false;
+        }
         applySceneSnapshot(normalizedState, serialized, selectedIds);
-        setLoading(false);
+        return true;
       } catch (err) {
+        if (!isMountedRef.current) {
+          return false;
+        }
         const message = err instanceof Error ? err.message : String(err);
-        if (cancelled) return;
-        setInitialData(createInitialScene());
-        latestElementsRef.current = [];
-        selectedElementIdsRef.current = [];
-        setSelectedElementCount(0);
+        if (resetOnError) {
+          setInitialData(createInitialScene());
+          latestElementsRef.current = [];
+          selectedElementIdsRef.current = [];
+          setSelectedElementCount(0);
+        }
         setError(t.diagramView.loadFailed.replace("{message}", message));
-        setLoading(false);
+        return false;
+      } finally {
+        if (showLoading && isMountedRef.current) {
+          setLoading(false);
+        }
       }
-    };
+    },
+    [applySceneSnapshot, filePath, t],
+  );
 
-    void load();
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const loaded = await loadSceneFromDisk({ showLoading: true, resetOnError: true });
+      if (cancelled || !loaded) return;
+    })();
+
     return () => {
       cancelled = true;
       if (!isManualSave) {
@@ -274,7 +311,55 @@ export function DiagramView({
         window.clearTimeout(saveTimerRef.current);
       }
     };
-  }, [applySceneSnapshot, filePath, isManualSave, saveNow, t]);
+  }, [filePath, isManualSave, loadSceneFromDisk, saveNow]);
+
+  useEffect(() => {
+    if (!liveSync) return;
+
+    let unlisten: (() => void) | null = null;
+    let reloadTimer: number | null = null;
+    const targetPath = normalizeFsPath(filePath);
+
+    const setup = async () => {
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+        unlisten = await listen<FsChangePayload | null>("fs:change", (event) => {
+          const changedPath = getFsChangePath(event.payload);
+          if (!changedPath || normalizeFsPath(changedPath) !== targetPath) {
+            return;
+          }
+
+          const pending = pendingSerializedRef.current;
+          if (!isManualSave && pending && pending !== lastSavedSerializedRef.current) {
+            return;
+          }
+          if (isManualSave && hasUnsavedChanges) {
+            return;
+          }
+
+          if (reloadTimer) {
+            window.clearTimeout(reloadTimer);
+          }
+          reloadTimer = window.setTimeout(() => {
+            void loadSceneFromDisk({ showLoading: false, resetOnError: false });
+          }, 160);
+        });
+      } catch (err) {
+        console.warn("[DiagramView] liveSync listener setup failed:", err);
+      }
+    };
+
+    void setup();
+
+    return () => {
+      if (unlisten) {
+        unlisten();
+      }
+      if (reloadTimer) {
+        window.clearTimeout(reloadTimer);
+      }
+    };
+  }, [filePath, hasUnsavedChanges, isManualSave, liveSync, loadSceneFromDisk]);
 
   useEffect(() => {
     if (loading) return;
@@ -433,6 +518,7 @@ export function DiagramView({
             excalidrawApiRef.current = api;
           }}
           initialData={initialData}
+          viewModeEnabled={viewModeEnabled}
           theme={isDarkMode ? "dark" : "light"}
           onChange={(elements, appState, files) => {
             latestElementsRef.current = elements;

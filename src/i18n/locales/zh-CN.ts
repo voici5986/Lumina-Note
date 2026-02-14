@@ -1417,6 +1417,7 @@ export default {
     openInteractive: '交互编辑',
     closeInteractive: '收起编辑',
     inlineEditorTitle: '图表草稿编辑（手动保存）',
+    assistantLiveTitle: '助手侧实时图表',
     reset: '重置',
     sendToChat: '发送到对话',
     sendToChatHint: '将当前选中元素（或整个画布）作为引用发送到 AI 对话',
