@@ -3,7 +3,7 @@ import { CaptureUpdateAction, Excalidraw, restore, serializeAsJSON } from "@exca
 import type { ExcalidrawImperativeAPI, ExcalidrawInitialDataState } from "@excalidraw/excalidraw/types";
 import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, MessageSquareQuote, RotateCcw } from "lucide-react";
+import { Loader2, MessageSquareQuote, RotateCcw, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { readFile, saveFile } from "@/lib/tauri";
 import { useAIStore } from "@/stores/useAIStore";
@@ -14,6 +14,8 @@ interface DiagramViewProps {
   filePath: string;
   externalContent?: string;
   className?: string;
+  saveMode?: "auto" | "manual";
+  showSendToChatButton?: boolean;
 }
 
 const SAVE_DEBOUNCE_MS = 700;
@@ -129,16 +131,26 @@ function normalizeSceneFromRaw(raw: string): {
   return { normalizedState, serialized, selectedIds };
 }
 
-export function DiagramView({ filePath, externalContent, className }: DiagramViewProps) {
+export function DiagramView({
+  filePath,
+  externalContent,
+  className,
+  saveMode = "auto",
+  showSendToChatButton = true,
+}: DiagramViewProps) {
   const { t } = useLocaleStore();
   const isDarkMode = useUIStore((state) => state.isDarkMode);
+  const isManualSave = saveMode === "manual";
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [initialData, setInitialData] = useState<ExcalidrawInitialDataState>(() => createInitialScene());
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [selectedElementCount, setSelectedElementCount] = useState(0);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const saveTimerRef = useRef<number | null>(null);
   const lastSavedSerializedRef = useRef("");
+  const latestSerializedRef = useRef("");
   const pendingSerializedRef = useRef<string | null>(null);
   const latestElementsRef = useRef<readonly OrderedExcalidrawElement[]>([]);
   const selectedElementIdsRef = useRef<string[]>([]);
@@ -148,9 +160,11 @@ export function DiagramView({ filePath, externalContent, className }: DiagramVie
   const applySceneSnapshot = useCallback(
     (snapshot: ExcalidrawInitialDataState, serialized: string, selectedIds: string[]) => {
       lastSavedSerializedRef.current = serialized;
+      latestSerializedRef.current = serialized;
       latestElementsRef.current = snapshot.elements as OrderedExcalidrawElement[];
       selectedElementIdsRef.current = selectedIds;
       setSelectedElementCount(selectedIds.length);
+      setHasUnsavedChanges(false);
 
       const api = excalidrawApiRef.current;
       if (api) {
@@ -204,6 +218,24 @@ export function DiagramView({ filePath, externalContent, className }: DiagramVie
     [saveNow, t],
   );
 
+  const saveDraftNow = useCallback(async () => {
+    const serialized = latestSerializedRef.current;
+    if (!serialized || serialized === lastSavedSerializedRef.current || isSaving) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      await saveNow(serialized);
+      setHasUnsavedChanges(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(t.diagramView.saveFailed.replace("{message}", message));
+    } finally {
+      setIsSaving(false);
+    }
+  }, [isSaving, saveNow, t]);
+
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -230,17 +262,19 @@ export function DiagramView({ filePath, externalContent, className }: DiagramVie
     void load();
     return () => {
       cancelled = true;
-      const pending = pendingSerializedRef.current;
-      if (pending && pending !== lastSavedSerializedRef.current) {
-        void saveNow(pending).catch((err) => {
-          console.error("Failed to flush diagram save:", err);
-        });
+      if (!isManualSave) {
+        const pending = pendingSerializedRef.current;
+        if (pending && pending !== lastSavedSerializedRef.current) {
+          void saveNow(pending).catch((err) => {
+            console.error("Failed to flush diagram save:", err);
+          });
+        }
       }
       if (saveTimerRef.current) {
         window.clearTimeout(saveTimerRef.current);
       }
     };
-  }, [applySceneSnapshot, filePath, saveNow, t]);
+  }, [applySceneSnapshot, filePath, isManualSave, saveNow, t]);
 
   useEffect(() => {
     if (loading) return;
@@ -248,7 +282,10 @@ export function DiagramView({ filePath, externalContent, className }: DiagramVie
     if (externalContent === lastAppliedExternalContentRef.current) return;
 
     const pending = pendingSerializedRef.current;
-    if (pending && pending !== lastSavedSerializedRef.current) {
+    if (!isManualSave && pending && pending !== lastSavedSerializedRef.current) {
+      return;
+    }
+    if (isManualSave && hasUnsavedChanges) {
       return;
     }
 
@@ -272,7 +309,7 @@ export function DiagramView({ filePath, externalContent, className }: DiagramVie
       const message = err instanceof Error ? err.message : String(err);
       setError(t.diagramView.loadFailed.replace("{message}", message));
     }
-  }, [applySceneSnapshot, externalContent, loading, t]);
+  }, [applySceneSnapshot, externalContent, hasUnsavedChanges, isManualSave, loading, t]);
 
   const handleSendReferenceToChat = useCallback(() => {
     const allElements = latestElementsRef.current;
@@ -333,22 +370,44 @@ export function DiagramView({ filePath, externalContent, className }: DiagramVie
       <div className="flex items-center justify-between border-b border-border px-3 py-2 text-xs text-muted-foreground">
         <span className="truncate">{filePath}</span>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleSendReferenceToChat}
-            className="inline-flex items-center gap-1 rounded-ui-sm border border-border px-2 py-1 text-[11px] text-foreground hover:bg-muted"
-            title={t.diagramView.sendToChatHint}
-          >
-            <MessageSquareQuote className="h-3 w-3" />
-            <span>{t.diagramView.sendToChat}</span>
-            {selectedElementCount > 0 ? (
-              <span className="text-muted-foreground">({selectedElementCount})</span>
-            ) : null}
-          </button>
+          {showSendToChatButton ? (
+            <button
+              type="button"
+              onClick={handleSendReferenceToChat}
+              className="inline-flex items-center gap-1 rounded-ui-sm border border-border px-2 py-1 text-[11px] text-foreground hover:bg-muted"
+              title={t.diagramView.sendToChatHint}
+            >
+              <MessageSquareQuote className="h-3 w-3" />
+              <span>{t.diagramView.sendToChat}</span>
+              {selectedElementCount > 0 ? (
+                <span className="text-muted-foreground">({selectedElementCount})</span>
+              ) : null}
+            </button>
+          ) : null}
+          {isManualSave ? (
+            <button
+              type="button"
+              onClick={() => {
+                void saveDraftNow();
+              }}
+              disabled={!hasUnsavedChanges || isSaving}
+              className="inline-flex items-center gap-1 rounded-ui-sm border border-border px-2 py-1 text-[11px] text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+              title={t.diagramView.saveDraft}
+            >
+              <Save className="h-3 w-3" />
+              <span>{isSaving ? t.diagramView.savingDraft : t.diagramView.saveDraft}</span>
+            </button>
+          ) : null}
           <span>
-            {lastSavedAt
-              ? t.diagramView.autoSavedAt.replace("{time}", new Date(lastSavedAt).toLocaleTimeString())
-              : t.diagramView.notSavedYet}
+            {isManualSave
+              ? (hasUnsavedChanges
+                  ? t.diagramView.unsavedDraft
+                  : (lastSavedAt
+                      ? t.diagramView.savedAt.replace("{time}", new Date(lastSavedAt).toLocaleTimeString())
+                      : t.diagramView.notSavedYet))
+              : (lastSavedAt
+                  ? t.diagramView.autoSavedAt.replace("{time}", new Date(lastSavedAt).toLocaleTimeString())
+                  : t.diagramView.notSavedYet)}
           </span>
         </div>
       </div>
@@ -381,6 +440,11 @@ export function DiagramView({ filePath, externalContent, className }: DiagramVie
             selectedElementIdsRef.current = selectedIds;
             setSelectedElementCount(selectedIds.length);
             const serialized = serializeAsJSON(elements, appState, files, "local");
+            latestSerializedRef.current = serialized;
+            if (isManualSave) {
+              setHasUnsavedChanges(serialized !== lastSavedSerializedRef.current);
+              return;
+            }
             scheduleSave(serialized);
           }}
         />
