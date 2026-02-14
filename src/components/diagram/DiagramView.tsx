@@ -23,6 +23,25 @@ interface DiagramViewProps {
 
 const SAVE_DEBOUNCE_MS = 700;
 const MAX_QUOTED_ELEMENTS = 12;
+const DIAGRAM_LOAD_TIMEOUT_MS = 12000;
+
+async function readFileWithTimeout(path: string, timeoutMs: number): Promise<string> {
+  let timeoutId: number | null = null;
+  try {
+    return await Promise.race([
+      readFile(path),
+      new Promise<string>((_, reject) => {
+        timeoutId = window.setTimeout(() => {
+          reject(new Error(`Diagram load timed out after ${Math.round(timeoutMs / 1000)}s`));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== null) {
+      window.clearTimeout(timeoutId);
+    }
+  }
+}
 
 function getSelectedElementIds(appState: unknown): string[] {
   if (!appState) return [];
@@ -261,7 +280,7 @@ export function DiagramView({
           setLoading(true);
         }
         setError(null);
-        const raw = await readFile(filePath);
+        const raw = await readFileWithTimeout(filePath, DIAGRAM_LOAD_TIMEOUT_MS);
         const { normalizedState, serialized, selectedIds } = normalizeSceneFromRaw(raw);
         if (!isMountedRef.current) {
           return false;
