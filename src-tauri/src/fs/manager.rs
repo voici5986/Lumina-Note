@@ -158,7 +158,7 @@ pub fn write_file_content(path: &str, content: &str) -> Result<(), AppError> {
 }
 
 /// Check whether a file or directory exists under allowed roots.
-pub fn path_exists(path: &str) -> Result<bool, AppError> {
+pub fn path_exists_in_allowed_roots(path: &str) -> Result<bool, AppError> {
     let path = Path::new(path);
     ensure_allowed_path(path, false)?;
     Ok(path.exists())
@@ -430,7 +430,8 @@ mod tests {
         let file_path = dir.path().join("exists.md");
         with_allowed_root(dir.path(), || {
             fs::write(&file_path, "ok").expect("write fixture");
-            let exists = path_exists(file_path.to_string_lossy().as_ref()).expect("check exists");
+            let exists = path_exists_in_allowed_roots(file_path.to_string_lossy().as_ref())
+                .expect("check exists");
             assert!(exists);
         });
     }
@@ -440,7 +441,7 @@ mod tests {
         let allowed = TempDir::new().expect("allowed temp dir");
         let outside = TempDir::new().expect("outside temp dir");
         with_allowed_root(allowed.path(), || {
-            let err = path_exists(outside.path().to_string_lossy().as_ref())
+            let err = path_exists_in_allowed_roots(outside.path().to_string_lossy().as_ref())
                 .expect_err("should reject outside root");
             assert!(matches!(err, AppError::InvalidPath(_)));
         });

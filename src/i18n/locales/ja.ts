@@ -640,6 +640,8 @@ export default {
       create: '作成',
       creating: '作成中...',
       failed: 'データベースの作成に失敗しました',
+      pathForbidden: '現在のアクセス許可範囲外にはデータベースを作成できません。',
+      pathForbiddenPath: '現在のワークスペースのパスを確認してください: {path}',
       templates: {
         blank: {
           name: '空白データベース',

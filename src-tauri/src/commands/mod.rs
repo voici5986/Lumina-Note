@@ -364,7 +364,7 @@ pub async fn save_file(path: String, content: String) -> Result<(), AppError> {
 /// Check whether a file or directory exists.
 #[tauri::command]
 pub async fn path_exists(path: String) -> Result<bool, AppError> {
-    fs::path_exists(&path)
+    fs::path_exists_in_allowed_roots(&path)
 }
 
 /// Write binary file (for images, etc.)

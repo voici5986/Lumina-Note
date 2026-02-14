@@ -640,6 +640,8 @@ export default {
       create: '建立',
       creating: '建立中...',
       failed: '建立資料庫失敗',
+      pathForbidden: '無法在目前可存取範圍外建立資料庫。',
+      pathForbiddenPath: '請確認目前工作區路徑可存取：{path}',
       templates: {
         blank: {
           name: '空白資料庫',

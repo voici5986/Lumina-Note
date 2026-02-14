@@ -640,6 +640,8 @@ export default {
       create: '创建',
       creating: '创建中...',
       failed: '创建数据库失败',
+      pathForbidden: '无法在当前可访问范围外创建数据库。',
+      pathForbiddenPath: '请确认当前工作区路径可访问：{path}',
       templates: {
         blank: {
           name: '空白数据库',

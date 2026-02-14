@@ -11,6 +11,18 @@ interface CreateDatabaseDialogProps {
   onClose: () => void;
 }
 
+function normalizePathForDisplay(path: string): string {
+  return path.replace(/\\/g, '/');
+}
+
+function extractForbiddenPath(detail: string): string | null {
+  const pluginFsMatch = detail.match(/forbidden path:\s*(.+)$/i);
+  if (pluginFsMatch?.[1]) return pluginFsMatch[1].trim();
+  const rustFsMatch = detail.match(/Path not permitted:\s*(.+)$/i);
+  if (rustFsMatch?.[1]) return rustFsMatch[1].trim();
+  return null;
+}
+
 export function CreateDatabaseDialog({ isOpen, onClose }: CreateDatabaseDialogProps) {
   const { createDatabase } = useDatabaseStore();
   const { openDatabaseTab, refreshFileTree } = useFileStore();
@@ -23,6 +35,20 @@ export function CreateDatabaseDialog({ isOpen, onClose }: CreateDatabaseDialogPr
   const [name, setName] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateId>('blank');
   const [isCreating, setIsCreating] = useState(false);
+
+  const formatCreateDatabaseError = (detail: string): string => {
+    const forbiddenPath = extractForbiddenPath(detail);
+    if (forbiddenPath) {
+      return [
+        t.database.createDialog.pathForbidden,
+        t.database.createDialog.pathForbiddenPath.replace('{path}', normalizePathForDisplay(forbiddenPath)),
+      ].join('\n');
+    }
+    if (/No vault path set/i.test(detail)) {
+      return t.common.openWorkspaceFirst;
+    }
+    return detail ? `${t.database.createDialog.failed}\n${detail}` : t.database.createDialog.failed;
+  };
 
   const templates = useMemo<TemplateItem[]>(() => ([
     { id: 'blank', name: t.database.createDialog.templates.blank.name, icon: Database, description: t.database.createDialog.templates.blank.desc },
@@ -66,7 +92,7 @@ export function CreateDatabaseDialog({ isOpen, onClose }: CreateDatabaseDialogPr
     } catch (error) {
       console.error('Failed to create database:', error);
       const detail = error instanceof Error ? error.message : String(error ?? "");
-      alert(detail ? `${t.database.createDialog.failed}\n${detail}` : t.database.createDialog.failed);
+      alert(formatCreateDatabaseError(detail));
     } finally {
       setIsCreating(false);
     }

@@ -36,6 +36,20 @@ function generateNoteId(): string {
   return `note-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function normalizePathForFs(path: string): string {
+  return path.replace(/\\/g, '/').replace(/\/+$/, '');
+}
+
+function joinFsPath(base: string, ...segments: string[]): string {
+  const head = normalizePathForFs(base);
+  const tail = segments
+    .flatMap((segment) => segment.split('/'))
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  if (tail.length === 0) return head;
+  return `${head}/${tail.join('/')}`;
+}
+
 // 将名称转换为安全的文件名/ID
 function slugify(name: string): string {
   return name
@@ -86,11 +100,11 @@ async function ensureUniquePath(basePath: string, ext: string): Promise<string> 
 function getDbDir(): string {
   const vaultPath = useFileStore.getState().vaultPath;
   if (!vaultPath) throw new Error("No vault path set");
-  return `${vaultPath}/Databases`;
+  return joinFsPath(vaultPath, 'Databases');
 }
 
 function getDbPath(dbId: string): string {
-  return `${getDbDir()}/${dbId}.db.json`;
+  return joinFsPath(getDbDir(), `${dbId}.db.json`);
 }
 
 function normalizeFolderSegments(input: string): string[] {
@@ -112,7 +126,7 @@ function resolveDatabaseNoteFolder(db: Database): string {
 
 function getDatabaseNoteDirectory(vaultPath: string, db: Database): string {
   const folder = resolveDatabaseNoteFolder(db);
-  return `${vaultPath}/${folder}`;
+  return joinFsPath(vaultPath, folder);
 }
 
 async function ensureDirectoryRecursive(path: string): Promise<void> {

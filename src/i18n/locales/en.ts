@@ -640,6 +640,8 @@ export default {
       create: 'Create',
       creating: 'Creating...',
       failed: 'Failed to create database',
+      pathForbidden: 'Cannot create a database outside the current allowed scope.',
+      pathForbiddenPath: 'Confirm the current workspace path is accessible: {path}',
       templates: {
         blank: {
           name: 'Blank database',
