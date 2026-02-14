@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, Copy, X } from "lucide-react";
 import { useErrorStore, type AppErrorNotice } from "@/stores/useErrorStore";
+import { useShallow } from "zustand/react/shallow";
 
 const buildIssuePayload = (notice: AppErrorNotice): string =>
   [
@@ -16,11 +17,9 @@ const buildIssuePayload = (notice: AppErrorNotice): string =>
     .join("\n");
 
 export function ErrorNotifications() {
-  const { notices, dismissNotice, clearNotices } = useErrorStore((state) => ({
-    notices: state.notices,
-    dismissNotice: state.dismissNotice,
-    clearNotices: state.clearNotices,
-  }));
+  const [notices, dismissNotice, clearNotices] = useErrorStore(
+    useShallow((state) => [state.notices, state.dismissNotice, state.clearNotices]),
+  );
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const sorted = useMemo(
