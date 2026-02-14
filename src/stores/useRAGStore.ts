@@ -227,17 +227,17 @@ export const useRAGStore = create<RAGState>()(
         if (state?.config) {
           try {
             const decryptedConfig = { ...state.config };
-            
+
             // 解密 Embedding API Key
             if (state.config.embeddingApiKey) {
               decryptedConfig.embeddingApiKey = await decryptApiKey(state.config.embeddingApiKey);
             }
-            
+
             // 解密 Reranker API Key
             if (state.config.rerankerApiKey) {
               decryptedConfig.rerankerApiKey = await decryptApiKey(state.config.rerankerApiKey);
             }
-            
+
             // 延迟执行，确保 store 创建完成后再调用 setState
             setTimeout(() => {
               useRAGStore.setState({ config: decryptedConfig });
