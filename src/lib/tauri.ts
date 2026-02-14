@@ -2,7 +2,6 @@ import { invoke } from "@tauri-apps/api/core";
 import type { SkillDetail, SkillInfo } from "@/types/skills";
 import type { PluginEntry, PluginInfo } from "@/types/plugins";
 import {
-  exists as tauriExists,
   readDir as tauriReadDir,
   rename as tauriRename,
 } from "@tauri-apps/plugin-fs";
@@ -357,7 +356,7 @@ export async function writeFile(path: string, content: string): Promise<void> {
  * Check if a file or directory exists
  */
 export async function exists(path: string): Promise<boolean> {
-  return tauriExists(path);
+  return invoke<boolean>("path_exists", { path });
 }
 
 /**

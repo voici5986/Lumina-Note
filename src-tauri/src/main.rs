@@ -38,6 +38,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::read_file,
             commands::save_file,
+            commands::path_exists,
             commands::write_binary_file,
             commands::read_binary_file_base64,
             commands::list_directory,

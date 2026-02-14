@@ -157,6 +157,13 @@ pub fn write_file_content(path: &str, content: &str) -> Result<(), AppError> {
     fs::write(path, content).map_err(AppError::from)
 }
 
+/// Check whether a file or directory exists under allowed roots.
+pub fn path_exists(path: &str) -> Result<bool, AppError> {
+    let path = Path::new(path);
+    ensure_allowed_path(path, false)?;
+    Ok(path.exists())
+}
+
 /// List directory contents recursively (all files)
 pub fn list_dir_recursive(path: &str) -> Result<Vec<FileEntry>, AppError> {
     let root = Path::new(path);
@@ -412,6 +419,28 @@ mod tests {
         let outside_file = outside.path().join("secret.txt");
         with_allowed_root(allowed.path(), || {
             let err = write_file_content(outside_file.to_string_lossy().as_ref(), "nope")
+                .expect_err("should reject outside root");
+            assert!(matches!(err, AppError::InvalidPath(_)));
+        });
+    }
+
+    #[test]
+    fn path_exists_within_allowed_root() {
+        let dir = TempDir::new().expect("temp dir");
+        let file_path = dir.path().join("exists.md");
+        with_allowed_root(dir.path(), || {
+            fs::write(&file_path, "ok").expect("write fixture");
+            let exists = path_exists(file_path.to_string_lossy().as_ref()).expect("check exists");
+            assert!(exists);
+        });
+    }
+
+    #[test]
+    fn path_exists_rejects_outside_allowed_root() {
+        let allowed = TempDir::new().expect("allowed temp dir");
+        let outside = TempDir::new().expect("outside temp dir");
+        with_allowed_root(allowed.path(), || {
+            let err = path_exists(outside.path().to_string_lossy().as_ref())
                 .expect_err("should reject outside root");
             assert!(matches!(err, AppError::InvalidPath(_)));
         });
