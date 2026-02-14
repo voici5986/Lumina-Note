@@ -1844,62 +1844,6 @@ export function MainAIChatShell() {
                   })
                 )}
 
-                {!isExportSelectionMode && chatMode === "agent" && (agentQueueCount > 0 || rustActiveTaskPreview || (llmRetryState && agentStatus === "running")) && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mb-4 max-w-[80%]"
-                  >
-                    <div className="bg-muted/50 border border-border rounded-xl p-3">
-                      <div className="flex items-center justify-between gap-3 mb-2">
-                        <div className="flex items-center gap-2 text-sm font-medium">
-                          <History className="w-4 h-4 text-muted-foreground" />
-                          <span>{t.ai.agentQueueTitle}</span>
-                        </div>
-                        <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">
-                          {t.ai.agentQueuePending.replace("{count}", String(agentQueueCount))}
-                        </span>
-                      </div>
-                      {rustActiveTaskPreview && (
-                        <p className="text-xs text-muted-foreground mb-2">
-                          {t.ai.agentQueueCurrent}: <span className="text-foreground">{rustActiveTaskPreview}</span>
-                        </p>
-                      )}
-                      {agentQueueCount > 0 && (
-                        <div className="space-y-1">
-                          {rustQueuedTasks.slice(0, 3).map((item) => (
-                            <div key={item.id} className="text-xs text-muted-foreground truncate">
-                              #{item.position} {item.task}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {isAgentWaitingApproval && (
-                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
-                          {t.ai.agentQueueWaitingApprovalHint}
-                        </p>
-                      )}
-                      {llmRetryState && agentStatus === "running" && (
-                        <div className="mt-2 rounded-md border border-amber-400/40 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-700 dark:text-amber-300">
-                          <p className="font-medium">
-                            {t.ai.agentRetryTitle}
-                            {" "}
-                            {t.ai.agentRetryAttempt
-                              .replace('{attempt}', String(llmRetryState.attempt))
-                              .replace('{max}', String(llmRetryState.maxRetries))}
-                          </p>
-                          <p className="mt-0.5 text-amber-700/90 dark:text-amber-300/90">
-                            {t.ai.agentRetryReason}: {llmRetryState.reason}
-                          </p>
-                          <p className="mt-0.5">
-                            {t.ai.agentRetryIn.replace('{seconds}', String(retrySecondsLeft ?? 0))}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-
                 {/* 创建/编辑的文件链接 */}
                 {!isExportSelectionMode && chatMode === "agent" && agentStatus !== "running" && (() => {
                   const createdFiles = extractCreatedFiles();
@@ -1990,6 +1934,61 @@ export function MainAIChatShell() {
           {/* 输入框容器 */}
           {!isCodexMode && (
           <div className={`w-full shrink-0 ${hasStarted ? "pb-4" : ""}`}>
+            {!isExportSelectionMode && chatMode === "agent" && (agentQueueCount > 0 || rustActiveTaskPreview || (llmRetryState && agentStatus === "running")) && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="w-full max-w-3xl mx-auto px-4 mb-2"
+              >
+                <div className="bg-muted/50 border border-border rounded-xl p-3">
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <History className="w-4 h-4 text-muted-foreground" />
+                      <span>{t.ai.agentQueueTitle}</span>
+                    </div>
+                    <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                      {t.ai.agentQueuePending.replace("{count}", String(agentQueueCount))}
+                    </span>
+                  </div>
+                  {rustActiveTaskPreview && (
+                    <p className="text-xs text-muted-foreground mb-2">
+                      {t.ai.agentQueueCurrent}: <span className="text-foreground">{rustActiveTaskPreview}</span>
+                    </p>
+                  )}
+                  {agentQueueCount > 0 && (
+                    <div className="space-y-1">
+                      {rustQueuedTasks.slice(0, 3).map((item) => (
+                        <div key={item.id} className="text-xs text-muted-foreground truncate">
+                          #{item.position} {item.task}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {isAgentWaitingApproval && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                      {t.ai.agentQueueWaitingApprovalHint}
+                    </p>
+                  )}
+                  {llmRetryState && agentStatus === "running" && (
+                    <div className="mt-2 rounded-md border border-amber-400/40 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-700 dark:text-amber-300">
+                      <p className="font-medium">
+                        {t.ai.agentRetryTitle}
+                        {" "}
+                        {t.ai.agentRetryAttempt
+                          .replace('{attempt}', String(llmRetryState.attempt))
+                          .replace('{max}', String(llmRetryState.maxRetries))}
+                      </p>
+                      <p className="mt-0.5 text-amber-700/90 dark:text-amber-300/90">
+                        {t.ai.agentRetryReason}: {llmRetryState.reason}
+                      </p>
+                      <p className="mt-0.5">
+                        {t.ai.agentRetryIn.replace('{seconds}', String(retrySecondsLeft ?? 0))}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
             <motion.div
               className="w-full max-w-3xl mx-auto px-4"
               initial={false}
