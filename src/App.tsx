@@ -52,7 +52,7 @@ import { PluginStatusBar } from "@/components/layout/PluginStatusBar";
 import { PluginContextMenuHost } from "@/components/plugins/PluginContextMenuHost";
 import { PluginShellSlotHost } from "@/components/plugins/PluginShellSlotHost";
 import { ErrorNotifications } from "@/components/layout/ErrorNotifications";
-import { reportUnhandledError } from "@/lib/reportError";
+import { reportOperationError, reportUnhandledError } from "@/lib/reportError";
 
 // Debug logging is enabled via a runtime toggle (or always in dev).
 
@@ -113,8 +113,13 @@ function DiffViewWrapper() {
         diffResolver(true);
       }
     } catch (error) {
-      console.error("Failed to apply edit:", error);
-      alert(`❌ ${t.ai.applyEditFailed}: ${error}`);
+      reportOperationError({
+        source: "App.DiffViewWrapper.handleAccept",
+        action: "Apply AI edit diff",
+        error,
+        userMessage: t.ai.applyEditFailed,
+        context: { filePath: pendingDiff.filePath },
+      });
     }
   }, [pendingDiff, clearPendingEdits, openFile, diffResolver, t]);
 
@@ -361,7 +366,13 @@ function App() {
           }, 500);
         });
       } catch (error) {
-        console.warn("[FileWatcher] Failed to start:", error);
+        reportOperationError({
+          source: "App.setupWatcher",
+          action: "Start filesystem watcher",
+          error,
+          level: "warning",
+          context: { vaultPath },
+        });
       }
     };
 
@@ -390,7 +401,12 @@ function App() {
           useFileStore.getState().openWebpageTab(payload.url);
         });
       } catch (error) {
-        console.warn("[Browser] Failed to setup new-tab listener:", error);
+        reportOperationError({
+          source: "App.setupBrowserNewTabListener",
+          action: "Register browser new-tab listener",
+          error,
+          level: "warning",
+        });
       }
     };
 
@@ -505,7 +521,13 @@ function App() {
   useEffect(() => {
     if (vaultPath && ragConfig.enabled && ragConfig.embeddingApiKey) {
       initializeRAG(vaultPath).catch((error) => {
-        console.warn("[RAG] Failed to initialize:", error);
+        reportOperationError({
+          source: "App.initializeRAG",
+          action: "Initialize RAG index",
+          error,
+          level: "warning",
+          context: { vaultPath },
+        });
       });
     }
   }, [vaultPath, ragConfig.enabled, ragConfig.embeddingApiKey, initializeRAG]);

@@ -1205,7 +1205,6 @@ function FileTreeItem({
   onCreateCancel,
   vaultPath,
 }: FileTreeItemProps) {
-  const { t } = useLocaleStore();
   const [isDragOver, setIsDragOver] = useState(false);
   const { moveFileToFolder, moveFolderToFolder } = useFileStore(
     useShallow((state) => ({
