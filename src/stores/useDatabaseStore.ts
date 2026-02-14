@@ -132,27 +132,10 @@ function getDatabaseNoteDirectory(vaultPath: string, db: Database): string {
 async function ensureDirectoryRecursive(path: string): Promise<void> {
   const normalizedPath = path.replace(/\\/g, '/').replace(/\/+$/, '');
   if (!normalizedPath) return;
-
-  const isAbsolute = normalizedPath.startsWith('/');
-  const segments = normalizedPath.split('/').filter(Boolean);
-  if (segments.length === 0) return;
-
-  let cursor = '';
-  const isDriveRoot = /^[A-Za-z]:$/.test(segments[0]);
-
-  if (isAbsolute) {
-    cursor = '/';
-  } else if (isDriveRoot) {
-    cursor = segments[0];
-    segments.shift();
-  }
-
-  for (const segment of segments) {
-    cursor = cursor === '/' ? `/${segment}` : (cursor ? `${cursor}/${segment}` : segment);
-    if (!(await exists(cursor))) {
-      await createDir(cursor);
-    }
-  }
+  if (await exists(normalizedPath)) return;
+  // 后端 create_dir 使用 create_dir_all，直接创建目标目录即可，
+  // 避免逐级探测到 allowed root 之外（如 /Users）触发权限错误。
+  await createDir(normalizedPath);
 }
 
 // 格式化 YAML 值
@@ -189,6 +172,11 @@ function findTitleColumn(columns: DatabaseColumn[]): DatabaseColumn | undefined 
 
 function isBlankCellValue(value: unknown): boolean {
   return value === undefined || value === null || (typeof value === 'string' && value.trim() === '');
+}
+
+function normalizeError(error: unknown): Error {
+  if (error instanceof Error) return error;
+  return new Error(String(error));
 }
 
 // ==================== Store Interface ====================
@@ -669,108 +657,115 @@ export const useDatabaseStore = create<DatabaseState>()(
       
       // ===== 行操作 (Dataview: 操作笔记 YAML) =====
       addRow: async (dbId: string, cells?: Record<string, CellValue>) => {
-        const vaultPath = useFileStore.getState().vaultPath;
-        if (!vaultPath) throw new Error("No vault path");
-        
-        const db = get().databases[dbId];
-        if (!db) throw new Error("Database not found");
-        
-        const now = new Date().toISOString();
+        try {
+          const vaultPath = useFileStore.getState().vaultPath;
+          if (!vaultPath) throw new Error("No vault path");
 
-        const draftCells = { ...(cells || {}) };
-        const titleColumn = findTitleColumn(db.columns);
-        
-        // 获取标题值：优先从 cells 中获取，否则用默认名
-        let titleValue = '';
-        if (titleColumn) {
-          // cells 可能用列名或列 ID 作为 key
-          titleValue = String(draftCells[titleColumn.id] || draftCells[titleColumn.name] || '');
-        }
-        
-        // 如果没有标题，用数据库名 + 日期时间
-        if (!titleValue) {
-          const dateStr = new Date().toISOString().slice(0, 10);
-          titleValue = `${db.name}-${dateStr}`;
-        }
-        
-        // 生成安全的文件名
-        const safeFileName = slugify(titleValue) || generateId();
-        const noteDirectory = getDatabaseNoteDirectory(vaultPath, db);
-        await ensureDirectoryRecursive(noteDirectory);
-        const basePath = `${noteDirectory}/${safeFileName}`;
-        const notePath = await ensureUniquePath(basePath, '.md');
-        const noteName = notePath.split('/').pop()?.replace('.md', '') || safeFileName;
-        
-        // 构建列 ID 到列名的映射
-        const idToName = new Map<string, string>();
-        for (const col of db.columns) {
-          idToName.set(col.id, col.name);
-        }
-        
-        // 最终标题值（用于 frontmatter）
-        const finalTitle = titleValue || noteName;
-        const noteId = generateNoteId();
+          const db = get().databases[dbId];
+          if (!db) throw new Error("Database not found");
 
-        if (titleColumn) {
-          draftCells[titleColumn.id] = finalTitle;
-          delete draftCells[titleColumn.name];
-        }
-        
-        // 构建 YAML 内容（使用列名）
-        const yamlLines = [
-          `db: ${JSON.stringify(dbId)}`,
-          `noteId: ${JSON.stringify(noteId)}`,
-          `title: ${finalTitle}`,
-          `createdAt: ${now}`,
-          `updatedAt: ${now}`,
-        ];
-        
-        for (const [columnId, value] of Object.entries(draftCells)) {
-            const columnName = idToName.get(columnId) || columnId;
-            if (!['db', 'noteid', 'title', 'createdat', 'updatedat'].includes(columnName.toLowerCase())) {
-              yamlLines.push(`${columnName}: ${formatYamlValue(value)}`);
-            }
-        }
-        
-        // 创建笔记文件
-        const noteContent = `---
+          const now = new Date().toISOString();
+
+          const draftCells = { ...(cells || {}) };
+          const titleColumn = findTitleColumn(db.columns);
+
+          // 获取标题值：优先从 cells 中获取，否则用默认名
+          let titleValue = '';
+          if (titleColumn) {
+            // cells 可能用列名或列 ID 作为 key
+            titleValue = String(draftCells[titleColumn.id] || draftCells[titleColumn.name] || '');
+          }
+
+          // 如果没有标题，用数据库名 + 日期时间
+          if (!titleValue) {
+            const dateStr = new Date().toISOString().slice(0, 10);
+            titleValue = `${db.name}-${dateStr}`;
+          }
+
+          // 生成安全的文件名
+          const safeFileName = slugify(titleValue) || generateId();
+          const noteDirectory = getDatabaseNoteDirectory(vaultPath, db);
+          await ensureDirectoryRecursive(noteDirectory);
+          const basePath = `${noteDirectory}/${safeFileName}`;
+          const notePath = await ensureUniquePath(basePath, '.md');
+          const noteName = notePath.split('/').pop()?.replace('.md', '') || safeFileName;
+
+          // 构建列 ID 到列名的映射
+          const idToName = new Map<string, string>();
+          for (const col of db.columns) {
+            idToName.set(col.id, col.name);
+          }
+
+          // 最终标题值（用于 frontmatter）
+          const finalTitle = titleValue || noteName;
+          const noteId = generateNoteId();
+
+          if (titleColumn) {
+            draftCells[titleColumn.id] = finalTitle;
+            delete draftCells[titleColumn.name];
+          }
+
+          // 构建 YAML 内容（使用列名）
+          const yamlLines = [
+            `db: ${JSON.stringify(dbId)}`,
+            `noteId: ${JSON.stringify(noteId)}`,
+            `title: ${finalTitle}`,
+            `createdAt: ${now}`,
+            `updatedAt: ${now}`,
+          ];
+
+          for (const [columnId, value] of Object.entries(draftCells)) {
+              const columnName = idToName.get(columnId) || columnId;
+              if (!['db', 'noteid', 'title', 'createdat', 'updatedat'].includes(columnName.toLowerCase())) {
+                yamlLines.push(`${columnName}: ${formatYamlValue(value)}`);
+              }
+          }
+
+          // 创建笔记文件
+          const noteContent = `---
 ${yamlLines.join('\n')}
 ---
 
 # ${finalTitle}
 
 `;
-        
-        await saveFile(notePath, noteContent);
-        
-        // 创建新行并添加到状态
-        const newRow: DatabaseRow = {
-          id: noteId,
-          notePath,
-          noteTitle: finalTitle,
-          cells: draftCells,
-          createdAt: now,
-          updatedAt: now,
-        };
-        
-        set((state) => {
-          const currentDb = state.databases[dbId];
-          if (!currentDb) return state;
-          return {
-            databases: {
-              ...state.databases,
-              [dbId]: {
-                ...currentDb,
-                rows: [...currentDb.rows, newRow],
-              }
-            }
+
+          await saveFile(notePath, noteContent);
+
+          // 创建新行并添加到状态
+          const newRow: DatabaseRow = {
+            id: noteId,
+            notePath,
+            noteTitle: finalTitle,
+            cells: draftCells,
+            createdAt: now,
+            updatedAt: now,
           };
-        });
-        
-        // 刷新文件树
-        useFileStore.getState().refreshFileTree();
-        
-        return notePath;
+
+          set((state) => {
+            const currentDb = state.databases[dbId];
+            if (!currentDb) return state;
+            return {
+              databases: {
+                ...state.databases,
+                [dbId]: {
+                  ...currentDb,
+                  rows: [...currentDb.rows, newRow],
+                }
+              }
+            };
+          });
+
+          // 刷新文件树
+          void useFileStore.getState().refreshFileTree().catch((error) => {
+            console.warn("[Database] Failed to refresh file tree after addRow:", error);
+          });
+
+          return notePath;
+        } catch (error) {
+          console.error(`[Database] Failed to add row in "${dbId}":`, error);
+          throw normalizeError(error);
+        }
       },
       
       updateCell: async (dbId: string, rowId: string, columnId: string, value: CellValue) => {
@@ -872,6 +867,7 @@ ${yamlLines.join('\n')}
           });
         } catch (error) {
           console.error(`Failed to remove row ${rowId}:`, error);
+          throw normalizeError(error);
         }
       },
       
@@ -934,7 +930,9 @@ ${yamlLines.join('\n')}
             };
           });
           
-          useFileStore.getState().refreshFileTree();
+          void useFileStore.getState().refreshFileTree().catch((error) => {
+            console.warn("[Database] Failed to refresh file tree after duplicateRow:", error);
+          });
           
           return notePath;
         } catch (error) {
