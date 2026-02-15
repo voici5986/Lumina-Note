@@ -57,9 +57,11 @@ export const FlashcardReview: React.FC<FlashcardReviewProps> = ({
   const [isFlipped, setIsFlipped] = useState(false);
   const [clozeIndex] = useState(1);
   const hasAttemptedStartRef = useRef(false);
-  const frontRef = useRef<HTMLDivElement | null>(null);
-  const backRef = useRef<HTMLDivElement | null>(null);
+  const frontContentRef = useRef<HTMLDivElement | null>(null);
+  const backContentRef = useRef<HTMLDivElement | null>(null);
   const [cardHeight, setCardHeight] = useState<number | null>(null);
+  const baseMinHeight = 300;
+  const faceVerticalPadding = 64; // p-8 => top+bottom 64px
 
   // 开始复习（只尝试一次，避免无卡时重复触发导致渲染循环）
   useEffect(() => {
@@ -87,21 +89,41 @@ export const FlashcardReview: React.FC<FlashcardReviewProps> = ({
     }
   }, [deckId]);
 
-  // 根据正反面内容计算卡片高度，避免翻转时位置跳动
-  useEffect(() => {
-    // 等待内容渲染完成后再测量高度
-    const timer = setTimeout(() => {
-      const frontHeight = frontRef.current?.offsetHeight ?? 0;
-      const backHeight = backRef.current?.offsetHeight ?? 0;
-      const baseMinHeight = 300;
-      const maxHeight = Math.max(frontHeight, backHeight, baseMinHeight);
-      if (maxHeight > 0) {
-        setCardHeight(maxHeight);
-      }
-    }, 0);
+  const updateCardHeight = useCallback(() => {
+    const frontHeight = frontContentRef.current?.offsetHeight ?? 0;
+    const backHeight = backContentRef.current?.offsetHeight ?? 0;
+    const measured = Math.max(
+      frontHeight + faceVerticalPadding,
+      backHeight + faceVerticalPadding,
+      baseMinHeight,
+    );
+    setCardHeight((prev) => (prev === measured ? prev : measured));
+  }, [baseMinHeight, faceVerticalPadding]);
 
-    return () => clearTimeout(timer);
-  }, [currentCard, isFlipped]);
+  // 根据正反面真实内容动态计算卡片高度，避免翻转和异步渲染时尺寸失真
+  useEffect(() => {
+    if (!currentCard) {
+      setCardHeight(null);
+      return;
+    }
+
+    const timer = window.setTimeout(updateCardHeight, 0);
+    const onResize = () => updateCardHeight();
+    window.addEventListener('resize', onResize);
+
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => updateCardHeight());
+      if (frontContentRef.current) observer.observe(frontContentRef.current);
+      if (backContentRef.current) observer.observe(backContentRef.current);
+    }
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('resize', onResize);
+      observer?.disconnect();
+    };
+  }, [currentCard, isFlipped, updateCardHeight]);
 
   // 处理评分
   const handleRating = useCallback(async (rating: ReviewRating) => {
@@ -239,11 +261,12 @@ export const FlashcardReview: React.FC<FlashcardReviewProps> = ({
                 "flex flex-col items-center justify-center"
               )}
               style={{ backfaceVisibility: 'hidden' }}
-              ref={frontRef}
             >
-              <CardFront card={currentCard} clozeIndex={clozeIndex} t={t} />
-              <div className="mt-8 text-sm text-muted-foreground">
-                {t.flashcard.clickOrSpaceToFlip}
+              <div ref={frontContentRef} className="w-full flex flex-col items-center">
+                <CardFront card={currentCard} clozeIndex={clozeIndex} t={t} />
+                <div className="mt-8 text-sm text-muted-foreground">
+                  {t.flashcard.clickOrSpaceToFlip}
+                </div>
               </div>
             </div>
 
@@ -258,9 +281,10 @@ export const FlashcardReview: React.FC<FlashcardReviewProps> = ({
                 backfaceVisibility: 'hidden',
                 transform: 'rotateY(180deg)',
               }}
-              ref={backRef}
             >
-              <CardBack card={currentCard} clozeIndex={clozeIndex} t={t} />
+              <div ref={backContentRef} className="w-full">
+                <CardBack card={currentCard} clozeIndex={clozeIndex} t={t} />
+              </div>
             </div>
           </motion.div>
         </div>
