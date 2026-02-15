@@ -10,14 +10,16 @@ import {
   X, 
   Check, 
   Brain,
-  SkipForward
+  SkipForward,
+  AlertTriangle,
 } from 'lucide-react';
 import { useFlashcardStore } from '../../stores/useFlashcardStore';
 import { useLocaleStore } from '../../stores/useLocaleStore';
 import { ReviewRating, Flashcard } from '../../types/flashcard';
-import { previewNextReview, formatInterval } from '@/services/flashcard/sm2';
+import { daysBetween, formatInterval, previewNextReview } from '@/services/flashcard/sm2';
 import { renderClozeFront, renderClozeBack } from '@/services/flashcard/flashcard';
 import { cn } from '../../lib/utils';
+import { useShallow } from 'zustand/react/shallow';
 
 interface FlashcardReviewProps {
   deckId?: string;
@@ -30,24 +32,39 @@ export const FlashcardReview: React.FC<FlashcardReviewProps> = ({
 }) => {
   const { 
     currentSession, 
+    lastReviewSummary,
+    error,
     startReview, 
     submitReview, 
     skipCard, 
-    endReview 
-  } = useFlashcardStore();
+    endReview,
+    clearError,
+  } = useFlashcardStore(
+    useShallow((state) => ({
+      currentSession: state.currentSession,
+      lastReviewSummary: state.lastReviewSummary,
+      error: state.error,
+      startReview: state.startReview,
+      submitReview: state.submitReview,
+      skipCard: state.skipCard,
+      endReview: state.endReview,
+      clearError: state.clearError,
+    })),
+  );
   const { t } = useLocaleStore();
   
   const [isFlipped, setIsFlipped] = useState(false);
   const [clozeIndex] = useState(1);
+  const hasAttemptedStartRef = useRef(false);
   const frontRef = useRef<HTMLDivElement | null>(null);
   const backRef = useRef<HTMLDivElement | null>(null);
   const [cardHeight, setCardHeight] = useState<number | null>(null);
 
-  // 开始复习
+  // 开始复习（只尝试一次，避免无卡时重复触发导致渲染循环）
   useEffect(() => {
-    if (!currentSession) {
-      startReview(deckId);
-    }
+    if (currentSession || hasAttemptedStartRef.current || !deckId) return;
+    hasAttemptedStartRef.current = true;
+    startReview(deckId);
   }, [deckId, currentSession, startReview]);
 
   // 重置翻转状态
@@ -55,7 +72,19 @@ export const FlashcardReview: React.FC<FlashcardReviewProps> = ({
     setIsFlipped(false);
   }, [currentSession?.currentIndex]);
 
+  useEffect(() => {
+    if (currentSession) {
+      hasAttemptedStartRef.current = true;
+    }
+  }, [currentSession]);
+
   const currentCard = currentSession?.cards[currentSession.currentIndex];
+
+  useEffect(() => {
+    if (deckId) {
+      hasAttemptedStartRef.current = false;
+    }
+  }, [deckId]);
 
   // 根据正反面内容计算卡片高度，避免翻转时位置跳动
   useEffect(() => {
@@ -101,14 +130,27 @@ export const FlashcardReview: React.FC<FlashcardReviewProps> = ({
 
   // 无卡片或会话结束
   if (!currentSession || !currentCard) {
+    const hasSummary = Boolean(lastReviewSummary && lastReviewSummary.reviewed > 0);
+    const reviewed = lastReviewSummary?.reviewed ?? 0;
+    const correct = lastReviewSummary?.correct ?? 0;
+    const accuracy = reviewed > 0 ? Math.round((correct / reviewed) * 100) : 0;
+    const noCardsDetail = error && error !== t.flashcard.noCardsToReview ? error : null;
+
     return (
       <div className="flex flex-col items-center justify-center h-full p-8">
         <Brain className="w-16 h-16 text-primary/50 mb-4" />
-        <h2 className="text-xl font-semibold mb-2">{t.flashcard.reviewComplete}</h2>
-        {currentSession && (
+        <h2 className="text-xl font-semibold mb-2">
+          {hasSummary ? t.flashcard.reviewComplete : t.flashcard.noCardsToReview}
+        </h2>
+        {hasSummary && (
           <div className="text-muted-foreground mb-4">
-            {t.flashcard.reviewedCards.replace('{count}', String(currentSession.reviewed))}，
-            {t.flashcard.accuracy.replace('{percent}', String(Math.round((currentSession.correct / currentSession.reviewed) * 100)))}
+            {t.flashcard.reviewedCards.replace('{count}', String(reviewed))}，
+            {t.flashcard.accuracy.replace('{percent}', String(accuracy))}
+          </div>
+        )}
+        {!hasSummary && noCardsDetail && (
+          <div className="mb-4 rounded border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {noCardsDetail}
           </div>
         )}
         <button
@@ -123,6 +165,10 @@ export const FlashcardReview: React.FC<FlashcardReviewProps> = ({
 
   const progress = (currentSession.currentIndex / currentSession.cards.length) * 100;
   const nextReviews = previewNextReview(currentCard);
+  const today = new Date().toISOString().split('T')[0];
+  const hardInterval = Math.max(0, daysBetween(today, nextReviews[1]));
+  const goodInterval = Math.max(0, daysBetween(today, nextReviews[2]));
+  const easyInterval = Math.max(0, daysBetween(today, nextReviews[3]));
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -149,6 +195,22 @@ export const FlashcardReview: React.FC<FlashcardReviewProps> = ({
           {currentSession.currentIndex + 1} / {currentSession.cards.length}
         </div>
       </div>
+      {error && (
+        <div className="mx-4 mt-3 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div className="min-w-0 flex-1 break-words">{error}</div>
+            <button
+              type="button"
+              onClick={clearError}
+              className="rounded p-0.5 text-destructive/80 hover:bg-destructive/10"
+              aria-label="dismiss review error"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 卡片区域 */}
       <div className="flex-1 flex items-center justify-center p-8">
@@ -225,21 +287,21 @@ export const FlashcardReview: React.FC<FlashcardReviewProps> = ({
                   />
                   <RatingButton
                     label={t.flashcard.hard}
-                    sublabel={formatInterval(parseInt(nextReviews[1].split('-')[2]) - new Date().getDate())}
+                    sublabel={formatInterval(hardInterval)}
                     color="orange"
                     onClick={() => handleRating(1)}
                     shortcut="2"
                   />
                   <RatingButton
                     label={t.flashcard.good}
-                    sublabel={formatInterval(parseInt(nextReviews[2].split('-')[2]) - new Date().getDate())}
+                    sublabel={formatInterval(goodInterval)}
                     color="green"
                     onClick={() => handleRating(2)}
                     shortcut="3"
                   />
                   <RatingButton
                     label={t.flashcard.easy}
-                    sublabel={formatInterval(parseInt(nextReviews[3].split('-')[2]) - new Date().getDate())}
+                    sublabel={formatInterval(easyInterval)}
                     color="blue"
                     onClick={() => handleRating(3)}
                     shortcut="4"

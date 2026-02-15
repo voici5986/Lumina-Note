@@ -9,19 +9,38 @@ import { DeckList } from './DeckList';
 import { FlashcardReview } from './FlashcardReview';
 import { useFlashcardStore } from '../../stores/useFlashcardStore';
 import { useFileStore } from '../../stores/useFileStore';
-import { Loader2 } from 'lucide-react';
+import { AlertTriangle, Loader2, X } from 'lucide-react';
 import { useLocaleStore } from '@/stores/useLocaleStore';
+import { useShallow } from 'zustand/react/shallow';
 
 interface FlashcardViewProps {
   deckId?: string;
 }
 
 export const FlashcardView: React.FC<FlashcardViewProps> = ({ deckId }) => {
-  const [reviewingDeckId, setReviewingDeckId] = useState<string | null>(deckId || null);
+  const [reviewingDeckId, setReviewingDeckId] = useState<string | null>(null);
   const [showCreateCard, setShowCreateCard] = useState(false);
   const [createDeckId, setCreateDeckId] = useState<string>('Default');
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-  const { currentSession, endReview, loadCards, isLoading } = useFlashcardStore();
+  const {
+    currentSession,
+    endReview,
+    loadCards,
+    isLoading,
+    startReview,
+    error,
+    clearError,
+  } = useFlashcardStore(
+    useShallow((state) => ({
+      currentSession: state.currentSession,
+      endReview: state.endReview,
+      loadCards: state.loadCards,
+      isLoading: state.isLoading,
+      startReview: state.startReview,
+      error: state.error,
+      clearError: state.clearError,
+    })),
+  );
   const { fileTree } = useFileStore();
 
   // 加载闪卡
@@ -41,9 +60,10 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ deckId }) => {
   }, [fileTree, refreshCards]);
 
   // 开始复习
-  const handleStartReview = (id: string) => {
-    setReviewingDeckId(id);
-  };
+  const handleStartReview = useCallback((id: string) => {
+    const started = startReview(id);
+    setReviewingDeckId(started ? id : null);
+  }, [startReview]);
 
   // 创建卡片
   const handleCreateCard = (id: string) => {
@@ -56,6 +76,11 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ deckId }) => {
     setReviewingDeckId(null);
     endReview();
   };
+
+  useEffect(() => {
+    if (!deckId) return;
+    handleStartReview(deckId);
+  }, [deckId, handleStartReview]);
 
   // 如果正在复习，显示复习界面
   if (reviewingDeckId || currentSession) {
@@ -71,6 +96,23 @@ export const FlashcardView: React.FC<FlashcardViewProps> = ({ deckId }) => {
   return (
     <>
       <div className="relative flex-1 overflow-auto">
+        {error && (
+          <div className="mx-4 mt-4 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div className="min-w-0 flex-1 break-words">{error}</div>
+              <button
+                type="button"
+                onClick={clearError}
+                className="rounded p-0.5 text-destructive/80 hover:bg-destructive/10"
+                aria-label="dismiss flashcard error"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {!hasLoadedOnce && isLoading && (
           <div className="absolute inset-0 bg-background/60 backdrop-blur-[1px] flex items-center justify-center z-10">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -103,7 +145,7 @@ interface CreateCardDialogProps {
 
 const CreateCardDialog: React.FC<CreateCardDialogProps> = ({ deckId, onClose }) => {
   const { t } = useLocaleStore();
-  const { addCard } = useFlashcardStore();
+  const addCard = useFlashcardStore((state) => state.addCard);
   const [front, setFront] = useState('');
   const [back, setBack] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -121,8 +163,8 @@ const CreateCardDialog: React.FC<CreateCardDialogProps> = ({ deckId, onClose }) 
         tags: [],
       });
       onClose();
-    } catch (error) {
-      console.error('创建卡片失败:', error);
+    } catch {
+      // 错误由 store 上报并展示，不在对话框里重复处理
     } finally {
       setIsSubmitting(false);
     }

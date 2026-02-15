@@ -20,6 +20,7 @@ import { useFlashcardStore } from '../../stores/useFlashcardStore';
 import { cn } from '../../lib/utils';
 import { useLocaleStore } from '../../stores/useLocaleStore';
 import { Flashcard } from '../../types/flashcard';
+import { useShallow } from 'zustand/react/shallow';
 
 interface DeckListProps {
   onStartReview: (deckId: string) => void;
@@ -30,7 +31,16 @@ export const DeckList: React.FC<DeckListProps> = ({
   onStartReview, 
   onCreateCard 
 }) => {
-  const { getDecks, getDeckStats, getDueCards, getCardsByDeck, deleteDeck, deleteCard } = useFlashcardStore();
+  const { getDecks, getDeckStats, getDueCards, getCardsByDeck, deleteDeck, deleteCard } = useFlashcardStore(
+    useShallow((state) => ({
+      getDecks: state.getDecks,
+      getDeckStats: state.getDeckStats,
+      getDueCards: state.getDueCards,
+      getCardsByDeck: state.getCardsByDeck,
+      deleteDeck: state.deleteDeck,
+      deleteCard: state.deleteCard,
+    })),
+  );
   const { t } = useLocaleStore();
   const [expandedDecks, setExpandedDecks] = React.useState<Set<string>>(new Set());
   const [pendingDelete, setPendingDelete] = React.useState<{ type: 'deck' | 'card'; deckId: string; notePath?: string } | null>(null);
@@ -75,6 +85,8 @@ export const DeckList: React.FC<DeckListProps> = ({
       } else if (pendingDelete.notePath) {
         await deleteCard(pendingDelete.notePath);
       }
+    } catch {
+      // 错误由 store 上报并展示
     } finally {
       setIsDeleting(false);
       setPendingDelete(null);

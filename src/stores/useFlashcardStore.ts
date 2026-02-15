@@ -14,66 +14,51 @@ import {
 } from '../types/flashcard';
 import { calculateNextReview, isDue, calculateDeckStats, INITIAL_SM2_STATE } from '@/services/flashcard/sm2';
 import { yamlToCard, generateCardMarkdown, generateCardFilename } from '@/services/flashcard/flashcard';
+import { parseFrontmatter, updateFrontmatter } from '@/services/markdown/frontmatter';
 import { useFileStore } from './useFileStore';
 import { createFile, saveFile, deleteFile } from '../lib/tauri';
 import { getCurrentTranslations } from '@/stores/useLocaleStore';
+import { reportOperationError } from '@/lib/reportError';
 
-/**
- * 简单的 YAML 解析器（仅支持基本格式）
- */
-function parseSimpleYaml(yamlStr: string): Record<string, any> {
-  const result: Record<string, any> = {};
-  const lines = yamlStr.split('\n');
-  let currentArray: string[] | null = null;
-  
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    
-    // 数组项
-    if (trimmed.startsWith('- ')) {
-      if (currentArray) {
-        let value = trimmed.slice(2).trim();
-        // 移除引号
-        if ((value.startsWith('"') && value.endsWith('"')) || 
-            (value.startsWith("'") && value.endsWith("'"))) {
-          value = value.slice(1, -1);
-        }
-        currentArray.push(value);
-      }
-      continue;
-    }
-    
-    // 键值对
-    const colonIndex = line.indexOf(':');
-    if (colonIndex > 0) {
-      const key = line.slice(0, colonIndex).trim();
-      let value = line.slice(colonIndex + 1).trim();
-      
-      // 结束之前的数组
-      currentArray = null;
-      
-      if (value === '' || value === '|') {
-        // 可能是数组或多行文本的开始
-        result[key] = [];
-        currentArray = result[key];
-      } else {
-        // 移除引号
-        if ((value.startsWith('"') && value.endsWith('"')) || 
-            (value.startsWith("'") && value.endsWith("'"))) {
-          value = value.slice(1, -1);
-        }
-        // 尝试解析数字和布尔值
-        if (value === 'true') result[key] = true;
-        else if (value === 'false') result[key] = false;
-        else if (!isNaN(Number(value)) && value !== '') result[key] = Number(value);
-        else result[key] = value;
-      }
+type ReviewSummary = {
+  deckId: string;
+  reviewed: number;
+  correct: number;
+  incorrect: number;
+  endedAt: string;
+};
+
+const FLASHCARD_YAML_PATCH_FIELDS: (keyof Flashcard)[] = [
+  'type',
+  'deck',
+  'source',
+  'tags',
+  'front',
+  'back',
+  'text',
+  'question',
+  'options',
+  'answer',
+  'items',
+  'ordered',
+  'explanation',
+  'ease',
+  'interval',
+  'repetitions',
+  'due',
+  'lastReview',
+  'created',
+];
+
+const buildYamlPatchFromUpdates = (updates: Partial<Flashcard>): Record<string, unknown> => {
+  const patch: Record<string, unknown> = {};
+  for (const key of FLASHCARD_YAML_PATCH_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(updates, key)) {
+      patch[key] = updates[key];
     }
   }
-  
-  return result;
-}
+  return patch;
+};
 
 // ==================== Store 类型 ====================
 
@@ -84,6 +69,7 @@ interface FlashcardState {
   
   // 复习会话
   currentSession: ReviewSession | null;
+  lastReviewSummary: ReviewSummary | null;
   
   // UI 状态
   isLoading: boolean;
@@ -96,10 +82,11 @@ interface FlashcardState {
   deleteCard: (notePath: string) => Promise<void>;
   
   // 复习
-  startReview: (deckId?: string) => void;
+  startReview: (deckId?: string) => boolean;
   submitReview: (rating: ReviewRating) => Promise<void>;
   skipCard: () => void;
   endReview: () => void;
+  clearError: () => void;
   
   // 牌组
   getDecks: () => Deck[];
@@ -119,6 +106,7 @@ export const useFlashcardStore = create<FlashcardState>((set, get) => ({
   cards: new Map(),
   decks: [],
   currentSession: null,
+  lastReviewSummary: null,
   isLoading: false,
   error: null,
 
@@ -143,46 +131,77 @@ export const useFlashcardStore = create<FlashcardState>((set, get) => ({
       
       const flashcardsDir = await join(vaultPath, 'Flashcards');
       const newCards = new Map<string, Flashcard>();
+      const failedFiles: string[] = [];
       
       try {
-        const entries = await readDir(flashcardsDir);
-        
-        for (const entry of entries) {
-          if (entry.name?.endsWith('.md')) {
+        const scanDir = async (dirPath: string, relativeDir: string): Promise<void> => {
+          const entries = await readDir(dirPath);
+
+          for (const entry of entries) {
+            if (!entry.name) continue;
+
+            const absolutePath = await join(dirPath, entry.name);
+            const relativePath = `${relativeDir}/${entry.name}`;
+
+            if (entry.isDirectory) {
+              await scanDir(absolutePath, relativePath);
+              continue;
+            }
+
+            if (!entry.name.endsWith('.md')) continue;
+
             try {
-              const filePath = await join(flashcardsDir, entry.name);
-              const content = await readTextFile(filePath);
-              
-              // 解析 YAML frontmatter
-              const yamlMatch = content.match(/^---\n([\s\S]*?)\n---/);
-              if (yamlMatch) {
-                const yamlContent = yamlMatch[1];
-                const yaml = parseSimpleYaml(yamlContent);
-                
-                if (yaml.db === 'flashcards') {
-                  const notePath = `Flashcards/${entry.name}`;
-                  const card = yamlToCard(yaml, notePath, content);
-                  if (card) {
-                    newCards.set(notePath, card);
-                  }
+              const content = await readTextFile(absolutePath);
+              const parsed = parseFrontmatter(content);
+              if (parsed.parseError) {
+                throw new Error(parsed.parseError);
+              }
+              const yaml = parsed.frontmatter as Record<string, unknown>;
+
+              if (yaml.db === 'flashcards') {
+                const card = yamlToCard(yaml, relativePath, content);
+                if (card) {
+                  newCards.set(relativePath, card);
                 }
               }
             } catch (e) {
-              console.warn(`Failed to parse flashcard: ${entry.name}`, e);
+              failedFiles.push(relativePath);
+              console.warn(`Failed to parse flashcard: ${relativePath}`, e);
             }
           }
-        }
+        };
+
+        await scanDir(flashcardsDir, 'Flashcards');
       } catch (e) {
         // Flashcards 目录可能不存在
         console.log('Flashcards directory not found or empty');
       }
-      
-      set({ cards: newCards, isLoading: false });
+
+      if (failedFiles.length > 0) {
+        const t = getCurrentTranslations();
+        const preview = failedFiles.slice(0, 5).join(', ');
+        const userMessage = `${t.flashcard.loadFailed}: ${failedFiles.length}`;
+        set({ cards: newCards, isLoading: false, error: userMessage });
+        reportOperationError({
+          source: 'FlashcardStore.loadCards',
+          action: 'Parse flashcards',
+          error: new Error(`Failed files: ${preview}`),
+          userMessage,
+          level: 'warning',
+        });
+        return;
+      }
+
+      set({ cards: newCards, isLoading: false, error: null });
     } catch (error) {
       const t = getCurrentTranslations();
-      set({ 
-        isLoading: false, 
-        error: error instanceof Error ? error.message : t.flashcard.loadFailed,
+      const message = error instanceof Error ? error.message : t.flashcard.loadFailed;
+      set({ isLoading: false, error: message });
+      reportOperationError({
+        source: 'FlashcardStore.loadCards',
+        action: 'Load flashcards',
+        error,
+        userMessage: message,
       });
     }
   },
@@ -197,40 +216,51 @@ export const useFlashcardStore = create<FlashcardState>((set, get) => ({
     if (!vaultPath) {
       throw new Error(getCurrentTranslations().common.openWorkspaceFirst);
     }
-    
-    // 生成文件名和路径
-    const filename = generateCardFilename(cardData);
-    const separator = vaultPath.includes('\\') ? '\\' : '/';
-    const fullPath = `${vaultPath}${separator}${folder}${separator}${filename}`;
-    const notePath = `${folder}/${filename}`;
-    
-    // 生成 Markdown 内容
-    const content = generateCardMarkdown(cardData);
-    
-    // 创建文件并写入内容
-    await createFile(fullPath);
-    await saveFile(fullPath, content);
-    
-    // 刷新文件树
-    await fileStore.refreshFileTree();
-    
-    // 添加到 store
-    const card: Flashcard = {
-      ...INITIAL_SM2_STATE,
-      ...cardData,
-      id: notePath,
-      notePath,
-      deck: cardData.deck || 'Default',
-      created: new Date().toISOString().split('T')[0],
-    } as Flashcard;
-    
-    set(state => {
-      const newCards = new Map(state.cards);
-      newCards.set(notePath, card);
-      return { cards: newCards };
-    });
-    
-    return notePath;
+
+    try {
+      // 生成文件名和路径
+      const filename = generateCardFilename(cardData);
+      const separator = vaultPath.includes('\\') ? '\\' : '/';
+      const fullPath = `${vaultPath}${separator}${folder}${separator}${filename}`;
+      const notePath = `${folder}/${filename}`;
+      
+      // 生成 Markdown 内容
+      const content = generateCardMarkdown(cardData);
+      
+      // 创建文件并写入内容
+      await createFile(fullPath);
+      await saveFile(fullPath, content);
+      
+      // 刷新文件树
+      await fileStore.refreshFileTree();
+      
+      // 添加到 store
+      const card: Flashcard = {
+        ...INITIAL_SM2_STATE,
+        ...cardData,
+        id: notePath,
+        notePath,
+        deck: cardData.deck || 'Default',
+        created: new Date().toISOString().split('T')[0],
+      } as Flashcard;
+      
+      set(state => {
+        const newCards = new Map(state.cards);
+        newCards.set(notePath, card);
+        return { cards: newCards, error: null };
+      });
+      
+      return notePath;
+    } catch (error) {
+      const message = reportOperationError({
+        source: 'FlashcardStore.addCard',
+        action: 'Create flashcard',
+        error,
+        userMessage: getCurrentTranslations().flashcard.loadFailed,
+      });
+      set({ error: message });
+      throw error;
+    }
   },
 
   /**
@@ -244,19 +274,43 @@ export const useFlashcardStore = create<FlashcardState>((set, get) => ({
     if (!card || !vaultPath) return;
     
     const updatedCard = { ...card, ...updates };
-    
-    // 更新笔记文件
-    const content = generateCardMarkdown(updatedCard);
     const separator = vaultPath.includes('\\') ? '\\' : '/';
     const fullPath = `${vaultPath}${separator}${notePath.replace(/\//g, separator)}`;
-    await saveFile(fullPath, content);
-    
-    // 更新 store
-    set(state => {
-      const newCards = new Map(state.cards);
-      newCards.set(notePath, updatedCard);
-      return { cards: newCards };
-    });
+
+    try {
+      // 优先仅更新 frontmatter，避免重写正文导致内容丢失
+      const yamlPatch = buildYamlPatchFromUpdates(updates);
+      let content = generateCardMarkdown(updatedCard);
+
+      if (Object.keys(yamlPatch).length > 0) {
+        try {
+          const { readTextFile } = await import('@tauri-apps/plugin-fs');
+          const existing = await readTextFile(fullPath);
+          content = updateFrontmatter(existing, yamlPatch);
+        } catch {
+          // 文件不存在或读取失败时，回退到完整重写
+        }
+      }
+
+      await saveFile(fullPath, content);
+      
+      // 更新 store
+      set(state => {
+        const newCards = new Map(state.cards);
+        newCards.set(notePath, updatedCard);
+        return { cards: newCards, error: null };
+      });
+    } catch (error) {
+      const t = getCurrentTranslations();
+      const message = reportOperationError({
+        source: 'FlashcardStore.updateCard',
+        action: 'Update flashcard',
+        error,
+        userMessage: t.flashcard.loadFailed,
+      });
+      set({ error: message });
+      throw error;
+    }
   },
 
   /**
@@ -268,15 +322,25 @@ export const useFlashcardStore = create<FlashcardState>((set, get) => ({
     
     if (!vaultPath) return;
     
-    const separator = vaultPath.includes('\\') ? '\\' : '/';
-    const fullPath = `${vaultPath}${separator}${notePath.replace(/\//g, separator)}`;
-    await deleteFile(fullPath);
-    
-    set(state => {
-      const newCards = new Map(state.cards);
-      newCards.delete(notePath);
-      return { cards: newCards };
-    });
+    try {
+      const separator = vaultPath.includes('\\') ? '\\' : '/';
+      const fullPath = `${vaultPath}${separator}${notePath.replace(/\//g, separator)}`;
+      await deleteFile(fullPath);
+      
+      set(state => {
+        const newCards = new Map(state.cards);
+        newCards.delete(notePath);
+        return { cards: newCards, error: null };
+      });
+    } catch (error) {
+      const message = reportOperationError({
+        source: 'FlashcardStore.deleteCard',
+        action: 'Delete flashcard',
+        error,
+      });
+      set({ error: message });
+      throw error;
+    }
   },
 
   /**
@@ -287,7 +351,7 @@ export const useFlashcardStore = create<FlashcardState>((set, get) => ({
     
     if (dueCards.length === 0) {
       set({ error: getCurrentTranslations().flashcard.noCardsToReview });
-      return;
+      return false;
     }
     
     // 随机打乱顺序
@@ -304,7 +368,9 @@ export const useFlashcardStore = create<FlashcardState>((set, get) => ({
         incorrect: 0,
       },
       error: null,
+      lastReviewSummary: null,
     });
+    return true;
   },
 
   /**
@@ -321,7 +387,11 @@ export const useFlashcardStore = create<FlashcardState>((set, get) => ({
     const newState = calculateNextReview(currentCard, rating);
     
     // 更新卡片
-    await get().updateCard(currentCard.notePath, newState);
+    try {
+      await get().updateCard(currentCard.notePath, newState);
+    } catch {
+      return;
+    }
     
     // 更新会话统计
     set(state => {
@@ -341,7 +411,16 @@ export const useFlashcardStore = create<FlashcardState>((set, get) => ({
       
       // 检查是否完成
       if (newSession.currentIndex >= newSession.cards.length) {
-        return { currentSession: null };
+        return {
+          currentSession: null,
+          lastReviewSummary: {
+            deckId: newSession.deckId,
+            reviewed: newSession.reviewed,
+            correct: newSession.correct,
+            incorrect: newSession.incorrect,
+            endedAt: new Date().toISOString(),
+          },
+        };
       }
       
       return { currentSession: newSession };
@@ -375,6 +454,10 @@ export const useFlashcardStore = create<FlashcardState>((set, get) => ({
    */
   endReview: () => {
     set({ currentSession: null });
+  },
+
+  clearError: () => {
+    set({ error: null });
   },
 
   /**
