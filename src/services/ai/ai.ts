@@ -64,6 +64,7 @@ function buildSystemPrompt(files: FileReference[], intent?: IntentType): string 
   const t = getCurrentTranslations();
   const chatPrompt = t.prompts.chat;
   const editPrompt = t.prompts.edit;
+  const routerPrompt = t.prompts.router;
   
   // 如果是闲聊意图，使用极简 Prompt
   if (intent === "chat") {
@@ -72,6 +73,20 @@ function buildSystemPrompt(files: FileReference[], intent?: IntentType): string 
       prompt += `\n\n${chatPrompt.contextFiles}\n`;
       for (const file of files) {
         prompt += `\n=== ${file.name} ===\n${file.content || chatPrompt.emptyFile}\n`;
+      }
+    }
+    return prompt;
+  }
+
+  // 闪卡意图：使用编辑能力并显式注入路由语义，避免意图漂移
+  if (intent === "flashcard") {
+    let prompt = `${editPrompt.system}\n\n${routerPrompt.system}\n\nFocus on flashcard generation and review workflows.`;
+    if (files.length > 0) {
+      prompt += `\n\n${editPrompt.currentFiles}\n`;
+      for (const file of files) {
+        prompt += `\n=== ${file.name} ===\n`;
+        prompt += file.content || editPrompt.contentNotLoaded;
+        prompt += `\n=== ${editPrompt.fileEnd} ===\n`;
       }
     }
     return prompt;

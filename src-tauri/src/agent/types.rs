@@ -52,6 +52,7 @@ pub enum TaskIntent {
     Create,   // 创建内容
     Organize, // 整理文件
     Search,   // 搜索研究
+    Flashcard, // 生成与管理闪卡
     Complex,  // 复杂任务（需要规划）
 }
 
