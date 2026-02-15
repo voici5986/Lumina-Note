@@ -47,13 +47,13 @@ impl Default for AgentType {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskIntent {
-    Chat,     // 简单聊天
-    Edit,     // 编辑笔记
-    Create,   // 创建内容
-    Organize, // 整理文件
-    Search,   // 搜索研究
+    Chat,      // 简单聊天
+    Edit,      // 编辑笔记
+    Create,    // 创建内容
+    Organize,  // 整理文件
+    Search,    // 搜索研究
     Flashcard, // 生成与管理闪卡
-    Complex,  // 复杂任务（需要规划）
+    Complex,   // 复杂任务（需要规划）
 }
 
 impl Default for TaskIntent {
