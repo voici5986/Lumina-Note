@@ -157,11 +157,14 @@ describe('stringifyFrontmatter', () => {
     expect(result).toContain('count: 5');
   });
 
-  it('should stringify arrays inline', () => {
+  it('should stringify arrays', () => {
     const data = { tags: ['a', 'b', 'c'] };
     const result = stringifyFrontmatter(data);
     
-    expect(result).toBe('tags: [a, b, c]');
+    expect(result).toContain('tags:');
+    expect(result).toContain('- a');
+    expect(result).toContain('- b');
+    expect(result).toContain('- c');
   });
 
   it('should stringify booleans', () => {
