@@ -36,6 +36,8 @@
 
 ## 下载
 
+<div align="center">
+
 前往 [Releases](https://github.com/blueberrycongee/Lumina-Note/releases) 获取最新版：
 
 | 平台 | 安装包 |
@@ -43,6 +45,8 @@
 | Windows | `.msi` / `.exe` |
 | macOS (Intel) | `x64.dmg` |
 | macOS (Apple Silicon) | `aarch64.dmg` |
+
+</div>
 
 ---
 

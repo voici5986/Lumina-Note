@@ -36,6 +36,8 @@
 
 ## ダウンロード
 
+<div align="center">
+
 最新版は [Releases](https://github.com/blueberrycongee/Lumina-Note/releases) から取得できます。
 
 | プラットフォーム | パッケージ |
@@ -43,6 +45,8 @@
 | Windows | `.msi` / `.exe` |
 | macOS (Intel) | `x64.dmg` |
 | macOS (Apple Silicon) | `aarch64.dmg` |
+
+</div>
 
 ---
 

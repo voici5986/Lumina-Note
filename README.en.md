@@ -36,6 +36,8 @@ Your notes stay on your device. Lumina Note helps you write, connect, and evolve
 
 ## Download
 
+<div align="center">
+
 Get the latest build from [Releases](https://github.com/blueberrycongee/Lumina-Note/releases):
 
 | Platform | Package |
@@ -43,6 +45,8 @@ Get the latest build from [Releases](https://github.com/blueberrycongee/Lumina-N
 | Windows | `.msi` / `.exe` |
 | macOS (Intel) | `x64.dmg` |
 | macOS (Apple Silicon) | `aarch64.dmg` |
+
+</div>
 
 ---
 
