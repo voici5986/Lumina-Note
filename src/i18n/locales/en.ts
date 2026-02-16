@@ -1333,42 +1333,6 @@ export default {
     copy: 'Copy',
   },
 
-  // Debug panels
-  debug: {
-    rustAgentTest: {
-      title: '🦀 Rust Agent Test',
-      notInitialized: 'Not initialized',
-      streamingLabel: 'Streaming',
-      planLabel: 'Plan',
-      inputPlaceholder: 'Enter a test task...',
-      workspaceLabel: 'Workspace',
-      configLabel: 'Config',
-      customModelNotSet: 'Custom model not set',
-      noApiKey: 'No API key',
-      status: {
-        idle: 'Idle',
-        running: 'Running',
-        completed: 'Completed',
-        error: 'Error',
-        aborted: 'Aborted',
-        waiting_approval: 'Waiting for approval',
-      },
-    },
-    agentStats: {
-      title: 'Agent Stats',
-      currentTask: 'Current task',
-      toolCalls: 'Tool calls',
-      failureCount: '({count} failed)',
-      successRate: 'Success rate',
-      cumulativeStats: 'Overall stats',
-      taskCompletion: 'Task completion',
-      toolSuccessRate: 'Tool success rate',
-      completed: 'Completed',
-      failed: 'Failed',
-      tokens: 'Tokens',
-    },
-  },
-
   // Selection Toolbar
   selectionToolbar: {
     addToChat: 'Add to Chat',

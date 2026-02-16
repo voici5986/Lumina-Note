@@ -1334,42 +1334,6 @@ export default {
     copy: '複製',
   },
 
-  // 調試面板
-  debug: {
-    rustAgentTest: {
-      title: '🦀 Rust Agent 測試',
-      notInitialized: '未初始化',
-      streamingLabel: '串流輸出',
-      planLabel: '計畫',
-      inputPlaceholder: '輸入測試任務...',
-      workspaceLabel: '工作區',
-      configLabel: '設定',
-      customModelNotSet: '未設定自訂模型',
-      noApiKey: '未設定 Key',
-      status: {
-        idle: '閒置',
-        running: '執行中',
-        completed: '已完成',
-        error: '錯誤',
-        aborted: '已中止',
-        waiting_approval: '等待審批',
-      },
-    },
-    agentStats: {
-      title: 'Agent 統計',
-      currentTask: '目前任務',
-      toolCalls: '工具呼叫',
-      failureCount: '({count} 失敗)',
-      successRate: '成功率',
-      cumulativeStats: '累計統計',
-      taskCompletion: '任務完成度',
-      toolSuccessRate: '工具成功率',
-      completed: '完成',
-      failed: '失敗',
-      tokens: 'Token',
-    },
-  },
-
   // 選中工具列
   selectionToolbar: {
     addToChat: '添加到對話',

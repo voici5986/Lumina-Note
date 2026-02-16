@@ -1334,42 +1334,6 @@ export default {
     copy: 'コピー',
   },
 
-  // デバッグパネル
-  debug: {
-    rustAgentTest: {
-      title: '🦀 Rust Agent テスト',
-      notInitialized: '未初期化',
-      streamingLabel: 'ストリーミング',
-      planLabel: '計画',
-      inputPlaceholder: 'テストタスクを入力...',
-      workspaceLabel: 'ワークスペース',
-      configLabel: '設定',
-      customModelNotSet: 'カスタムモデル未設定',
-      noApiKey: 'API Key 未設定',
-      status: {
-        idle: '待機中',
-        running: '実行中',
-        completed: '完了',
-        error: 'エラー',
-        aborted: '中断',
-        waiting_approval: '承認待ち',
-      },
-    },
-    agentStats: {
-      title: 'Agent 統計',
-      currentTask: '現在のタスク',
-      toolCalls: 'ツール呼び出し',
-      failureCount: '({count} 件失敗)',
-      successRate: '成功率',
-      cumulativeStats: '累計統計',
-      taskCompletion: 'タスク完了率',
-      toolSuccessRate: 'ツール成功率',
-      completed: '完了',
-      failed: '失敗',
-      tokens: 'トークン',
-    },
-  },
-
   // 選択ツールバー
   selectionToolbar: {
     addToChat: 'チャットに追加',
