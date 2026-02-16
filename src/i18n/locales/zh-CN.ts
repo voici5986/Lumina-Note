@@ -1334,29 +1334,6 @@ export default {
     copy: '复制',
   },
 
-  // 调试面板
-  debug: {
-    rustAgentTest: {
-      title: '🦀 Rust Agent 测试',
-      notInitialized: '未初始化',
-      streamingLabel: '流式输出',
-      planLabel: '计划',
-      inputPlaceholder: '输入测试任务...',
-      workspaceLabel: '工作区',
-      configLabel: '配置',
-      customModelNotSet: '未设置自定义模型',
-      noApiKey: '未配置 Key',
-      status: {
-        idle: '空闲',
-        running: '运行中',
-        completed: '已完成',
-        error: '错误',
-        aborted: '已中止',
-        waiting_approval: '等待审批',
-      },
-    },
-  },
-
   // 选中工具栏
   selectionToolbar: {
     addToChat: '添加到对话',
