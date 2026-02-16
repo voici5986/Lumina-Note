@@ -175,7 +175,6 @@ export async function chat(
       } : undefined,
     };
   } catch (error) {
-    console.error('[AI Debug] Error in chat():', error);
     throw error;
   }
 }
