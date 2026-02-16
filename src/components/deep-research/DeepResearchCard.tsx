@@ -30,6 +30,7 @@ import {
   Download,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isIMEComposing } from "@/lib/imeUtils";
 import {
   useDeepResearchStore,
   ResearchPhase,
@@ -441,6 +442,7 @@ function ClarificationPanel({
           className="flex-1 px-3 py-2 text-sm border border-border rounded-md 
                      bg-background focus:outline-none focus:ring-1 focus:ring-primary"
           onKeyDown={(e) => {
+            if (isIMEComposing(e)) return;
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               handleSubmit();
@@ -889,6 +891,7 @@ ${reportContent}`;
                 className="w-full px-3 py-2 text-sm border border-border rounded-md bg-muted/50 focus:outline-none focus:ring-1 focus:ring-primary mb-3"
                 autoFocus
                 onKeyDown={(e) => {
+                  if (isIMEComposing(e)) return;
                   if (e.key === "Enter") handleSave();
                   if (e.key === "Escape") setShowSaveDialog(false);
                 }}
