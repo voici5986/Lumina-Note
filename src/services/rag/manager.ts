@@ -267,8 +267,6 @@ export class RAGManager {
     content: string;
     modified: number;
   }[]> {
-    console.log("[RAG] Scanning workspace:", workspacePath);
-    
     // 使用 Tauri 的 list_directory 获取文件列表
     // 注意: Rust 返回 snake_case (is_dir)，需要匹配
     const entries = await invoke<Array<{
@@ -278,8 +276,6 @@ export class RAGManager {
       children?: unknown[];
     }>>("list_directory", { path: workspacePath });
 
-    console.log("[RAG] Root entries count:", entries.length);
-
     const files: { path: string; content: string; modified: number }[] = [];
 
     // 递归收集所有 .md 文件
@@ -287,7 +283,6 @@ export class RAGManager {
       for (const item of items) {
         if (item.is_dir) {
           if (item.children && item.children.length > 0) {
-            console.log(`[RAG] ${"  ".repeat(depth)}📁 ${item.name} (${(item.children as unknown[]).length} items)`);
             await collectFiles(item.children as typeof entries, depth + 1);
           }
         } else if (item.path.endsWith(".md")) {
@@ -304,7 +299,6 @@ export class RAGManager {
     };
 
     await collectFiles(entries);
-    console.log("[RAG] Total .md files found:", files.length);
     return files;
   }
 }
