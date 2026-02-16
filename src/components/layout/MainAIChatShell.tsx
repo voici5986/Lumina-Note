@@ -12,6 +12,7 @@ import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { processMessageWithFiles } from "@/hooks/useChatSend";
 import { parseMarkdown } from "@/services/markdown/markdown";
 import { resolve } from "@/lib/path";
+import { isIMEComposing } from "@/lib/imeUtils";
 import { listAgentSkills, readAgentSkill, getDocToolsStatus, installDocTools, createDir, saveFile, exists } from "@/lib/tauri";
 import type { SelectedSkill, SkillInfo } from "@/types/skills";
 import {
@@ -1098,6 +1099,9 @@ export function MainAIChatShell() {
 
   // 键盘事件
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // IME 输入法组合期间，忽略所有快捷键（如 Enter 确认候选词）
+    if (isIMEComposing(e)) return;
+
     if (showMention) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
