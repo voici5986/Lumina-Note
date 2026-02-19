@@ -253,6 +253,7 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
   const draggedNodeId = useRef<string | null>(null);
   const hasDragged = useRef(false); // 是否发生了拖拽
   const clickedNodeRef = useRef<GraphNode | null>(null); // 点击的节点
+  const frameTickRef = useRef(0);
 
   const [params, setParams] = useState({
     repulsion: 3000,
@@ -313,6 +314,7 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
     const nodes: GraphNode[] = [];
     const edges: GraphEdge[] = [];
     const nodeMap = new Map<string, GraphNode>();
+    const linkEdgeSet = new Set<string>();
     const folderColorMap = new Map<string, { folderColor: string; fileColor: string }>(); // 文件夹路径 -> 颜色对
     let colorIndex = 0;
 
@@ -418,14 +420,12 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
           for (const linkName of links) {
             const targetNode = nodeMap.get(linkName.toLowerCase());
             if (targetNode && targetNode.id !== node.id && !targetNode.isFolder) {
-              // 检查双链边是否已存在
-              const exists = edges.some(
-                (e) =>
-                  e.type === 'link' &&
-                  ((e.source === node.id && e.target === targetNode.id) ||
-                    (e.source === targetNode.id && e.target === node.id))
-              );
-              if (!exists) {
+              const sourceId = node.id;
+              const targetId = targetNode.id;
+              const edgeKey =
+                sourceId < targetId ? `${sourceId}\u0000${targetId}` : `${targetId}\u0000${sourceId}`;
+              if (!linkEdgeSet.has(edgeKey)) {
+                linkEdgeSet.add(edgeKey);
                 edges.push({ source: node.id, target: targetNode.id, type: 'link' });
                 node.connections++;
                 targetNode.connections++;
@@ -522,7 +522,12 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
     canvas.style.height = `${height}px`;
     ctx.scale(dpr, dpr);
 
-    PhysicsEngine.step(nodesRef.current, edgesRef.current, { ...params, width, height });
+    frameTickRef.current += 1;
+    const nodeCount = nodesRef.current.length;
+    const physicsInterval = nodeCount > 600 ? 3 : nodeCount > 300 ? 2 : 1;
+    if (!document.hidden && frameTickRef.current % physicsInterval === 0) {
+      PhysicsEngine.step(nodesRef.current, edgesRef.current, { ...params, width, height });
+    }
 
     ctx.clearRect(0, 0, width, height);
 
@@ -532,11 +537,20 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
     ctx.translate(-width / 2, -height / 2);
 
     const hasSelection = selectedNode !== null || hoverNode !== null;
+    const nodeById = new Map(nodesRef.current.map((node) => [node.id, node]));
+    const focusNodeId = hoverNode || selectedNode?.id || null;
+    const connectedToFocus = new Set<string>();
+    if (focusNodeId) {
+      edgesRef.current.forEach((edge) => {
+        if (edge.source === focusNodeId) connectedToFocus.add(edge.target);
+        if (edge.target === focusNodeId) connectedToFocus.add(edge.source);
+      });
+    }
 
     // Draw edges
     edgesRef.current.forEach((edge) => {
-      const u = nodesRef.current.find((n) => n.id === edge.source);
-      const v = nodesRef.current.find((n) => n.id === edge.target);
+      const u = nodeById.get(edge.source);
+      const v = nodeById.get(edge.target);
       if (!u || !v) return;
 
       const isHighlighted =
@@ -601,15 +615,7 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
       const isSelected = selectedNode && node.id === selectedNode.id;
       const isCurrent = !node.isFolder && currentFile?.includes(node.label);
 
-      let isNeighbor = false;
-      const targetId = hoverNode || (selectedNode ? selectedNode.id : null);
-      if (targetId) {
-        isNeighbor = edgesRef.current.some(
-          (e) =>
-            (e.source === targetId && e.target === node.id) ||
-            (e.target === targetId && e.source === node.id)
-        );
-      }
+      const isNeighbor = focusNodeId ? connectedToFocus.has(node.id) : false;
 
       const isHighlighted = isHovered || isSelected || isNeighbor || isCurrent;
 
@@ -872,11 +878,12 @@ export function KnowledgeGraph({ className = "", isolatedNode }: KnowledgeGraphP
   // Get connected nodes for selected node
   const connectedNodes = useMemo(() => {
     if (!selectedNode) return [];
+    const nodeById = new Map(nodesRef.current.map((node) => [node.id, node]));
     return edgesRef.current
       .filter((e) => e.source === selectedNode.id || e.target === selectedNode.id)
       .map((e) => {
         const targetId = e.source === selectedNode.id ? e.target : e.source;
-        return nodesRef.current.find((n) => n.id === targetId);
+        return nodeById.get(targetId);
       })
       .filter(Boolean) as GraphNode[];
   }, [selectedNode]);

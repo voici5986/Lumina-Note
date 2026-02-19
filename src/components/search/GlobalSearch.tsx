@@ -36,6 +36,8 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
   const [useRegex, setUseRegex] = useState(false);
   const [caseSensitive, setCaseSensitive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileLinesCacheRef = useRef<Map<string, string[]>>(new Map());
+  const searchRunIdRef = useRef(0);
   
   const { fileTree, openFile } = useFileStore();
   const { hideAllWebViews, showAllWebViews } = useBrowserStore();
@@ -52,6 +54,8 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
   // Focus input when opened
   useEffect(() => {
     if (isOpen) {
+      searchRunIdRef.current += 1;
+      fileLinesCacheRef.current.clear();
       setQuery("");
       setReplaceQuery("");
       setResults([]);
@@ -75,25 +79,41 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
     return files;
   }, [fileTree]);
 
+  // Keep cache in sync with active file set when tree changes.
+  useEffect(() => {
+    const activePaths = new Set(allFiles.map((f) => f.path));
+    const cache = fileLinesCacheRef.current;
+    for (const cachedPath of cache.keys()) {
+      if (!activePaths.has(cachedPath)) {
+        cache.delete(cachedPath);
+      }
+    }
+  }, [allFiles]);
+
   // Search function
   const performSearch = useCallback(async () => {
-    if (!query.trim()) {
+    const runId = ++searchRunIdRef.current;
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery) {
+      setIsSearching(false);
       setResults([]);
+      setExpandedFiles(new Set());
       return;
     }
 
     setIsSearching(true);
     const searchResults: SearchResult[] = [];
     const failedFiles: string[] = [];
+    const filesWithMatches: string[] = [];
 
     try {
       // Build search pattern
       let pattern: RegExp;
       try {
         if (useRegex) {
-          pattern = new RegExp(query, caseSensitive ? "g" : "gi");
+          pattern = new RegExp(trimmedQuery, caseSensitive ? "g" : "gi");
         } else {
-          const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const escaped = trimmedQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
           pattern = new RegExp(escaped, caseSensitive ? "g" : "gi");
         }
       } catch (error) {
@@ -102,17 +122,25 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
           action: "Compile search pattern",
           error,
           level: "warning",
-          context: { query, useRegex, caseSensitive },
+          context: { query: trimmedQuery, useRegex, caseSensitive },
         });
-        setIsSearching(false);
         return;
       }
 
       // Search through all files
       for (const file of allFiles) {
+        if (runId !== searchRunIdRef.current) {
+          return;
+        }
+
         try {
-          const content = await readFile(file.path);
-          const lines = content.split("\n");
+          let lines = fileLinesCacheRef.current.get(file.path);
+          if (!lines) {
+            const content = await readFile(file.path);
+            lines = content.split("\n");
+            fileLinesCacheRef.current.set(file.path, lines);
+          }
+
           const matches: SearchMatch[] = [];
 
           lines.forEach((line, lineIndex) => {
@@ -136,15 +164,25 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
               name: file.name,
               matches,
             });
-            // Auto-expand files with matches
-            setExpandedFiles(prev => new Set([...prev, file.path]));
+            filesWithMatches.push(file.path);
           }
         } catch {
           failedFiles.push(file.path);
         }
       }
 
+      if (runId !== searchRunIdRef.current) {
+        return;
+      }
+
       setResults(searchResults);
+      if (filesWithMatches.length > 0) {
+        setExpandedFiles(prev => {
+          const next = new Set(prev);
+          filesWithMatches.forEach(path => next.add(path));
+          return next;
+        });
+      }
       if (failedFiles.length > 0) {
         reportOperationError({
           source: "GlobalSearch.performSearch",
@@ -158,7 +196,9 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
         });
       }
     } finally {
-      setIsSearching(false);
+      if (runId === searchRunIdRef.current) {
+        setIsSearching(false);
+      }
     }
   }, [query, allFiles, useRegex, caseSensitive]);
 
