@@ -186,7 +186,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
     }>)?.map(tc => ({
       id: tc.id,
       name: tc.function.name,
-      arguments: JSON.parse(tc.function.arguments || "{}"),
+      arguments: this.parseToolArguments(tc.function.arguments),
     }));
 
     // 解析 usage
@@ -201,6 +201,22 @@ export class OpenAICompatibleProvider implements LLMProvider {
         totalTokens: usage.total_tokens || 0,
       } : undefined,
     };
+  }
+
+  private parseToolArguments(rawArgs: unknown): Record<string, unknown> {
+    if (typeof rawArgs !== "string" || rawArgs.trim() === "") {
+      return {};
+    }
+
+    try {
+      const parsed = JSON.parse(rawArgs) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+      return {};
+    } catch {
+      return {};
+    }
   }
 
   /**

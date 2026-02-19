@@ -4,6 +4,7 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
+import { stat } from "@tauri-apps/plugin-fs";
 import { Embedder } from "./embedder";
 import { Reranker } from "./reranker";
 import { MarkdownChunker } from "./chunker";
@@ -32,6 +33,7 @@ export class RAGManager {
   private config: RAGConfig;
   private workspacePath: string | null = null;
   private isIndexing = false;
+  private fileStateCache = new Map<string, { modified: number; contentHash: number }>();
 
   constructor(config: RAGConfig) {
     this.config = config;
@@ -288,8 +290,7 @@ export class RAGManager {
         } else if (item.path.endsWith(".md")) {
           try {
             const content = await invoke<string>("read_file", { path: item.path });
-            // 获取文件修改时间 (简化处理，使用当前时间)
-            const modified = Date.now();
+            const modified = await this.resolveFileModifiedTime(item.path, content);
             files.push({ path: item.path, content, modified });
           } catch (e) {
             console.warn(`[RAG] Failed to read file: ${item.path}`, e);
@@ -300,5 +301,57 @@ export class RAGManager {
 
     await collectFiles(entries);
     return files;
+  }
+
+  private async resolveFileModifiedTime(path: string, content: string): Promise<number> {
+    try {
+      const info = await stat(path);
+      const mtime = info.mtime;
+      const timestamp = this.normalizeTimestamp(mtime);
+      if (timestamp !== null) {
+        this.fileStateCache.set(path, {
+          modified: timestamp,
+          contentHash: this.computeContentHash(content),
+        });
+        return timestamp;
+      }
+    } catch {
+      // ignore stat failures and use content-based fallback
+    }
+
+    const contentHash = this.computeContentHash(content);
+    const previous = this.fileStateCache.get(path);
+    if (previous && previous.contentHash === contentHash) {
+      return previous.modified;
+    }
+
+    const now = Date.now();
+    const nextModified = previous ? Math.max(now, previous.modified + 1) : now;
+    this.fileStateCache.set(path, { modified: nextModified, contentHash });
+    return nextModified;
+  }
+
+  private normalizeTimestamp(value: unknown): number | null {
+    if (value instanceof Date) {
+      const time = value.getTime();
+      return Number.isFinite(time) ? time : null;
+    }
+    if (typeof value === "number") {
+      return Number.isFinite(value) ? value : null;
+    }
+    if (typeof value === "string") {
+      const parsed = new Date(value).getTime();
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  }
+
+  private computeContentHash(content: string): number {
+    let hash = 2166136261;
+    for (let i = 0; i < content.length; i++) {
+      hash ^= content.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
   }
 }
