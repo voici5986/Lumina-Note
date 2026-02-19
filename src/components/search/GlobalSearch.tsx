@@ -3,6 +3,7 @@ import { useFileStore } from "@/stores/useFileStore";
 import { useBrowserStore } from "@/stores/useBrowserStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 import { FileEntry, readFile } from "@/lib/tauri";
+import type { FsChangePayload } from "@/lib/fsChange";
 import { cn, getFileName } from "@/lib/utils";
 import { reportOperationError } from "@/lib/reportError";
 import { Search, X, FileText, Loader2, Replace, ChevronDown, ChevronRight } from "lucide-react";
@@ -38,6 +39,8 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const fileLinesCacheRef = useRef<Map<string, string[]>>(new Map());
   const searchRunIdRef = useRef(0);
+
+  const getCacheKey = useCallback((path: string) => path.replace(/\\/g, "/"), []);
   
   const { fileTree, openFile } = useFileStore();
   const { hideAllWebViews, showAllWebViews } = useBrowserStore();
@@ -81,14 +84,69 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
 
   // Keep cache in sync with active file set when tree changes.
   useEffect(() => {
-    const activePaths = new Set(allFiles.map((f) => f.path));
+    const activePaths = new Set(allFiles.map((f) => getCacheKey(f.path)));
     const cache = fileLinesCacheRef.current;
     for (const cachedPath of cache.keys()) {
       if (!activePaths.has(cachedPath)) {
         cache.delete(cachedPath);
       }
     }
-  }, [allFiles]);
+  }, [allFiles, getCacheKey]);
+
+  // Invalidate per-file cache when underlying files change.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let dispose = false;
+    let unlisten: (() => void) | null = null;
+
+    const setupListener = async () => {
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+        const handleInvalidate = (path: unknown) => {
+          if (typeof path !== "string" || !path) return;
+          fileLinesCacheRef.current.delete(getCacheKey(path));
+        };
+
+        const disposeListener = await listen<FsChangePayload | null>("fs:change", (event) => {
+          const payload = event.payload;
+          if (!payload || typeof payload !== "object") return;
+
+          if (payload.type === "Modified" || payload.type === "Created" || payload.type === "Deleted") {
+            handleInvalidate(payload.path);
+            return;
+          }
+
+          if (payload.type === "Renamed") {
+            handleInvalidate(payload.old_path);
+            handleInvalidate(payload.new_path);
+          }
+        });
+
+        if (dispose) {
+          disposeListener();
+          return;
+        }
+        unlisten = disposeListener;
+      } catch (error) {
+        reportOperationError({
+          source: "GlobalSearch.fsChangeListener",
+          action: "Subscribe fs:change for cache invalidation",
+          error,
+          level: "warning",
+        });
+      }
+    };
+
+    setupListener();
+
+    return () => {
+      dispose = true;
+      if (unlisten) {
+        unlisten();
+      }
+    };
+  }, [isOpen, getCacheKey]);
 
   // Search function
   const performSearch = useCallback(async () => {
@@ -134,11 +192,12 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
         }
 
         try {
-          let lines = fileLinesCacheRef.current.get(file.path);
+          const cacheKey = getCacheKey(file.path);
+          let lines = fileLinesCacheRef.current.get(cacheKey);
           if (!lines) {
             const content = await readFile(file.path);
             lines = content.split("\n");
-            fileLinesCacheRef.current.set(file.path, lines);
+            fileLinesCacheRef.current.set(cacheKey, lines);
           }
 
           const matches: SearchMatch[] = [];
@@ -200,7 +259,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
         setIsSearching(false);
       }
     }
-  }, [query, allFiles, useRegex, caseSensitive]);
+  }, [query, allFiles, useRegex, caseSensitive, getCacheKey]);
 
   // Debounced search
   useEffect(() => {
