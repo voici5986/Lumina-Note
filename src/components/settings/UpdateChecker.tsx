@@ -1,8 +1,8 @@
-import { useState, useRef } from "react";
-import { check, Update } from "@tauri-apps/plugin-updater";
+import { useState, useRef, useEffect } from "react";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { Loader2, RefreshCw, Download, RotateCcw, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, RefreshCw, Download, RotateCcw, CheckCircle2, AlertCircle, SkipForward } from "lucide-react";
 import { useLocaleStore } from "@/stores/useLocaleStore";
+import { useUpdateStore, checkForUpdate, getUpdateHandle } from "@/stores/useUpdateStore";
 import { reportOperationError } from "@/lib/reportError";
 
 type DownloadEvent = {
@@ -15,8 +15,16 @@ type DownloadEvent = {
 
 export function UpdateChecker() {
     const { t } = useLocaleStore();
-    const [checking, setChecking] = useState(false);
-    const [update, setUpdate] = useState<Update | null>(null);
+    const {
+        availableUpdate,
+        hasUnreadUpdate,
+        isChecking,
+        skippedVersions,
+        skipVersion,
+        clearSkippedVersion,
+        markUpdateAsRead,
+    } = useUpdateStore();
+
     const [status, setStatus] = useState<"idle" | "downloading" | "installing" | "ready" | "error" | "up-to-date">("idle");
     const [error, setError] = useState<string | null>(null);
     const [progress, setProgress] = useState<number>(0);
@@ -25,36 +33,44 @@ export function UpdateChecker() {
     const contentLengthRef = useRef<number>(0);
     const downloadedRef = useRef<number>(0);
 
-    const checkForUpdates = async () => {
-        try {
-            setChecking(true);
-            setError(null);
+    // 打开设置时标记更新为已读
+    useEffect(() => {
+        if (hasUnreadUpdate) {
+            markUpdateAsRead();
+        }
+    }, [hasUnreadUpdate, markUpdateAsRead]);
+
+    // 同步 store 中的更新状态到本地 status
+    useEffect(() => {
+        if (availableUpdate && status === "up-to-date") {
             setStatus("idle");
+        }
+    }, [availableUpdate, status]);
 
-            const updateResult = await check();
+    const handleCheckForUpdates = async () => {
+        setError(null);
+        setStatus("idle");
 
-            if (updateResult?.available) {
-                setUpdate(updateResult);
-            } else {
-                setUpdate(null);
+        try {
+            const hasUpdate = await checkForUpdate(true); // force check
+            if (!hasUpdate) {
                 setStatus("up-to-date");
             }
         } catch (err) {
             reportOperationError({
-                source: "UpdateChecker.checkForUpdates",
+                source: "UpdateChecker.handleCheckForUpdates",
                 action: "Check for updates",
                 error: err,
                 level: "warning",
             });
             setError(err instanceof Error ? err.message : String(err));
             setStatus("error");
-        } finally {
-            setChecking(false);
         }
     };
 
     const installUpdate = async () => {
-        if (!update) return;
+        const updateHandle = getUpdateHandle();
+        if (!updateHandle) return;
 
         try {
             setStatus("downloading");
@@ -63,7 +79,7 @@ export function UpdateChecker() {
             contentLengthRef.current = 0;
             downloadedRef.current = 0;
 
-            await update.downloadAndInstall((event: DownloadEvent) => {
+            await updateHandle.downloadAndInstall((event: DownloadEvent) => {
                 switch (event.event) {
                     case 'Started':
                         const len = (event.data as any).contentLength;
@@ -99,6 +115,13 @@ export function UpdateChecker() {
         }
     };
 
+    const handleSkipVersion = () => {
+        if (availableUpdate) {
+            skipVersion(availableUpdate.version);
+            setStatus("idle");
+        }
+    };
+
     const handleRelaunch = async () => {
         try {
             await relaunch();
@@ -112,15 +135,17 @@ export function UpdateChecker() {
         }
     };
 
+    const hasUpdate = availableUpdate !== null;
+
     return (
         <div className="space-y-4 p-4 rounded-xl bg-muted/30 border border-border/50">
             <div className="flex items-center justify-between">
                 <div className="space-y-1">
                     <h3 className="font-medium">{t.updateChecker.title}</h3>
                     <p className="text-sm text-muted-foreground">
-                        {status === "idle" && !update && t.updateChecker.descIdle}
+                        {status === "idle" && !hasUpdate && t.updateChecker.descIdle}
                         {status === "up-to-date" && t.updateChecker.descUpToDate}
-                        {status === "idle" && update && t.updateChecker.descAvailable.replace("{version}", update.version)}
+                        {status === "idle" && hasUpdate && t.updateChecker.descAvailable.replace("{version}", availableUpdate.version)}
                         {status === "downloading" && t.updateChecker.descDownloading}
                         {status === "installing" && t.updateChecker.descInstalling}
                         {status === "ready" && t.updateChecker.descReady}
@@ -129,13 +154,13 @@ export function UpdateChecker() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    {(status === "idle" || status === "up-to-date") && !update && (
+                    {(status === "idle" || status === "up-to-date") && !hasUpdate && (
                         <button
-                            onClick={checkForUpdates}
-                            disabled={checking}
+                            onClick={handleCheckForUpdates}
+                            disabled={isChecking}
                             className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
                         >
-                            {checking ? (
+                            {isChecking ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
                                 <RefreshCw className="w-4 h-4" />
@@ -144,14 +169,24 @@ export function UpdateChecker() {
                         </button>
                     )}
 
-                    {status === "idle" && update && (
-                        <button
-                            onClick={installUpdate}
-                            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                        >
-                            <Download className="w-4 h-4" />
-                            {t.updateChecker.actionInstall}
-                        </button>
+                    {status === "idle" && hasUpdate && (
+                        <>
+                            <button
+                                onClick={handleSkipVersion}
+                                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
+                                title={t.updateChecker.actionSkip}
+                            >
+                                <SkipForward className="w-4 h-4" />
+                                {t.updateChecker.actionSkip}
+                            </button>
+                            <button
+                                onClick={installUpdate}
+                                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                            >
+                                <Download className="w-4 h-4" />
+                                {t.updateChecker.actionInstall}
+                            </button>
+                        </>
                     )}
 
                     {status === "ready" && (
@@ -175,12 +210,12 @@ export function UpdateChecker() {
             )}
 
             {/* 更新详情 */}
-            {update && status === "idle" && (
+            {hasUpdate && status === "idle" && (
                 <div className="text-sm text-muted-foreground bg-background/50 p-3 rounded-lg border border-border/50">
                     <p className="font-medium text-foreground mb-1">
-                        {t.updateChecker.versionLabel.replace("{version}", update.version)}
+                        {t.updateChecker.versionLabel.replace("{version}", availableUpdate.version)}
                     </p>
-                    <p className="whitespace-pre-wrap">{update.body || t.updateChecker.noChangelog}</p>
+                    <p className="whitespace-pre-wrap">{availableUpdate.body || t.updateChecker.noChangelog}</p>
                 </div>
             )}
 
@@ -205,6 +240,25 @@ export function UpdateChecker() {
                 <div className="flex items-center gap-2 text-sm text-green-600 bg-green-500/10 p-3 rounded-lg">
                     <CheckCircle2 className="w-4 h-4" />
                     <span>{t.updateChecker.readyHint}</span>
+                </div>
+            )}
+
+            {/* 已跳过的版本列表 */}
+            {skippedVersions.length > 0 && (
+                <div className="text-xs text-muted-foreground pt-2 border-t border-border/50">
+                    <span>{t.updateChecker.skippedVersions}: </span>
+                    {skippedVersions.map((v, i) => (
+                        <span key={v}>
+                            <button
+                                onClick={() => clearSkippedVersion(v)}
+                                className="text-primary hover:underline"
+                                title={t.updateChecker.clearSkipped}
+                            >
+                                {v}
+                            </button>
+                            {i < skippedVersions.length - 1 && ", "}
+                        </span>
+                    ))}
                 </div>
             )}
         </div>
