@@ -1529,10 +1529,10 @@ export function MainAIChatShell() {
                   <span className="text-4xl">{welcomeEmoji}</span>
                 </div>
 
-                <h1 className="text-3xl font-bold text-foreground tracking-tight">
+                <h1 className="text-3xl font-bold text-foreground tracking-tight whitespace-nowrap overflow-hidden text-ellipsis">
                   {t.ai.welcomeTitle}
                 </h1>
-                <p className="text-muted-foreground text-sm">
+                <p className="text-muted-foreground text-sm whitespace-nowrap overflow-hidden text-ellipsis">
                   {t.ai.welcomeSubtitle}
                 </p>
               </motion.div>
