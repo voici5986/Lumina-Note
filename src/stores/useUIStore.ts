@@ -86,6 +86,10 @@ interface UIState {
   // Diagnostics
   diagnosticsEnabled: boolean;
   setDiagnosticsEnabled: (enabled: boolean) => void;
+
+  // Editor font size
+  editorFontSize: number;
+  setEditorFontSize: (size: number) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -192,6 +196,10 @@ export const useUIStore = create<UIState>()(
       // Diagnostics
       diagnosticsEnabled: false,
       setDiagnosticsEnabled: (enabled) => set({ diagnosticsEnabled: enabled }),
+
+      // Editor font size (10-32px)
+      editorFontSize: 16,
+      setEditorFontSize: (size) => set({ editorFontSize: Math.max(10, Math.min(32, size)) }),
     }),
     {
       name: "neurone-ui",
