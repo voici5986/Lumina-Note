@@ -837,7 +837,7 @@ export function Sidebar() {
       {/* Favorites */}
       <div className="px-2 mb-2">
         <div className="flex items-center justify-between px-1 mb-1">
-          <span className="text-xs font-semibold text-muted-foreground">{t.favorites.title}</span>
+          <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis">{t.favorites.title}</span>
           <div className="flex items-center gap-1">
             <button
               onClick={() => setFavoriteSortMode("manual")}
