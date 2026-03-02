@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { getChangelogForVersion } from './parse_changelog';
+import { getChangelogForVersion } from './parse_changelog.js';
 
 // Script to generate latest.json for Tauri v2 updater.
 // Supports macOS (aarch64, x86_64) and Windows (x64).
