@@ -9,9 +9,9 @@ describe("ResizeHandle", () => {
 
   it("uses latest pointer position within the same animation frame", () => {
     const onResize = vi.fn();
-    let rafCallback: FrameRequestCallback | null = null;
+    let rafCallback: ((timestamp: number) => void) | undefined;
 
-    vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb: FrameRequestCallback) => {
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb: (timestamp: number) => void) => {
       rafCallback = cb;
       return 1;
     });
@@ -25,8 +25,11 @@ describe("ResizeHandle", () => {
     fireEvent.mouseMove(document, { clientX: 110 });
     fireEvent.mouseMove(document, { clientX: 130 });
 
-    expect(rafCallback).not.toBeNull();
-    rafCallback?.(16);
+    expect(rafCallback).toBeDefined();
+    if (!rafCallback) {
+      throw new Error("RAF callback was not scheduled");
+    }
+    rafCallback(16);
 
     expect(onResize).toHaveBeenCalledTimes(1);
     expect(onResize).toHaveBeenLastCalledWith(30);
