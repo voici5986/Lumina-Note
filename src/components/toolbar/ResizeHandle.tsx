@@ -19,12 +19,22 @@ export function ResizeHandle({
   const [hoverY, setHoverY] = useState(50);
   const rafRef = useRef<number | null>(null);
   const lastXRef = useRef(0);
+  const latestXRef = useRef(0);
+
+  const emitResize = useCallback(
+    (delta: number) => {
+      if (delta === 0) return;
+      onResize(direction === "right" ? -delta : delta);
+    },
+    [direction, onResize]
+  );
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
       lastXRef.current = e.clientX;
+      latestXRef.current = e.clientX;
       setIsDragging(true);
       
       // 拖动时禁用侧边栏的过渡动画
@@ -36,30 +46,33 @@ export function ResizeHandle({
   useEffect(() => {
     if (!isDragging) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      // 使用 requestAnimationFrame 节流
-      if (rafRef.current) return;
-      
-      rafRef.current = requestAnimationFrame(() => {
-        const delta = e.clientX - lastXRef.current;
-        lastXRef.current = e.clientX;
+    const flushPendingDelta = () => {
+      const delta = latestXRef.current - lastXRef.current;
+      lastXRef.current = latestXRef.current;
+      emitResize(delta);
+    };
 
-        if (delta !== 0) {
-          // Invert delta for right-side handles
-          onResize(direction === "right" ? -delta : delta);
-        }
-        
+    const handleMouseMove = (e: MouseEvent) => {
+      latestXRef.current = e.clientX;
+
+      // 使用 requestAnimationFrame 节流，并始终消费最新坐标，避免帧内丢增量
+      if (rafRef.current) return;
+
+      rafRef.current = requestAnimationFrame(() => {
+        flushPendingDelta();
         rafRef.current = null;
       });
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
-      lastXRef.current = 0;
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
+        flushPendingDelta();
       }
+      lastXRef.current = 0;
+      latestXRef.current = 0;
       // 恢复过渡动画
       document.body.classList.remove("resizing");
     };
@@ -80,7 +93,7 @@ export function ResizeHandle({
         cancelAnimationFrame(rafRef.current);
       }
     };
-  }, [isDragging, direction, onResize]);
+  }, [emitResize, isDragging]);
 
   const updateHoverY = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
