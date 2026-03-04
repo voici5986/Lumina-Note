@@ -160,27 +160,20 @@ describe('CodeMirror live selection gap bridge', () => {
     expect(visibleBlockTexts.some((text) => text.includes('>'))).toBe(true);
   });
 
-  it('injects ::selection CSS rule for code block content at highest precedence', () => {
+  it('adds mark decoration for selection inside code block content', () => {
     const content = '```javascript\nconsole.log("hi")\n```';
-    setupEditor(content);
+    const { container, view } = setupEditor(content);
 
-    // The library's inlineSelectionFix should inject a style rule that
-    // re-enables ::selection on .cm-line.cm-codeblock-content.
-    const sheets = Array.from(document.styleSheets);
-    const selectionRules: string[] = [];
-    for (const sheet of sheets) {
-      try {
-        for (const rule of Array.from(sheet.cssRules)) {
-          const text = (rule as CSSStyleRule).selectorText ?? '';
-          if (text.includes('cm-codeblock-content') && text.includes('selection')) {
-            selectionRules.push(text);
-          }
-        }
-      } catch {
-        /* cross-origin sheets */
-      }
-    }
-    expect(selectionRules.length).toBeGreaterThanOrEqual(1);
+    // Select inside the code block content
+    const codeStart = content.indexOf('console');
+    const codeEnd = content.indexOf(')\n```');
+    act(() => {
+      view.dispatch({ selection: { anchor: codeStart, head: codeEnd } });
+    });
+
+    // The library's codeBlockSelectionPlugin should add .cm-codeblock-sel marks
+    const selMarks = container.querySelectorAll('.cm-codeblock-sel');
+    expect(selMarks.length).toBeGreaterThanOrEqual(1);
   });
 
   it('keeps heading mark collapsed when heading line is not active', () => {
