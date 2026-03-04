@@ -902,7 +902,13 @@ const selectionStatePlugin = ViewPlugin.fromClass(class {
     this.updateClass(view);
   }
   update(update: ViewUpdate) {
-    if (update.selectionSet) {
+    const isDragging = update.state.field(mouseSelectingField, false);
+    const wasDragging = update.startState.field(mouseSelectingField, false);
+    if (wasDragging && !isDragging) {
+      this.updateClass(update.view);
+      return;
+    }
+    if (update.selectionSet && !isDragging) {
       this.updateClass(update.view);
     }
   }
@@ -940,9 +946,15 @@ function isInsideSkippedSelectionParent(node: any): boolean {
 const selectionBridgeField = StateField.define<DecorationSet>({
   create: buildSelectionBridgeDecorations,
   update(deco, tr) {
-    return (tr.docChanged || tr.selection || tr.reconfigured)
-      ? buildSelectionBridgeDecorations(tr.state)
-      : deco.map(tr.changes);
+    if (tr.docChanged || tr.reconfigured) return buildSelectionBridgeDecorations(tr.state);
+    // Rebuild when drag ends so decorations catch up
+    const isDragging = tr.state.field(mouseSelectingField, false);
+    const wasDragging = tr.startState.field(mouseSelectingField, false);
+    if (wasDragging && !isDragging) return buildSelectionBridgeDecorations(tr.state);
+    if (!tr.selection) return deco;
+    // Skip expensive syntax-tree iteration while dragging
+    if (isDragging) return deco;
+    return buildSelectionBridgeDecorations(tr.state);
   },
   provide: f => EditorView.decorations.from(f),
 });
