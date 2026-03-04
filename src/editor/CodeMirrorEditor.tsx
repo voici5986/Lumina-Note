@@ -150,6 +150,10 @@ const createEditorTheme = (fontSize: number) =>
       margin: '0 1px',
       pointerEvents: 'auto',
     },
+    '&.cm-drag-selecting .cm-formatting-inline, &.cm-drag-selecting .cm-formatting-block, &.cm-drag-selecting .cm-math-inline, &.cm-drag-selecting .cm-math-source, &.cm-drag-selecting .cm-selection-bridge, &.cm-drag-selecting .cm-selection-gap': {
+      transition: 'none !important',
+      animation: 'none !important',
+    },
 
     // 块级标记 (标题/列表/引用) - 默认隐藏
     '.cm-formatting-block': {
@@ -825,6 +829,13 @@ const livePreviewPlugin = ViewPlugin.fromClass(
       this.decorations = buildLivePreviewDecorations(view);
     }
     update(update: ViewUpdate) {
+      const isDragging = update.state.field(mouseSelectingField, false);
+      const wasDragging = update.startState.field(mouseSelectingField, false);
+      if (isDragging) return;
+      if (wasDragging && !isDragging) {
+        this.decorations = buildLivePreviewDecorations(update.view);
+        return;
+      }
       if (checkUpdateAction(update) === 'rebuild') {
         this.decorations = buildLivePreviewDecorations(update.view);
       }
@@ -1137,9 +1148,12 @@ const selectionStatePlugin = ViewPlugin.fromClass(
     }
     destroy() {
       this.view.dom.classList.remove('cm-has-selection');
+      this.view.dom.classList.remove('cm-drag-selecting');
     }
     private updateClass(view: EditorView) {
+      const isDragging = view.state.field(mouseSelectingField, false);
       const hasSelection = view.state.selection.ranges.some((range) => range.from !== range.to);
+      view.dom.classList.toggle('cm-drag-selecting', isDragging);
       view.dom.classList.toggle('cm-has-selection', hasSelection);
       const main = view.state.selection.main;
       const detail = hasSelection
@@ -1177,8 +1191,8 @@ const selectionBridgeField = StateField.define<DecorationSet>({
     const wasDragging = tr.startState.field(mouseSelectingField, false);
     if (wasDragging && !isDragging) return buildSelectionBridgeDecorations(tr.state);
     if (!tr.selection) return deco;
-    // Skip expensive syntax-tree iteration while dragging
-    if (isDragging) return deco;
+    // During drag, clear bridge overlays to avoid stale/flickering highlight layers.
+    if (isDragging) return Decoration.none;
     return buildSelectionBridgeDecorations(tr.state);
   },
   provide: (f) => EditorView.decorations.from(f),
