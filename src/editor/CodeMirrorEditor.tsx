@@ -29,14 +29,12 @@ import mermaid from "mermaid";
 import { PLUGIN_EDITOR_SELECTION_EVENT, pluginEditorRuntime } from "@/services/plugins/editorRuntime";
 import {
   checkUpdateAction,
-  codeBlockEditorPlugin,
   codeBlockField,
   collapseOnSelectionFacet,
   tableField,
   tableEditorPlugin,
   mouseSelectingField,
   setMouseSelecting,
-  setCodeBlockSourceMode,
   shouldShowSource
 } from "codemirror-live-markdown";
 
@@ -275,6 +273,52 @@ const createEditorTheme = (fontSize: number) => EditorView.theme({
   ".cm-codeblock-source": {
     backgroundColor: "rgba(139, 92, 246, 0.1)",
   },
+
+  // === Inline code block styles ===
+  ".cm-codeblock-header": {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    padding: "6px 16px",
+    backgroundColor: "hsl(var(--muted))",
+    borderRadius: "6px 6px 0 0",
+    borderBottom: "1px solid hsl(var(--border) / 0.3)",
+    fontSize: "12px",
+    minHeight: "28px",
+  },
+  ".cm-codeblock-lang": {
+    color: "hsl(var(--muted-foreground))",
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: "11px",
+    backgroundColor: "hsl(var(--background) / 0.5)",
+    padding: "2px 6px",
+    borderRadius: "3px",
+  },
+  ".cm-codeblock-content": {
+    backgroundColor: "hsl(var(--muted)) !important",
+    fontFamily: "'JetBrains Mono', monospace !important",
+    padding: "0 16px !important",
+    lineHeight: "1.7 !important",
+  },
+  ".cm-codeblock-footer": {
+    backgroundColor: "hsl(var(--muted))",
+    borderRadius: "0 0 6px 6px",
+    height: "6px",
+  },
+  // hljs token colors
+  ".hljs-keyword": { color: "hsl(var(--md-keyword, 280 70% 55%))" },
+  ".hljs-string": { color: "hsl(var(--md-string, 120 50% 40%))" },
+  ".hljs-comment": { color: "hsl(var(--muted-foreground))", fontStyle: "italic" },
+  ".hljs-number": { color: "hsl(var(--md-number, 30 80% 50%))" },
+  ".hljs-title": { color: "hsl(var(--md-link, 210 80% 55%))" },
+  ".hljs-built_in": { color: "hsl(var(--md-link, 210 80% 55%))" },
+  ".hljs-type": { color: "hsl(var(--md-keyword, 280 70% 55%))" },
+  ".hljs-function": { color: "hsl(var(--md-link, 210 80% 55%))" },
+  ".hljs-params": { color: "hsl(var(--foreground))" },
+  ".hljs-literal": { color: "hsl(var(--md-number, 30 80% 50%))" },
+  ".hljs-attr": { color: "hsl(var(--md-link, 210 80% 55%))" },
+  ".hljs-variable": { color: "hsl(var(--foreground))" },
+  ".hljs-meta": { color: "hsl(var(--muted-foreground))" },
 
   // 基础 Markdown 样式
   ".cm-header-1": { fontSize: "2em", fontWeight: "700", lineHeight: "1.3", color: "hsl(var(--md-heading, var(--foreground)))" },
@@ -983,134 +1027,6 @@ function shouldUpgradeSelectAll(view: EditorView, selection: Selection | null) {
   return coversViewport && !alreadyFull;
 }
 
-type CodeBlockDomContext = {
-  container: HTMLElement;
-  line: HTMLElement;
-  lineIndex: number;
-  lineStarts: number[];
-  from: number;
-  to: number;
-};
-
-function closestCodeBlockLine(target: EventTarget | null): HTMLElement | null {
-  if (!(target instanceof Node)) return null;
-  const element = target instanceof HTMLElement ? target : target.parentElement;
-  return element?.closest?.(".cm-codeblock-widget .cm-codeblock-line") as HTMLElement | null;
-}
-
-function parseCodeBlockContext(line: HTMLElement): CodeBlockDomContext | null {
-  const container = line.closest(".cm-codeblock-widget") as HTMLElement | null;
-  if (!container) return null;
-
-  const from = Number.parseInt(container.dataset.from || "", 10);
-  const to = Number.parseInt(container.dataset.to || "", 10);
-  const lineIndex = Number.parseInt(line.dataset.lineIndex || "", 10);
-  if (!Number.isFinite(from) || !Number.isFinite(to) || !Number.isFinite(lineIndex)) return null;
-
-  let lineStarts: number[] = [];
-  try {
-    const parsed = JSON.parse(container.dataset.lineStarts || "[]");
-    if (Array.isArray(parsed)) {
-      lineStarts = parsed
-        .map((value) => Number(value))
-        .filter((value) => Number.isFinite(value));
-    }
-  } catch {
-    lineStarts = [];
-  }
-
-  return { container, line, lineIndex, lineStarts, from, to };
-}
-
-function basePosForCodeLine(ctx: CodeBlockDomContext): number {
-  if (ctx.lineIndex >= 0) {
-    const start = ctx.lineStarts[ctx.lineIndex];
-    if (Number.isFinite(start)) return start;
-  }
-  if (ctx.lineIndex === -2) return ctx.to;
-  return ctx.from;
-}
-
-function textOffsetInLine(
-  ownerDoc: Document,
-  line: HTMLElement,
-  node: Node | null,
-  offset: number
-): number {
-  if (!node || !line.contains(node)) return 0;
-  try {
-    const range = ownerDoc.createRange();
-    range.setStart(line, 0);
-    range.setEnd(node, offset);
-    const measured = range.toString().length;
-    return measured >= 0 ? measured : 0;
-  } catch {
-    return 0;
-  }
-}
-
-function resolveCaretPointFromClick(
-  ownerDoc: Document,
-  event: MouseEvent,
-  line: HTMLElement
-): { node: Node | null; offset: number } {
-  const anyDoc = ownerDoc as Document & {
-    caretRangeFromPoint?: (x: number, y: number) => Range | null;
-    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
-  };
-
-  if (typeof anyDoc.caretRangeFromPoint === "function") {
-    const range = anyDoc.caretRangeFromPoint(event.clientX, event.clientY);
-    if (range && line.contains(range.startContainer)) {
-      return { node: range.startContainer, offset: range.startOffset };
-    }
-  }
-
-  if (typeof anyDoc.caretPositionFromPoint === "function") {
-    const pos = anyDoc.caretPositionFromPoint(event.clientX, event.clientY);
-    if (pos && line.contains(pos.offsetNode)) {
-      return { node: pos.offsetNode, offset: pos.offset };
-    }
-  }
-
-  return { node: event.target instanceof Node ? event.target : null, offset: 0 };
-}
-
-function domPointToCodePos(
-  ownerDoc: Document,
-  ctx: CodeBlockDomContext,
-  node: Node | null,
-  offset: number
-): number {
-  const base = basePosForCodeLine(ctx);
-  if (ctx.lineIndex < 0) return base;
-  const textOffset = textOffsetInLine(ownerDoc, ctx.line, node, offset);
-  const maxOffset = Math.max(0, ctx.line.textContent?.length ?? 0);
-  const clamped = Math.min(Math.max(0, textOffset), maxOffset);
-  return base + clamped;
-}
-
-function codeSelectionRangeFromDom(
-  ownerDoc: Document,
-  selection: Selection
-): { from: number; to: number } | null {
-  if (!selection.rangeCount || selection.isCollapsed) return null;
-  const range = selection.getRangeAt(0);
-
-  const startLine = closestCodeBlockLine(range.startContainer);
-  const endLine = closestCodeBlockLine(range.endContainer);
-  if (!startLine || !endLine) return null;
-
-  const startCtx = parseCodeBlockContext(startLine);
-  const endCtx = parseCodeBlockContext(endLine);
-  if (!startCtx || !endCtx) return null;
-  if (startCtx.container !== endCtx.container) return null;
-
-  const startPos = domPointToCodePos(ownerDoc, startCtx, range.startContainer, range.startOffset);
-  const endPos = domPointToCodePos(ownerDoc, endCtx, range.endContainer, range.endOffset);
-  if (startPos === endPos) return null;
-  return { from: Math.min(startPos, endPos), to: Math.max(startPos, endPos) };
-}
 
 // Workaround: ensure Cmd/Ctrl+A selects the full document even when native selectAll is triggered.
 const selectAllDomHandlers = Prec.highest(EditorView.domEventHandlers({
@@ -1545,7 +1461,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
             collapseOnSelectionFacet.of(true),
             livePreviewPlugin,
             tableEditorPlugin(),
-            codeBlockEditorPlugin({ copyButton: true }),
+            codeBlockField({ interaction: "inline", copyButton: true }),
             ...widgets,
           ];
         case 'source':
@@ -1690,63 +1606,9 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
         });
       };
 
-      const handleCodeBlockWidgetClick = (event: MouseEvent) => {
-        const v = viewRef.current;
-        if (!v || !v.state.facet(collapseOnSelectionFacet) || event.button !== 0) return;
-
-        const target = event.target as HTMLElement | null;
-        if (target?.closest(".cm-codeblock-copy, .cm-codeblock-toggle")) return;
-
-        const line = closestCodeBlockLine(event.target);
-        if (!line) return;
-
-        const ctx = parseCodeBlockContext(line);
-        if (!ctx) return;
-
-        const point = resolveCaretPointFromClick(ownerDoc, event, line);
-        const pos = domPointToCodePos(ownerDoc, ctx, point.node, point.offset);
-        v.focus();
-        v.dispatch({
-          selection: { anchor: pos },
-          effects: setCodeBlockSourceMode.of({
-            from: ctx.from,
-            to: ctx.to,
-            showSource: true,
-          }),
-          scrollIntoView: true,
-        });
-        event.preventDefault();
-        event.stopPropagation();
-      };
-
-      const handleCodeBlockSelectionDelete = (event: KeyboardEvent) => {
-        const v = viewRef.current;
-        if (!v || !v.state.facet(collapseOnSelectionFacet)) return;
-        if (event.key !== "Backspace" && event.key !== "Delete") return;
-
-        const selection = ownerDoc.getSelection();
-        if (!selection) return;
-
-        const deleteRange = codeSelectionRangeFromDom(ownerDoc, selection);
-        if (!deleteRange) return;
-
-        v.focus();
-        v.dispatch({
-          changes: { from: deleteRange.from, to: deleteRange.to, insert: "" },
-          selection: { anchor: deleteRange.from },
-          scrollIntoView: true,
-        });
-        selection.removeAllRanges();
-        event.preventDefault();
-        event.stopPropagation();
-      };
-
       ownerDoc.addEventListener('beforeinput', handleSelectAllBeforeInput, true);
       ownerDoc.addEventListener('keydown', handleSelectAllKeyDown, true);
       ownerDoc.addEventListener('selectionchange', handleSelectionChange);
-      ownerDoc.addEventListener('mousedown', handleCodeBlockWidgetClick, true);
-      ownerDoc.addEventListener('click', handleCodeBlockWidgetClick, true);
-      ownerDoc.addEventListener('keydown', handleCodeBlockSelectionDelete, true);
 
       // Paste Handler for Images
       const handlePaste = async (e: ClipboardEvent) => {
@@ -1834,7 +1696,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
         }
 
         // 1. Math/Table/CodeBlock Widget 点击 -> 聚焦源码
-        const widgetDom = target.closest('[data-widget-type="math"], [data-widget-type="table"], [data-widget-type="codeblock"]');
+        const widgetDom = target.closest('[data-widget-type="math"], [data-widget-type="table"]');
         if (widgetDom) {
           const pos = v.posAtDOM(widgetDom);
           if (pos !== null) {
@@ -1882,9 +1744,6 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
         ownerDoc.removeEventListener('beforeinput', handleSelectAllBeforeInput, true);
         ownerDoc.removeEventListener('keydown', handleSelectAllKeyDown, true);
         ownerDoc.removeEventListener('selectionchange', handleSelectionChange);
-        ownerDoc.removeEventListener('mousedown', handleCodeBlockWidgetClick, true);
-        ownerDoc.removeEventListener('click', handleCodeBlockWidgetClick, true);
-        ownerDoc.removeEventListener('keydown', handleCodeBlockSelectionDelete, true);
         unbindPluginExtensions();
         view.destroy();
         _cachedDoc = null;
