@@ -1,15 +1,23 @@
-import { useEffect, useRef, useImperativeHandle, forwardRef, useCallback } from "react";
-import { useFileStore } from "@/stores/useFileStore";
-import { useAIStore } from "@/stores/useAIStore";
-import { useSplitStore } from "@/stores/useSplitStore";
-import { useUIStore } from "@/stores/useUIStore";
-import { useLocaleStore } from "@/stores/useLocaleStore";
-import { useShallow } from "zustand/react/shallow";
-import { parseLuminaLink } from "@/services/pdf/annotations";
-import { writeBinaryFile, readBinaryFileBase64 } from "@/lib/tauri";
-import { EditorState, StateField, StateEffect, Compartment, Prec, ChangeSet, Text } from "@codemirror/state";
-import { slashCommandExtensions, placeholderExtension } from "./extensions/slashCommand";
-import { SlashMenu } from "./components/SlashMenu";
+import { useEffect, useRef, useImperativeHandle, forwardRef, useCallback } from 'react';
+import { useFileStore } from '@/stores/useFileStore';
+import { useAIStore } from '@/stores/useAIStore';
+import { useSplitStore } from '@/stores/useSplitStore';
+import { useUIStore } from '@/stores/useUIStore';
+import { useLocaleStore } from '@/stores/useLocaleStore';
+import { useShallow } from 'zustand/react/shallow';
+import { parseLuminaLink } from '@/services/pdf/annotations';
+import { writeBinaryFile, readBinaryFileBase64 } from '@/lib/tauri';
+import {
+  EditorState,
+  StateField,
+  StateEffect,
+  Compartment,
+  Prec,
+  ChangeSet,
+  Text,
+} from '@codemirror/state';
+import { slashCommandExtensions, placeholderExtension } from './extensions/slashCommand';
+import { SlashMenu } from './components/SlashMenu';
 import {
   EditorView,
   drawSelection,
@@ -19,14 +27,17 @@ import {
   ViewPlugin,
   ViewUpdate,
   WidgetType,
-} from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { Table } from "@lezer/markdown";
-import { syntaxTree } from "@codemirror/language";
-import katex from "katex";
-import mermaid from "mermaid";
-import { PLUGIN_EDITOR_SELECTION_EVENT, pluginEditorRuntime } from "@/services/plugins/editorRuntime";
+} from '@codemirror/view';
+import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
+import { Table } from '@lezer/markdown';
+import { syntaxTree } from '@codemirror/language';
+import katex from 'katex';
+import mermaid from 'mermaid';
+import {
+  PLUGIN_EDITOR_SELECTION_EVENT,
+  pluginEditorRuntime,
+} from '@/services/plugins/editorRuntime';
 import {
   checkUpdateAction,
   codeBlockField,
@@ -35,8 +46,8 @@ import {
   tableEditorPlugin,
   mouseSelectingField,
   setMouseSelecting,
-  shouldShowSource
-} from "codemirror-live-markdown";
+  shouldShowSource,
+} from 'codemirror-live-markdown';
 
 // Initialize mermaid
 mermaid.initialize({
@@ -74,274 +85,353 @@ export interface CodeMirrorEditorRef {
 
 // ============ 3. 样式定义 (动画与布局核心) ============
 
-const createEditorTheme = (fontSize: number) => EditorView.theme({
-  "&": { backgroundColor: "transparent", fontSize: `${fontSize}px`, height: "100%" },
-  ".cm-codeblock-widget pre": { fontSize: `${Math.max(10, fontSize - 2)}px` },
-  ".cm-content": { fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", padding: "16px 0", caretColor: "hsl(var(--foreground))" },
-  ".cm-cursor, .cm-dropCursor": { borderLeftColor: "hsl(var(--foreground))" },
-  ".cm-line": { padding: "0 16px", paddingLeft: "16px", lineHeight: "1.75", position: "relative" },
+const createEditorTheme = (fontSize: number) =>
+  EditorView.theme({
+    '&': { backgroundColor: 'transparent', fontSize: `${fontSize}px`, height: '100%' },
+    '.cm-codeblock-widget pre': { fontSize: `${Math.max(10, fontSize - 2)}px` },
+    '.cm-content': {
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      padding: '16px 0',
+      caretColor: 'hsl(var(--foreground))',
+    },
+    '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'hsl(var(--foreground))' },
+    '.cm-line': {
+      padding: '0 16px',
+      paddingLeft: '16px',
+      lineHeight: '1.75',
+      position: 'relative',
+    },
 
-  // 选区颜色（更淡的蓝色）
-  ".cm-selectionBackground": { backgroundColor: "rgba(191, 219, 254, 0.25) !important" },
-  "&.cm-focused .cm-selectionBackground": { backgroundColor: "rgba(191, 219, 254, 0.35) !important" },
+    // 选区颜色（更淡的蓝色）
+    '.cm-selectionBackground': { backgroundColor: 'rgba(191, 219, 254, 0.25) !important' },
+    '&.cm-focused .cm-selectionBackground': {
+      backgroundColor: 'rgba(191, 219, 254, 0.35) !important',
+    },
 
-  // === 动画核心样式 ===
+    // === 动画核心样式 ===
 
-  // 1. 悬挂标记 (Headings) - 绝对定位到左侧，不占用正文空间
-  ".cm-formatting-hanging": {
-    position: "absolute",
-    right: "100%", // 悬挂在内容左侧
-    marginRight: "6px",
-    color: "hsl(var(--muted-foreground) / 0.4)",
-    fontFamily: "'JetBrains Mono', monospace",
-    fontSize: "14px", // 固定字体大小，不继承标题大小
-    fontWeight: "bold",
-    userSelect: "none",
-    pointerEvents: "none",
-  },
+    // 1. 悬挂标记 (Headings) - 绝对定位到左侧，不占用正文空间
+    '.cm-formatting-hanging': {
+      position: 'absolute',
+      right: '100%', // 悬挂在内容左侧
+      marginRight: '6px',
+      color: 'hsl(var(--muted-foreground) / 0.4)',
+      fontFamily: "'JetBrains Mono', monospace",
+      fontSize: '14px', // 固定字体大小，不继承标题大小
+      fontWeight: 'bold',
+      userSelect: 'none',
+      pointerEvents: 'none',
+    },
 
-  // 2. 行内标记 (Bold, Italic) - 默认隐藏 (收缩)
-  ".cm-formatting-inline": {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    whiteSpace: "nowrap",
-    verticalAlign: "baseline",
-    color: "hsl(var(--muted-foreground) / 0.6)",
-    fontFamily: "'JetBrains Mono', monospace",
-    fontSize: "0.85em",
-    // 关键动画属性：初始宽度为0，透明度为0
-    maxWidth: "0",
-    opacity: "0",
-    transform: "scaleX(0.8)",
-    transition: "opacity 0.15s ease-out, transform 0.15s ease-out",
-    pointerEvents: "none",
-  },
+    // 2. 行内标记 (Bold, Italic) - 默认隐藏 (收缩)
+    '.cm-formatting-inline': {
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+      whiteSpace: 'nowrap',
+      verticalAlign: 'baseline',
+      color: 'hsl(var(--muted-foreground) / 0.6)',
+      fontFamily: "'JetBrains Mono', monospace",
+      fontSize: '0.85em',
+      // 关键动画属性：初始宽度为0，透明度为0
+      maxWidth: '0',
+      opacity: '0',
+      transform: 'scaleX(0.8)',
+      transition: 'opacity 0.15s ease-out, transform 0.15s ease-out',
+      pointerEvents: 'none',
+    },
 
-  // 3. 行内标记 - 激活状态 (展开)
-  ".cm-formatting-inline-visible": {
-    maxWidth: "4ch", // 足够容纳符号
-    opacity: "1",
-    transform: "scaleX(1)",
-    margin: "0 1px",
-    pointerEvents: "auto",
-  },
+    // 3. 行内标记 - 激活状态 (展开)
+    '.cm-formatting-inline-visible': {
+      maxWidth: '4ch', // 足够容纳符号
+      opacity: '1',
+      transform: 'scaleX(1)',
+      margin: '0 1px',
+      pointerEvents: 'auto',
+    },
 
-  // 块级标记 (标题/列表/引用) - 默认隐藏
-  ".cm-formatting-block": {
-    display: "inline",
-    overflow: "hidden",
-    fontSize: "0.01em",
-    lineHeight: "inherit",
-    opacity: "0",
-    color: "hsl(var(--muted-foreground))",
-    fontFamily: "'JetBrains Mono', monospace",
-    transition: "opacity 0.2s ease-out",
-  },
+    // 块级标记 (标题/列表/引用) - 默认隐藏
+    '.cm-formatting-block': {
+      display: 'inline',
+      overflow: 'hidden',
+      fontSize: '0.01em',
+      lineHeight: 'inherit',
+      opacity: '0',
+      color: 'hsl(var(--muted-foreground))',
+      fontFamily: "'JetBrains Mono', monospace",
+      transition: 'opacity 0.2s ease-out',
+    },
 
-  // 块级标记 - 激活状态 (展开)
-  ".cm-formatting-block-visible": {
-    fontSize: "1em",
-    opacity: "0.6",
-  },
+    // 块级标记 - 激活状态 (展开)
+    '.cm-formatting-block-visible': {
+      fontSize: '1em',
+      opacity: '0.6',
+    },
 
-  // Selection bridge for visible formatting marks and their gap spaces.
-  ".cm-selection-bridge, .cm-selection-gap": {
-    backgroundColor: "rgba(191, 219, 254, 0.25)",
-    borderRadius: "2px",
-    boxShadow: "1px 0 0 rgba(191, 219, 254, 0.25), -1px 0 0 rgba(191, 219, 254, 0.25)",
-  },
-  "&.cm-focused .cm-selection-bridge, &.cm-focused .cm-selection-gap": {
-    backgroundColor: "rgba(191, 219, 254, 0.35)",
-    boxShadow: "1px 0 0 rgba(191, 219, 254, 0.35), -1px 0 0 rgba(191, 219, 254, 0.35)",
-  },
+    // Selection bridge for visible formatting marks and their gap spaces.
+    '.cm-selection-bridge, .cm-selection-gap': {
+      backgroundColor: 'rgba(191, 219, 254, 0.25)',
+      borderRadius: '2px',
+      boxShadow: '1px 0 0 rgba(191, 219, 254, 0.25), -1px 0 0 rgba(191, 219, 254, 0.25)',
+    },
+    '&.cm-focused .cm-selection-bridge, &.cm-focused .cm-selection-gap': {
+      backgroundColor: 'rgba(191, 219, 254, 0.35)',
+      boxShadow: '1px 0 0 rgba(191, 219, 254, 0.35), -1px 0 0 rgba(191, 219, 254, 0.35)',
+    },
 
-  // === Math 编辑体验 ===
-  // 行内公式渲染结果 - 带淡入动画
-  ".cm-math-inline": {
-    display: "inline-block",
-    verticalAlign: "middle",
-    cursor: "pointer",
-    animation: "mathFadeIn 0.15s ease-out",
-  },
-  ".cm-math-block": { display: "block", textAlign: "center", padding: "0.5em 0", overflow: "hidden", cursor: "pointer" },
+    // === Math 编辑体验 ===
+    // 行内公式渲染结果 - 带淡入动画
+    '.cm-math-inline': {
+      display: 'inline-block',
+      verticalAlign: 'middle',
+      cursor: 'pointer',
+      animation: 'mathFadeIn 0.15s ease-out',
+    },
+    '.cm-math-block': {
+      display: 'block',
+      textAlign: 'center',
+      padding: '0.5em 0',
+      overflow: 'hidden',
+      cursor: 'pointer',
+    },
 
-  // 编辑模式：源码背景 (淡绿色) - 带淡入动画
-  ".cm-math-source": {
-    backgroundColor: "rgba(74, 222, 128, 0.15)",
-    color: "hsl(var(--foreground))",
-    fontFamily: "'JetBrains Mono', monospace",
-    borderRadius: "4px",
-    padding: "2px 4px",
-    zIndex: "1",
-    position: "relative",
-    cursor: "text",
-    animation: "mathFadeIn 0.15s ease-out",
-  },
+    // 编辑模式：源码背景 (淡绿色) - 带淡入动画
+    '.cm-math-source': {
+      backgroundColor: 'rgba(74, 222, 128, 0.15)',
+      color: 'hsl(var(--foreground))',
+      fontFamily: "'JetBrains Mono', monospace",
+      borderRadius: '4px',
+      padding: '2px 4px',
+      zIndex: '1',
+      position: 'relative',
+      cursor: 'text',
+      animation: 'mathFadeIn 0.15s ease-out',
+    },
 
-  // 公式淡入动画关键帧
-  "@keyframes mathFadeIn": {
-    "from": { opacity: "0", transform: "scale(0.95)" },
-    "to": { opacity: "1", transform: "scale(1)" },
-  },
-  // 编辑模式：预览面板 (位于源码下方)
-  ".cm-math-preview-panel": {
-    display: "block",
-    textAlign: "center",
-    padding: "8px",
-    marginTop: "4px",
-    marginBottom: "8px",
-    border: "1px solid hsl(var(--border) / 0.5)",
-    borderRadius: "6px",
-    backgroundColor: "hsl(var(--muted) / 0.3)",
-    pointerEvents: "none", // 关键：让鼠标点击穿透面板，避免无法聚焦其他位置
-    userSelect: "none",
-    opacity: 0.95
-  },
+    // 公式淡入动画关键帧
+    '@keyframes mathFadeIn': {
+      from: { opacity: '0', transform: 'scale(0.95)' },
+      to: { opacity: '1', transform: 'scale(1)' },
+    },
+    // 编辑模式：预览面板 (位于源码下方)
+    '.cm-math-preview-panel': {
+      display: 'block',
+      textAlign: 'center',
+      padding: '8px',
+      marginTop: '4px',
+      marginBottom: '8px',
+      border: '1px solid hsl(var(--border) / 0.5)',
+      borderRadius: '6px',
+      backgroundColor: 'hsl(var(--muted) / 0.3)',
+      pointerEvents: 'none', // 关键：让鼠标点击穿透面板，避免无法聚焦其他位置
+      userSelect: 'none',
+      opacity: 0.95,
+    },
 
-  // === Table 样式 ===
-  ".cm-table-widget": { display: "block", overflowX: "auto", cursor: "text" },
-  ".cm-table-widget table": { borderCollapse: "collapse", width: "100%" },
-  ".cm-table-widget th, .cm-table-widget td": { border: "1px solid hsl(var(--border))", padding: "8px 12px" },
-  ".cm-table-widget th": { backgroundColor: "hsl(var(--muted))", fontWeight: "600" },
-  ".cm-table-editor": { display: "block", overflowX: "auto", cursor: "text" },
-  ".cm-table-editor table": { borderCollapse: "collapse", width: "100%" },
-  ".cm-table-editor th, .cm-table-editor td": { border: "1px solid hsl(var(--border))", padding: "8px 12px" },
-  ".cm-table-editor th": { backgroundColor: "hsl(var(--muted))", fontWeight: "600" },
-  ".cm-table-cell": { outline: "none", minWidth: "40px" },
-  ".cm-table-toolbar": { display: "flex", justifyContent: "flex-end", marginBottom: "6px" },
-  ".cm-table-source-toggle": { display: "flex", justifyContent: "flex-end", marginBottom: "6px" },
-  ".cm-table-toggle": {
-    border: "1px solid hsl(var(--border))",
-    backgroundColor: "hsl(var(--background))",
-    color: "hsl(var(--foreground))",
-    borderRadius: "6px",
-    padding: "4px 8px",
-    fontSize: "12px",
-    lineHeight: "1",
-    cursor: "pointer",
-  },
-  ".cm-table-source": { fontFamily: "'JetBrains Mono', monospace !important", whiteSpace: "pre", color: "hsl(var(--foreground))", display: "block", overflowX: "auto", backgroundColor: "rgba(59, 130, 246, 0.1)" },
+    // === Table 样式 ===
+    '.cm-table-widget': { display: 'block', overflowX: 'auto', cursor: 'text' },
+    '.cm-table-widget table': { borderCollapse: 'collapse', width: '100%' },
+    '.cm-table-widget th, .cm-table-widget td': {
+      border: '1px solid hsl(var(--border))',
+      padding: '8px 12px',
+    },
+    '.cm-table-widget th': { backgroundColor: 'hsl(var(--muted))', fontWeight: '600' },
+    '.cm-table-editor': { display: 'block', overflowX: 'auto', cursor: 'text' },
+    '.cm-table-editor table': { borderCollapse: 'collapse', width: '100%' },
+    '.cm-table-editor th, .cm-table-editor td': {
+      border: '1px solid hsl(var(--border))',
+      padding: '8px 12px',
+    },
+    '.cm-table-editor th': { backgroundColor: 'hsl(var(--muted))', fontWeight: '600' },
+    '.cm-table-cell': { outline: 'none', minWidth: '40px' },
+    '.cm-table-toolbar': { display: 'flex', justifyContent: 'flex-end', marginBottom: '6px' },
+    '.cm-table-source-toggle': { display: 'flex', justifyContent: 'flex-end', marginBottom: '6px' },
+    '.cm-table-toggle': {
+      border: '1px solid hsl(var(--border))',
+      backgroundColor: 'hsl(var(--background))',
+      color: 'hsl(var(--foreground))',
+      borderRadius: '6px',
+      padding: '4px 8px',
+      fontSize: '12px',
+      lineHeight: '1',
+      cursor: 'pointer',
+    },
+    '.cm-table-source': {
+      fontFamily: "'JetBrains Mono', monospace !important",
+      whiteSpace: 'pre',
+      color: 'hsl(var(--foreground))',
+      display: 'block',
+      overflowX: 'auto',
+      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    },
 
-  // === Code Block 样式（codemirror-live-markdown）===
-  ".cm-codeblock-widget": {
-    display: "block",
-    position: "relative",
-    overflow: "hidden",
-    backgroundColor: "hsl(var(--muted))",
-    borderRadius: "6px",
-  },
-  ".cm-codeblock-actions": {
-    position: "absolute",
-    top: "8px",
-    right: "8px",
-    display: "flex",
-    gap: "6px",
-    zIndex: "1",
-  },
-  ".cm-codeblock-widget code": {
-    fontFamily: "'JetBrains Mono', monospace",
-  },
-  ".cm-codeblock-line": {
-    display: "block",
-    padding: "0 16px",
-    lineHeight: "1.7",
-    minHeight: "26px",
-  },
-  ".cm-codeblock-fence": {
-    color: "hsl(var(--muted-foreground) / 0.6)",
-  },
-  ".cm-codeblock-source-toggle": {
-    display: "flex",
-    justifyContent: "flex-end",
-    marginBottom: "6px",
-  },
-  ".cm-codeblock-toggle, .cm-codeblock-copy": {
-    border: "1px solid hsl(var(--border))",
-    backgroundColor: "hsl(var(--background))",
-    color: "hsl(var(--foreground))",
-    borderRadius: "6px",
-    padding: "4px 8px",
-    fontSize: "12px",
-    lineHeight: "1",
-    cursor: "pointer",
-  },
-  ".cm-codeblock-copy-success": {
-    color: "hsl(142 76% 36%)",
-  },
-  ".cm-codeblock-source": {
-    backgroundColor: "rgba(139, 92, 246, 0.1)",
-  },
+    // === Code Block 样式（codemirror-live-markdown）===
+    '.cm-codeblock-widget': {
+      display: 'block',
+      position: 'relative',
+      overflow: 'hidden',
+      backgroundColor: 'hsl(var(--muted))',
+      borderRadius: '6px',
+    },
+    '.cm-codeblock-actions': {
+      position: 'absolute',
+      top: '8px',
+      right: '8px',
+      display: 'flex',
+      gap: '6px',
+      zIndex: '1',
+    },
+    '.cm-codeblock-widget code': {
+      fontFamily: "'JetBrains Mono', monospace",
+    },
+    '.cm-codeblock-line': {
+      display: 'block',
+      padding: '0 16px',
+      lineHeight: '1.7',
+      minHeight: '26px',
+    },
+    '.cm-codeblock-fence': {
+      color: 'hsl(var(--muted-foreground) / 0.6)',
+    },
+    '.cm-codeblock-source-toggle': {
+      display: 'flex',
+      justifyContent: 'flex-end',
+      marginBottom: '6px',
+    },
+    '.cm-codeblock-toggle, .cm-codeblock-copy': {
+      border: '1px solid hsl(var(--border))',
+      backgroundColor: 'hsl(var(--background))',
+      color: 'hsl(var(--foreground))',
+      borderRadius: '6px',
+      padding: '4px 8px',
+      fontSize: '12px',
+      lineHeight: '1',
+      cursor: 'pointer',
+    },
+    '.cm-codeblock-copy-success': {
+      color: 'hsl(142 76% 36%)',
+    },
+    '.cm-codeblock-source': {
+      backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    },
 
-  // === Inline code block styles ===
-  ".cm-codeblock-header": {
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-    padding: "6px 16px",
-    backgroundColor: "hsl(var(--muted))",
-    borderRadius: "6px 6px 0 0",
-    borderBottom: "1px solid hsl(var(--border) / 0.3)",
-    fontSize: "12px",
-    minHeight: "28px",
-  },
-  ".cm-codeblock-lang": {
-    color: "hsl(var(--muted-foreground))",
-    fontFamily: "'JetBrains Mono', monospace",
-    fontSize: "11px",
-    backgroundColor: "hsl(var(--background) / 0.5)",
-    padding: "2px 6px",
-    borderRadius: "3px",
-  },
-  ".cm-codeblock-content": {
-    backgroundColor: "hsl(var(--muted)) !important",
-    fontFamily: "'JetBrains Mono', monospace !important",
-    padding: "0 16px !important",
-    lineHeight: "1.7 !important",
-  },
-  ".cm-codeblock-footer": {
-    backgroundColor: "hsl(var(--muted))",
-    borderRadius: "0 0 6px 6px",
-    height: "6px",
-  },
-  // hljs token colors
-  ".hljs-keyword": { color: "hsl(var(--md-keyword, 280 70% 55%))" },
-  ".hljs-string": { color: "hsl(var(--md-string, 120 50% 40%))" },
-  ".hljs-comment": { color: "hsl(var(--muted-foreground))", fontStyle: "italic" },
-  ".hljs-number": { color: "hsl(var(--md-number, 30 80% 50%))" },
-  ".hljs-title": { color: "hsl(var(--md-link, 210 80% 55%))" },
-  ".hljs-built_in": { color: "hsl(var(--md-link, 210 80% 55%))" },
-  ".hljs-type": { color: "hsl(var(--md-keyword, 280 70% 55%))" },
-  ".hljs-function": { color: "hsl(var(--md-link, 210 80% 55%))" },
-  ".hljs-params": { color: "hsl(var(--foreground))" },
-  ".hljs-literal": { color: "hsl(var(--md-number, 30 80% 50%))" },
-  ".hljs-attr": { color: "hsl(var(--md-link, 210 80% 55%))" },
-  ".hljs-variable": { color: "hsl(var(--foreground))" },
-  ".hljs-meta": { color: "hsl(var(--muted-foreground))" },
+    // === Inline code block styles ===
+    '.cm-codeblock-header': {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      padding: '6px 16px',
+      backgroundColor: 'hsl(var(--muted))',
+      borderRadius: '6px 6px 0 0',
+      borderBottom: '1px solid hsl(var(--border) / 0.3)',
+      fontSize: '12px',
+      minHeight: '28px',
+    },
+    '.cm-codeblock-lang': {
+      color: 'hsl(var(--muted-foreground))',
+      fontFamily: "'JetBrains Mono', monospace",
+      fontSize: '11px',
+      backgroundColor: 'hsl(var(--background) / 0.5)',
+      padding: '2px 6px',
+      borderRadius: '3px',
+    },
+    '.cm-codeblock-content': {
+      backgroundColor: 'hsl(var(--muted)) !important',
+      fontFamily: "'JetBrains Mono', monospace !important",
+      padding: '0 16px !important',
+      lineHeight: '1.7 !important',
+    },
+    '.cm-codeblock-footer': {
+      backgroundColor: 'hsl(var(--muted))',
+      borderRadius: '0 0 6px 6px',
+      height: '6px',
+    },
+    // hljs token colors
+    '.hljs-keyword': { color: 'hsl(var(--md-keyword, 280 70% 55%))' },
+    '.hljs-string': { color: 'hsl(var(--md-string, 120 50% 40%))' },
+    '.hljs-comment': { color: 'hsl(var(--muted-foreground))', fontStyle: 'italic' },
+    '.hljs-number': { color: 'hsl(var(--md-number, 30 80% 50%))' },
+    '.hljs-title': { color: 'hsl(var(--md-link, 210 80% 55%))' },
+    '.hljs-built_in': { color: 'hsl(var(--md-link, 210 80% 55%))' },
+    '.hljs-type': { color: 'hsl(var(--md-keyword, 280 70% 55%))' },
+    '.hljs-function': { color: 'hsl(var(--md-link, 210 80% 55%))' },
+    '.hljs-params': { color: 'hsl(var(--foreground))' },
+    '.hljs-literal': { color: 'hsl(var(--md-number, 30 80% 50%))' },
+    '.hljs-attr': { color: 'hsl(var(--md-link, 210 80% 55%))' },
+    '.hljs-variable': { color: 'hsl(var(--foreground))' },
+    '.hljs-meta': { color: 'hsl(var(--muted-foreground))' },
 
-  // 基础 Markdown 样式
-  ".cm-header-1": { fontSize: "2em", fontWeight: "700", lineHeight: "1.3", color: "hsl(var(--md-heading, var(--foreground)))" },
-  ".cm-header-2": { fontSize: "1.5em", fontWeight: "600", lineHeight: "1.4", color: "hsl(var(--md-heading, var(--foreground)))" },
-  ".cm-header-3": { fontSize: "1.25em", fontWeight: "600", lineHeight: "1.5", color: "hsl(var(--md-heading, var(--foreground)))" },
-  ".cm-header-4, .cm-header-5": { fontWeight: "600", color: "hsl(var(--md-heading, var(--foreground)))" },
-  ".cm-strong": { fontWeight: "700", color: "hsl(var(--md-bold, var(--foreground)))" },
-  ".cm-emphasis": { fontStyle: "italic", color: "hsl(var(--md-italic, var(--foreground)))" },
-  ".cm-link": { color: "hsl(var(--md-link, var(--primary)))", textDecoration: "underline" },
-  ".cm-code": { backgroundColor: "hsl(var(--muted))", padding: "2px 4px", borderRadius: "3px", fontFamily: "monospace" },
-  ".cm-wikilink": { color: "hsl(var(--primary))", textDecoration: "underline", cursor: "pointer" },
-  ".cm-strikethrough": { textDecoration: "line-through", color: "hsl(var(--muted-foreground))" },
-  ".cm-highlight": { backgroundColor: "hsl(50 100% 50% / 0.4)", padding: "1px 2px", borderRadius: "2px" },
-  ".cm-highlight-source": { backgroundColor: "hsl(50 100% 50% / 0.3)", borderRadius: "2px" },
-  ".cm-voice-preview": { color: "hsl(var(--muted-foreground))", fontStyle: "italic", opacity: 0.8 },
-  ".cm-image-widget": { display: "block", margin: "8px 0" },
-  ".cm-image-info": { background: "hsl(var(--muted))", padding: "4px 8px", borderRadius: "4px", fontSize: "12px", color: "hsl(var(--muted-foreground))", marginBottom: "4px", fontFamily: "monospace" },
-  ".markdown-image": { maxWidth: "100%", borderRadius: "6px", cursor: "pointer" },
+    // 基础 Markdown 样式
+    '.cm-header-1': {
+      fontSize: '2em',
+      fontWeight: '700',
+      lineHeight: '1.3',
+      color: 'hsl(var(--md-heading, var(--foreground)))',
+    },
+    '.cm-header-2': {
+      fontSize: '1.5em',
+      fontWeight: '600',
+      lineHeight: '1.4',
+      color: 'hsl(var(--md-heading, var(--foreground)))',
+    },
+    '.cm-header-3': {
+      fontSize: '1.25em',
+      fontWeight: '600',
+      lineHeight: '1.5',
+      color: 'hsl(var(--md-heading, var(--foreground)))',
+    },
+    '.cm-header-4, .cm-header-5': {
+      fontWeight: '600',
+      color: 'hsl(var(--md-heading, var(--foreground)))',
+    },
+    '.cm-strong': { fontWeight: '700', color: 'hsl(var(--md-bold, var(--foreground)))' },
+    '.cm-emphasis': { fontStyle: 'italic', color: 'hsl(var(--md-italic, var(--foreground)))' },
+    '.cm-link': { color: 'hsl(var(--md-link, var(--primary)))', textDecoration: 'underline' },
+    '.cm-code': {
+      backgroundColor: 'hsl(var(--muted))',
+      padding: '2px 4px',
+      borderRadius: '3px',
+      fontFamily: 'monospace',
+    },
+    '.cm-wikilink': {
+      color: 'hsl(var(--primary))',
+      textDecoration: 'underline',
+      cursor: 'pointer',
+    },
+    '.cm-strikethrough': { textDecoration: 'line-through', color: 'hsl(var(--muted-foreground))' },
+    '.cm-highlight': {
+      backgroundColor: 'hsl(50 100% 50% / 0.4)',
+      padding: '1px 2px',
+      borderRadius: '2px',
+    },
+    '.cm-highlight-source': { backgroundColor: 'hsl(50 100% 50% / 0.3)', borderRadius: '2px' },
+    '.cm-voice-preview': {
+      color: 'hsl(var(--muted-foreground))',
+      fontStyle: 'italic',
+      opacity: 0.8,
+    },
+    '.cm-image-widget': { display: 'block', margin: '8px 0' },
+    '.cm-image-info': {
+      background: 'hsl(var(--muted))',
+      padding: '4px 8px',
+      borderRadius: '4px',
+      fontSize: '12px',
+      color: 'hsl(var(--muted-foreground))',
+      marginBottom: '4px',
+      fontFamily: 'monospace',
+    },
+    '.markdown-image': { maxWidth: '100%', borderRadius: '6px', cursor: 'pointer' },
 
-  // Horizontal Rule styles
-  ".cm-hr": { border: "none", borderTop: "1px solid hsl(var(--border))", margin: "1rem 0", display: "block" },
-  ".cm-hr-source": { color: "hsl(var(--muted-foreground))", opacity: 0.6 },
-});
+    // Horizontal Rule styles
+    '.cm-hr': {
+      border: 'none',
+      borderTop: '1px solid hsl(var(--border))',
+      margin: '1rem 0',
+      display: 'block',
+    },
+    '.cm-hr-source': { color: 'hsl(var(--muted-foreground))', opacity: 0.6 },
+  });
 
 // ============ 4. Widgets ============
 
@@ -358,14 +448,14 @@ function prerenderMath(formula: string, displayMode: boolean): void {
   if (katexCache.size >= MAX_KATEX_CACHE) {
     // 简单清理：删除前 100 条
     const keysToDelete = Array.from(katexCache.keys()).slice(0, 100);
-    keysToDelete.forEach(k => katexCache.delete(k));
+    keysToDelete.forEach((k) => katexCache.delete(k));
   }
 
   try {
     const html = katex.renderToString(formula, {
       displayMode,
       throwOnError: false,
-      strict: false
+      strict: false,
     });
     katexCache.set(key, html);
   } catch {
@@ -374,31 +464,38 @@ function prerenderMath(formula: string, displayMode: boolean): void {
 }
 
 // 后台预渲染队列
-let prerenderQueue: { formula: string, displayMode: boolean }[] = [];
+let prerenderQueue: { formula: string; displayMode: boolean }[] = [];
 let prerenderScheduled = false;
 
 // 安全的 requestIdleCallback polyfill
 const safeRequestIdleCallback =
   typeof window !== 'undefined' && 'requestIdleCallback' in window
-    ? (window as typeof window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback
+    ? (
+        window as typeof window & {
+          requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number;
+        }
+      ).requestIdleCallback
     : (cb: () => void) => setTimeout(cb, 16);
 
 function schedulePrerenderBatch() {
   if (prerenderScheduled || prerenderQueue.length === 0) return;
   prerenderScheduled = true;
 
-  safeRequestIdleCallback(() => {
-    const batch = prerenderQueue.splice(0, 5); // 每次处理 5 个
-    batch.forEach(({ formula, displayMode }) => prerenderMath(formula, displayMode));
-    prerenderScheduled = false;
-    if (prerenderQueue.length > 0) schedulePrerenderBatch();
-  }, { timeout: 100 });
+  safeRequestIdleCallback(
+    () => {
+      const batch = prerenderQueue.splice(0, 5); // 每次处理 5 个
+      batch.forEach(({ formula, displayMode }) => prerenderMath(formula, displayMode));
+      prerenderScheduled = false;
+      if (prerenderQueue.length > 0) schedulePrerenderBatch();
+    },
+    { timeout: 100 },
+  );
 }
 
 function queuePrerender(formula: string, displayMode: boolean) {
   const key = `${formula}|${displayMode}`;
   if (katexCache.has(key)) return;
-  if (!prerenderQueue.some(q => q.formula === formula && q.displayMode === displayMode)) {
+  if (!prerenderQueue.some((q) => q.formula === formula && q.displayMode === displayMode)) {
     prerenderQueue.push({ formula, displayMode });
     schedulePrerenderBatch();
   }
@@ -406,21 +503,35 @@ function queuePrerender(formula: string, displayMode: boolean) {
 
 class MathWidget extends WidgetType {
   // isPreviewPanel: true = 编辑模式下方的预览面板; false = 预览模式下的替换块
-  constructor(readonly formula: string, readonly displayMode: boolean, readonly isPreviewPanel: boolean = false) { super(); }
+  constructor(
+    readonly formula: string,
+    readonly displayMode: boolean,
+    readonly isPreviewPanel: boolean = false,
+  ) {
+    super();
+  }
 
   eq(other: MathWidget) {
-    return other.formula === this.formula &&
+    return (
+      other.formula === this.formula &&
       other.displayMode === this.displayMode &&
-      other.isPreviewPanel === this.isPreviewPanel;
+      other.isPreviewPanel === this.isPreviewPanel
+    );
   }
 
   toDOM() {
-    const container = document.createElement(this.displayMode || this.isPreviewPanel ? "div" : "span");
-    container.className = this.isPreviewPanel ? "cm-math-preview-panel" : (this.displayMode ? "cm-math-block" : "cm-math-inline");
+    const container = document.createElement(
+      this.displayMode || this.isPreviewPanel ? 'div' : 'span',
+    );
+    container.className = this.isPreviewPanel
+      ? 'cm-math-preview-panel'
+      : this.displayMode
+        ? 'cm-math-block'
+        : 'cm-math-inline';
 
     // 只有非预览面板（即渲染态公式）才添加标记，用于点击检测
     if (!this.isPreviewPanel) {
-      container.dataset.widgetType = "math";
+      container.dataset.widgetType = 'math';
     }
 
     // 尝试使用缓存
@@ -430,10 +541,16 @@ class MathWidget extends WidgetType {
       container.innerHTML = cached;
     } else {
       try {
-        katex.render(this.formula, container, { displayMode: this.displayMode, throwOnError: false, strict: false });
+        katex.render(this.formula, container, {
+          displayMode: this.displayMode,
+          throwOnError: false,
+          strict: false,
+        });
         // 缓存渲染结果
         katexCache.set(cacheKey, container.innerHTML);
-      } catch (e) { container.textContent = this.formula; }
+      } catch (e) {
+        container.textContent = this.formula;
+      }
     }
     return container;
   }
@@ -447,15 +564,19 @@ class MathWidget extends WidgetType {
 
 // Mermaid 图表 Widget
 class MermaidWidget extends WidgetType {
-  constructor(readonly code: string) { super(); }
-  eq(other: MermaidWidget) { return other.code === this.code; }
+  constructor(readonly code: string) {
+    super();
+  }
+  eq(other: MermaidWidget) {
+    return other.code === this.code;
+  }
   toDOM() {
-    const container = document.createElement("div");
-    container.className = "mermaid-container my-2";
-    container.dataset.widgetType = "codeblock";
+    const container = document.createElement('div');
+    container.className = 'mermaid-container my-2';
+    container.dataset.widgetType = 'codeblock';
 
-    const pre = document.createElement("pre");
-    pre.className = "mermaid";
+    const pre = document.createElement('pre');
+    pre.className = 'mermaid';
     pre.textContent = this.code;
     container.appendChild(pre);
 
@@ -478,109 +599,158 @@ class MermaidWidget extends WidgetType {
 
     return container;
   }
-  ignoreEvent() { return true; }
+  ignoreEvent() {
+    return true;
+  }
 }
 
 class CalloutIconWidget extends WidgetType {
-  constructor(readonly icon: string) { super(); }
-  eq(other: CalloutIconWidget) { return other.icon === this.icon; }
-  toDOM() { const s = document.createElement("span"); s.className = "cm-callout-icon"; s.textContent = this.icon; s.style.cssText = "margin-right:6px;font-size:1.1em"; return s; }
-  ignoreEvent() { return true; }
+  constructor(readonly icon: string) {
+    super();
+  }
+  eq(other: CalloutIconWidget) {
+    return other.icon === this.icon;
+  }
+  toDOM() {
+    const s = document.createElement('span');
+    s.className = 'cm-callout-icon';
+    s.textContent = this.icon;
+    s.style.cssText = 'margin-right:6px;font-size:1.1em';
+    return s;
+  }
+  ignoreEvent() {
+    return true;
+  }
 }
 
 class VoicePreviewWidget extends WidgetType {
-  constructor(readonly text: string) { super(); }
-  eq(other: VoicePreviewWidget) { return other.text === this.text; }
-  toDOM() { const s = document.createElement("span"); s.className = "cm-voice-preview"; s.textContent = this.text; return s; }
-  ignoreEvent() { return true; }
+  constructor(readonly text: string) {
+    super();
+  }
+  eq(other: VoicePreviewWidget) {
+    return other.text === this.text;
+  }
+  toDOM() {
+    const s = document.createElement('span');
+    s.className = 'cm-voice-preview';
+    s.textContent = this.text;
+    return s;
+  }
+  ignoreEvent() {
+    return true;
+  }
 }
 
 class HorizontalRuleWidget extends WidgetType {
-  constructor() { super(); }
-  eq(_other: HorizontalRuleWidget) { return true; }
+  constructor() {
+    super();
+  }
+  eq(_other: HorizontalRuleWidget) {
+    return true;
+  }
   toDOM() {
-    const hr = document.createElement("hr");
-    hr.className = "cm-hr";
-    hr.style.cssText = "border:none;border-top:1px solid hsl(var(--border));margin:1rem 0;";
+    const hr = document.createElement('hr');
+    hr.className = 'cm-hr';
+    hr.style.cssText = 'border:none;border-top:1px solid hsl(var(--border));margin:1rem 0;';
     return hr;
   }
-  ignoreEvent() { return true; }
+  ignoreEvent() {
+    return true;
+  }
 }
 
 class ImageWidget extends WidgetType {
-  constructor(readonly src: string, readonly alt: string, readonly showInfo: boolean = false, readonly vaultPath: string = "") { super(); }
-  eq(other: ImageWidget) { return other.src === this.src && other.alt === this.alt && other.showInfo === this.showInfo; }
+  constructor(
+    readonly src: string,
+    readonly alt: string,
+    readonly showInfo: boolean = false,
+    readonly vaultPath: string = '',
+  ) {
+    super();
+  }
+  eq(other: ImageWidget) {
+    return other.src === this.src && other.alt === this.alt && other.showInfo === this.showInfo;
+  }
   toDOM() {
-    const container = document.createElement("div");
-    container.className = "cm-image-widget";
-    container.style.cssText = "display:block;margin:8px 0;";
-    container.dataset.widgetType = "image";
+    const container = document.createElement('div');
+    container.className = 'cm-image-widget';
+    container.style.cssText = 'display:block;margin:8px 0;';
+    container.dataset.widgetType = 'image';
     container.dataset.imageSrc = this.src;
 
     // 如果显示信息，添加路径提示
     if (this.showInfo) {
-      const info = document.createElement("div");
-      info.className = "cm-image-info";
-      info.style.cssText = "background:hsl(var(--primary)/0.1);padding:4px 8px;border-radius:4px;font-size:12px;color:hsl(var(--primary));margin-bottom:4px;font-family:monospace;display:inline-block;";
+      const info = document.createElement('div');
+      info.className = 'cm-image-info';
+      info.style.cssText =
+        'background:hsl(var(--primary)/0.1);padding:4px 8px;border-radius:4px;font-size:12px;color:hsl(var(--primary));margin-bottom:4px;font-family:monospace;display:inline-block;';
       info.textContent = this.src;
       container.appendChild(info);
     }
 
-    const img = document.createElement("img");
+    const img = document.createElement('img');
     img.alt = this.alt;
-    img.className = "markdown-image";
-    img.loading = "lazy";
-    img.style.cssText = "max-width:100%;border-radius:6px;cursor:pointer;";
+    img.className = 'markdown-image';
+    img.loading = 'lazy';
+    img.style.cssText = 'max-width:100%;border-radius:6px;cursor:pointer;';
 
     // 处理图片路径
-    if (this.src.startsWith("http") || this.src.startsWith("data:")) {
+    if (this.src.startsWith('http') || this.src.startsWith('data:')) {
       // 网络图片或 data URL
       img.src = this.src;
     } else if (this.vaultPath) {
       // 本地图片：使用 base64 加载
       const normalizedVaultPath = this.vaultPath.replace(/\\/g, '/');
       const normalizedSrc = this.src.replace(/\\/g, '/').replace(/^\.\//, '');
-      const fullPath = normalizedSrc.startsWith("/") || normalizedSrc.match(/^[A-Za-z]:/)
-        ? normalizedSrc
-        : `${normalizedVaultPath}/${normalizedSrc}`;
+      const fullPath =
+        normalizedSrc.startsWith('/') || normalizedSrc.match(/^[A-Za-z]:/)
+          ? normalizedSrc
+          : `${normalizedVaultPath}/${normalizedSrc}`;
 
       // 先显示加载中状态
-      img.style.opacity = "0.5";
+      img.style.opacity = '0.5';
       img.alt = useLocaleStore.getState().t.common.loading;
 
       // 异步加载 base64
       const ext = fullPath.split('.').pop()?.toLowerCase() || 'png';
-      const mimeType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' :
-        ext === 'gif' ? 'image/gif' :
-          ext === 'webp' ? 'image/webp' : 'image/png';
+      const mimeType =
+        ext === 'jpg' || ext === 'jpeg'
+          ? 'image/jpeg'
+          : ext === 'gif'
+            ? 'image/gif'
+            : ext === 'webp'
+              ? 'image/webp'
+              : 'image/png';
 
       readBinaryFileBase64(fullPath)
-        .then(base64 => {
+        .then((base64) => {
           img.src = `data:${mimeType};base64,${base64}`;
-          img.style.opacity = "1";
+          img.style.opacity = '1';
           img.alt = this.alt;
         })
-        .catch(err => {
+        .catch((err) => {
           console.error('[ImageWidget] Image load failed:', fullPath, err);
           img.alt = `${useLocaleStore.getState().t.editor.imageLoadFailed}: ${this.src}`;
-          img.style.opacity = "1";
+          img.style.opacity = '1';
         });
     }
 
     container.appendChild(img);
     return container;
   }
-  ignoreEvent() { return true; }
+  ignoreEvent() {
+    return true;
+  }
 }
 
 // ============ 5. 核心逻辑: Should Show Source? ============
 // shouldShowSource 从 codemirror-live-markdown 导入
 
 // ============ 6. StateFields & Plugins ============
-const LIVE_BLOCK_MARK_TYPES = new Set(["HeaderMark", "ListMark", "QuoteMark"]);
-const LIVE_ALWAYS_VISIBLE_BLOCK_MARK_TYPES = new Set(["ListMark", "QuoteMark"]);
-const LIVE_INLINE_MARK_TYPES = new Set(["EmphasisMark", "StrikethroughMark", "CodeMark"]);
-const SKIP_LIVE_PREVIEW_PARENT_TYPES = new Set(["FencedCode", "CodeBlock"]);
+const LIVE_BLOCK_MARK_TYPES = new Set(['HeaderMark', 'ListMark', 'QuoteMark']);
+const LIVE_ALWAYS_VISIBLE_BLOCK_MARK_TYPES = new Set(['ListMark', 'QuoteMark']);
+const LIVE_INLINE_MARK_TYPES = new Set(['EmphasisMark', 'StrikethroughMark', 'CodeMark']);
+const SKIP_LIVE_PREVIEW_PARENT_TYPES = new Set(['FencedCode', 'CodeBlock']);
 
 function isInsideSkippedLivePreviewParent(node: any): boolean {
   let parent = node.node.parent;
@@ -611,11 +781,11 @@ function buildLivePreviewDecorations(view: EditorView): DecorationSet {
       if (!LIVE_BLOCK_MARK_TYPES.has(node.name) && !LIVE_INLINE_MARK_TYPES.has(node.name)) return;
       if (isInsideSkippedLivePreviewParent(node)) return;
 
-      if (node.name === "CodeMark") {
+      if (node.name === 'CodeMark') {
         const parent = node.node.parent;
-        if (parent && parent.name === "InlineCode") {
+        if (parent && parent.name === 'InlineCode') {
           const text = state.doc.sliceString(parent.from, parent.to);
-          if (text.startsWith("`$") && text.endsWith("$`")) {
+          if (text.startsWith('`$') && text.endsWith('$`')) {
             return;
           }
         }
@@ -626,39 +796,46 @@ function buildLivePreviewDecorations(view: EditorView): DecorationSet {
         const isActiveLine = activeLines.has(lineNum) && !isDrag;
         const shouldShow = LIVE_ALWAYS_VISIBLE_BLOCK_MARK_TYPES.has(node.name) || isActiveLine;
         const cls = shouldShow
-          ? "cm-formatting-block cm-formatting-block-visible"
-          : "cm-formatting-block";
+          ? 'cm-formatting-block cm-formatting-block-visible'
+          : 'cm-formatting-block';
         decorations.push(Decoration.mark({ class: cls }).range(node.from, node.to));
         return;
       }
 
       if (node.from >= node.to) return;
       const isTouched = shouldShowSource(state, node.from, node.to);
-      const cls = isTouched && !isDrag
-        ? "cm-formatting-inline cm-formatting-inline-visible"
-        : "cm-formatting-inline";
+      const cls =
+        isTouched && !isDrag
+          ? 'cm-formatting-inline cm-formatting-inline-visible'
+          : 'cm-formatting-inline';
       decorations.push(Decoration.mark({ class: cls }).range(node.from, node.to));
-    }
+    },
   });
 
-  return Decoration.set(decorations.sort((a, b) => a.from - b.from), true);
+  return Decoration.set(
+    decorations.sort((a, b) => a.from - b.from),
+    true,
+  );
 }
 
-const livePreviewPlugin = ViewPlugin.fromClass(class {
-  decorations: DecorationSet;
-  constructor(view: EditorView) {
-    this.decorations = buildLivePreviewDecorations(view);
-  }
-  update(update: ViewUpdate) {
-    if (checkUpdateAction(update) === "rebuild") {
-      this.decorations = buildLivePreviewDecorations(update.view);
+const livePreviewPlugin = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) {
+      this.decorations = buildLivePreviewDecorations(view);
     }
-  }
-}, { decorations: (v) => v.decorations });
+    update(update: ViewUpdate) {
+      if (checkUpdateAction(update) === 'rebuild') {
+        this.decorations = buildLivePreviewDecorations(update.view);
+      }
+    }
+  },
+  { decorations: (v) => v.decorations },
+);
 
 // 共享 doc.toString() 缓存：Text 是不可变持久化结构，同一引用 = 同一内容
 let _cachedDoc: Text | null = null;
-let _cachedDocString: string = "";
+let _cachedDocString: string = '';
 
 function docString(state: EditorState): string {
   if (state.doc !== _cachedDoc) {
@@ -669,7 +846,7 @@ function docString(state: EditorState): string {
 }
 
 // 缓存公式位置，避免每次选择变化都重新解析
-let mathPositionsCache: { from: number, to: number }[] = [];
+let mathPositionsCache: { from: number; to: number }[] = [];
 
 const mathStateField = StateField.define<DecorationSet>({
   create: buildMathDecorations,
@@ -697,27 +874,30 @@ const mathStateField = StateField.define<DecorationSet>({
     if (tr.selection) {
       const oldSel = tr.startState.selection.main;
       const newSel = tr.state.selection.main;
-      const touchesMath = (sel: { from: number, to: number }) =>
-        mathPositionsCache.some(m =>
-          (sel.from >= m.from && sel.from <= m.to) ||
-          (sel.to >= m.from && sel.to <= m.to) ||
-          (sel.from <= m.from && sel.to >= m.to)
+      const touchesMath = (sel: { from: number; to: number }) =>
+        mathPositionsCache.some(
+          (m) =>
+            (sel.from >= m.from && sel.from <= m.to) ||
+            (sel.to >= m.from && sel.to <= m.to) ||
+            (sel.from <= m.from && sel.to >= m.to),
         );
-      if (touchesMath(oldSel) !== touchesMath(newSel) ||
-        (touchesMath(newSel) && (oldSel.from !== newSel.from || oldSel.to !== newSel.to))) {
+      if (
+        touchesMath(oldSel) !== touchesMath(newSel) ||
+        (touchesMath(newSel) && (oldSel.from !== newSel.from || oldSel.to !== newSel.to))
+      ) {
         return buildMathDecorations(tr.state);
       }
     }
 
     return deco;
   },
-  provide: f => EditorView.decorations.from(f),
+  provide: (f) => EditorView.decorations.from(f),
 });
 
 function buildMathDecorations(state: EditorState): DecorationSet {
   const decorations: any[] = [];
   const doc = docString(state);
-  const processed: { from: number, to: number }[] = [];
+  const processed: { from: number; to: number }[] = [];
 
   // 更新公式位置缓存
   mathPositionsCache = [];
@@ -725,7 +905,8 @@ function buildMathDecorations(state: EditorState): DecorationSet {
   const blockRegex = /\$\$([\s\S]+?)\$\$/g;
   let match;
   while ((match = blockRegex.exec(doc)) !== null) {
-    const from = match.index, to = from + match[0].length;
+    const from = match.index,
+      to = from + match[0].length;
     processed.push({ from, to });
     mathPositionsCache.push({ from, to }); // 添加到缓存
     const formula = match[1].trim();
@@ -735,20 +916,33 @@ function buildMathDecorations(state: EditorState): DecorationSet {
 
     if (shouldShowSource(state, from, to)) {
       // 编辑模式：源码高亮 + 预览面板(Preview Panel)
-      decorations.push(Decoration.mark({ class: "cm-math-source" }).range(from, to));
-      decorations.push(Decoration.widget({ widget: new MathWidget(formula, true, true), side: 1, block: true }).range(to));
+      decorations.push(Decoration.mark({ class: 'cm-math-source' }).range(from, to));
+      decorations.push(
+        Decoration.widget({
+          widget: new MathWidget(formula, true, true),
+          side: 1,
+          block: true,
+        }).range(to),
+      );
     } else {
       // 预览模式：完整替换
-      const fromLine = state.doc.lineAt(from), toLine = state.doc.lineAt(to);
+      const fromLine = state.doc.lineAt(from),
+        toLine = state.doc.lineAt(to);
       const isFullLine = from === fromLine.from && to === toLine.to;
-      decorations.push(Decoration.replace({ widget: new MathWidget(formula, true), block: isFullLine }).range(from, to));
+      decorations.push(
+        Decoration.replace({ widget: new MathWidget(formula, true), block: isFullLine }).range(
+          from,
+          to,
+        ),
+      );
     }
   }
 
   const inlineRegex = /(?<!\\|\$)\$(?!\$)((?:[^$\n]|\n(?!\n))+?)(?<!\\|\$)\$(?!\$)/g;
   while ((match = inlineRegex.exec(doc)) !== null) {
-    const from = match.index, to = from + match[0].length;
-    if (processed.some(p => from >= p.from && to <= p.to)) continue;
+    const from = match.index,
+      to = from + match[0].length;
+    if (processed.some((p) => from >= p.from && to <= p.to)) continue;
     mathPositionsCache.push({ from, to }); // 添加到缓存
     const inlineFormula = match[1].trim();
 
@@ -756,16 +950,21 @@ function buildMathDecorations(state: EditorState): DecorationSet {
     queuePrerender(inlineFormula, false);
 
     if (shouldShowSource(state, from, to)) {
-      decorations.push(Decoration.mark({ class: "cm-math-source" }).range(from, to));
+      decorations.push(Decoration.mark({ class: 'cm-math-source' }).range(from, to));
     } else {
-      decorations.push(Decoration.replace({ widget: new MathWidget(inlineFormula, false) }).range(from, to));
+      decorations.push(
+        Decoration.replace({ widget: new MathWidget(inlineFormula, false) }).range(from, to),
+      );
     }
   }
-  return Decoration.set(decorations.sort((a, b) => a.from - b.from), true);
+  return Decoration.set(
+    decorations.sort((a, b) => a.from - b.from),
+    true,
+  );
 }
 
 // Mermaid 代码块位置缓存（常规代码块改用 codemirror-live-markdown）
-let mermaidBlockPositionsCache: { from: number, to: number }[] = [];
+let mermaidBlockPositionsCache: { from: number; to: number }[] = [];
 
 const mermaidStateField = StateField.define<DecorationSet>({
   create: buildMermaidDecorations,
@@ -778,15 +977,23 @@ const mermaidStateField = StateField.define<DecorationSet>({
     if (tr.selection) {
       const oldSel = tr.startState.selection.main;
       const newSel = tr.state.selection.main;
-      const touches = (sel: { from: number, to: number }) =>
-        mermaidBlockPositionsCache.some(c => (sel.from >= c.from && sel.from <= c.to) || (sel.to >= c.from && sel.to <= c.to) || (sel.from <= c.from && sel.to >= c.to));
-      if (touches(oldSel) !== touches(newSel) || (touches(newSel) && (oldSel.from !== newSel.from || oldSel.to !== newSel.to))) {
+      const touches = (sel: { from: number; to: number }) =>
+        mermaidBlockPositionsCache.some(
+          (c) =>
+            (sel.from >= c.from && sel.from <= c.to) ||
+            (sel.to >= c.from && sel.to <= c.to) ||
+            (sel.from <= c.from && sel.to >= c.to),
+        );
+      if (
+        touches(oldSel) !== touches(newSel) ||
+        (touches(newSel) && (oldSel.from !== newSel.from || oldSel.to !== newSel.to))
+      ) {
         return buildMermaidDecorations(tr.state);
       }
     }
     return deco;
   },
-  provide: f => EditorView.decorations.from(f),
+  provide: (f) => EditorView.decorations.from(f),
 });
 
 function shouldShowMermaidSource(state: EditorState, from: number, to: number): boolean {
@@ -811,12 +1018,15 @@ function buildMermaidDecorations(state: EditorState): DecorationSet {
   mermaidBlockPositionsCache = [];
   syntaxTree(state).iterate({
     enter: (node) => {
-      if (node.name === "FencedCode") {
+      if (node.name === 'FencedCode') {
         const text = state.doc.sliceString(node.from, node.to);
         const lines = text.split('\n');
         if (lines.length < 2) return;
-        const lang = lines[0].replace(/^\s*`{3,}/, "").trim().toLowerCase();
-        if (lang !== "mermaid") return;
+        const lang = lines[0]
+          .replace(/^\s*`{3,}/, '')
+          .trim()
+          .toLowerCase();
+        if (lang !== 'mermaid') return;
 
         mermaidBlockPositionsCache.push({ from: node.from, to: node.to });
         if (shouldShowMermaidSource(state, node.from, node.to)) return;
@@ -825,13 +1035,13 @@ function buildMermaidDecorations(state: EditorState): DecorationSet {
         const widget = new MermaidWidget(code);
         decorations.push(Decoration.replace({ widget, block: true }).range(node.from, node.to));
       }
-    }
+    },
   });
   return Decoration.set(decorations);
 }
 
 // 高亮位置缓存
-let highlightPositionsCache: { from: number, to: number }[] = [];
+let highlightPositionsCache: { from: number; to: number }[] = [];
 
 const highlightStateField = StateField.define<DecorationSet>({
   create: buildHighlightDecorations,
@@ -844,15 +1054,23 @@ const highlightStateField = StateField.define<DecorationSet>({
     if (tr.selection) {
       const oldSel = tr.startState.selection.main;
       const newSel = tr.state.selection.main;
-      const touches = (sel: { from: number, to: number }) =>
-        highlightPositionsCache.some(h => (sel.from >= h.from && sel.from <= h.to) || (sel.to >= h.from && sel.to <= h.to) || (sel.from <= h.from && sel.to >= h.to));
-      if (touches(oldSel) !== touches(newSel) || (touches(newSel) && (oldSel.from !== newSel.from || oldSel.to !== newSel.to))) {
+      const touches = (sel: { from: number; to: number }) =>
+        highlightPositionsCache.some(
+          (h) =>
+            (sel.from >= h.from && sel.from <= h.to) ||
+            (sel.to >= h.from && sel.to <= h.to) ||
+            (sel.from <= h.from && sel.to >= h.to),
+        );
+      if (
+        touches(oldSel) !== touches(newSel) ||
+        (touches(newSel) && (oldSel.from !== newSel.from || oldSel.to !== newSel.to))
+      ) {
         return buildHighlightDecorations(tr.state);
       }
     }
     return deco;
   },
-  provide: f => EditorView.decorations.from(f),
+  provide: (f) => EditorView.decorations.from(f),
 });
 
 function buildHighlightDecorations(state: EditorState): DecorationSet {
@@ -870,8 +1088,8 @@ function buildHighlightDecorations(state: EditorState): DecorationSet {
     const from = match.index;
     const to = from + match[0].length;
     highlightPositionsCache.push({ from, to });
-    const textStart = from + 2;  // 跳过开头的 ==
-    const textEnd = to - 2;      // 跳过结尾的 ==
+    const textStart = from + 2; // 跳过开头的 ==
+    const textEnd = to - 2; // 跳过结尾的 ==
 
     // 检查是否在代码块内
     const lineStart = doc.lastIndexOf('\n', from) + 1;
@@ -881,12 +1099,13 @@ function buildHighlightDecorations(state: EditorState): DecorationSet {
     const isTouched = shouldShowSource(state, from, to);
 
     // 高亮文本部分始终添加高亮样式
-    decorations.push(Decoration.mark({ class: "cm-highlight" }).range(textStart, textEnd));
+    decorations.push(Decoration.mark({ class: 'cm-highlight' }).range(textStart, textEnd));
 
     // == 标记使用与加粗/斜体相同的动画类
-    const markCls = (isTouched && !isDrag)
-      ? `cm-formatting-inline cm-formatting-inline-visible${hasSelection ? " cm-selection-bridge" : ""}`
-      : "cm-formatting-inline";
+    const markCls =
+      isTouched && !isDrag
+        ? `cm-formatting-inline cm-formatting-inline-visible${hasSelection ? ' cm-selection-bridge' : ''}`
+        : 'cm-formatting-inline';
 
     // 开头的 ==
     decorations.push(Decoration.mark({ class: markCls }).range(from, textStart));
@@ -894,45 +1113,51 @@ function buildHighlightDecorations(state: EditorState): DecorationSet {
     decorations.push(Decoration.mark({ class: markCls }).range(textEnd, to));
   }
 
-  return Decoration.set(decorations.sort((a, b) => a.from - b.from), true);
+  return Decoration.set(
+    decorations.sort((a, b) => a.from - b.from),
+    true,
+  );
 }
 
-const selectionStatePlugin = ViewPlugin.fromClass(class {
-  constructor(private view: EditorView) {
-    this.updateClass(view);
-  }
-  update(update: ViewUpdate) {
-    const isDragging = update.state.field(mouseSelectingField, false);
-    const wasDragging = update.startState.field(mouseSelectingField, false);
-    if (wasDragging && !isDragging) {
-      this.updateClass(update.view);
-      return;
+const selectionStatePlugin = ViewPlugin.fromClass(
+  class {
+    constructor(private view: EditorView) {
+      this.updateClass(view);
     }
-    if (update.selectionSet && !isDragging) {
-      this.updateClass(update.view);
+    update(update: ViewUpdate) {
+      const isDragging = update.state.field(mouseSelectingField, false);
+      const wasDragging = update.startState.field(mouseSelectingField, false);
+      if (wasDragging && !isDragging) {
+        this.updateClass(update.view);
+        return;
+      }
+      if (update.selectionSet && !isDragging) {
+        this.updateClass(update.view);
+      }
     }
-  }
-  destroy() {
-    this.view.dom.classList.remove("cm-has-selection");
-  }
-  private updateClass(view: EditorView) {
-    const hasSelection = view.state.selection.ranges.some((range) => range.from !== range.to);
-    view.dom.classList.toggle("cm-has-selection", hasSelection);
-    const main = view.state.selection.main;
-    const detail = hasSelection
-      ? {
-          from: main.from,
-          to: main.to,
-          text: view.state.doc.sliceString(main.from, main.to),
-          lineFrom: view.state.doc.lineAt(main.from).number,
-          lineTo: view.state.doc.lineAt(main.to).number,
-        }
-      : null;
-    window.dispatchEvent(new CustomEvent(PLUGIN_EDITOR_SELECTION_EVENT, { detail }));
-  }
-}, { decorations: () => Decoration.none });
+    destroy() {
+      this.view.dom.classList.remove('cm-has-selection');
+    }
+    private updateClass(view: EditorView) {
+      const hasSelection = view.state.selection.ranges.some((range) => range.from !== range.to);
+      view.dom.classList.toggle('cm-has-selection', hasSelection);
+      const main = view.state.selection.main;
+      const detail = hasSelection
+        ? {
+            from: main.from,
+            to: main.to,
+            text: view.state.doc.sliceString(main.from, main.to),
+            lineFrom: view.state.doc.lineAt(main.from).number,
+            lineTo: view.state.doc.lineAt(main.to).number,
+          }
+        : null;
+      window.dispatchEvent(new CustomEvent(PLUGIN_EDITOR_SELECTION_EVENT, { detail }));
+    }
+  },
+  { decorations: () => Decoration.none },
+);
 
-const SKIP_SELECTION_PARENT_TYPES = new Set(["FencedCode", "CodeBlock"]);
+const SKIP_SELECTION_PARENT_TYPES = new Set(['FencedCode', 'CodeBlock']);
 
 function isInsideSkippedSelectionParent(node: any): boolean {
   let parent = node.node.parent;
@@ -956,7 +1181,7 @@ const selectionBridgeField = StateField.define<DecorationSet>({
     if (isDragging) return deco;
     return buildSelectionBridgeDecorations(tr.state);
   },
-  provide: f => EditorView.decorations.from(f),
+  provide: (f) => EditorView.decorations.from(f),
 });
 
 function selectEntireDocument(view: EditorView) {
@@ -969,11 +1194,205 @@ function selectEntireDocument(view: EditorView) {
   ) {
     return;
   }
-  view.dispatch(state.update({ selection: { anchor: 0, head: doc.length }, userEvent: "select" }));
+  view.dispatch(state.update({ selection: { anchor: 0, head: doc.length }, userEvent: 'select' }));
 }
 
 function selectAllDebugEnabled() {
-  return typeof window !== "undefined" && (window as any).__cmSelectAllDebug === true;
+  return typeof window !== 'undefined' && (window as any).__cmSelectAllDebug === true;
+}
+
+function shouldDisableDrawSelectionForTauriWebKit() {
+  if (typeof process !== 'undefined' && (process as any)?.env?.VITEST) return false;
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  const w = window as any;
+  const isTauriRuntime = '__TAURI_INTERNALS__' in w || '__TAURI__' in w;
+  if (!isTauriRuntime) return false;
+  const ua = navigator.userAgent || '';
+  const isWebKit = /AppleWebKit/i.test(ua) && !/(Chrome|Chromium|Edg|OPR)/i.test(ua);
+  return isWebKit;
+}
+
+const CM_SELECTION_VISUAL_DEBUG_STORAGE_KEY = 'cmSelectionVisualDebug';
+const CM_SELECTION_ANOMALY_THROTTLE_MS = 180;
+
+function selectionVisualDebugEnabled() {
+  if (typeof window === 'undefined') return false;
+  const w = window as any;
+  if (w.__cmSelectionVisualDebug === true) return true;
+  try {
+    return window.localStorage.getItem(CM_SELECTION_VISUAL_DEBUG_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+type RectSnapshot = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  top: number;
+  left: number;
+  right: number;
+  bottom: number;
+};
+
+function snapshotRect(rect: DOMRect | null): RectSnapshot | null {
+  if (!rect) return null;
+  return {
+    x: rect.x,
+    y: rect.y,
+    width: rect.width,
+    height: rect.height,
+    top: rect.top,
+    left: rect.left,
+    right: rect.right,
+    bottom: rect.bottom,
+  };
+}
+
+function describeElement(element: Element | null) {
+  if (!element) return null;
+  const el = element as HTMLElement;
+  const style = window.getComputedStyle(el);
+  return {
+    tag: el.tagName.toLowerCase(),
+    id: el.id || '',
+    className: el.className || '',
+    rect: snapshotRect(el.getBoundingClientRect()),
+    style: {
+      position: style.position,
+      display: style.display,
+      overflow: style.overflow,
+      overflowX: style.overflowX,
+      overflowY: style.overflowY,
+      transform: style.transform,
+      willChange: style.willChange,
+      contain: style.contain,
+      zoom: (style as any).zoom || '',
+      pointerEvents: style.pointerEvents,
+    },
+  };
+}
+
+function collectTransformChain(element: Element | null, limit = 8) {
+  const chain: Array<{
+    tag: string;
+    id: string;
+    className: string;
+    transform: string;
+    position: string;
+    zoom: string;
+  }> = [];
+  let current: Element | null = element;
+  let count = 0;
+  while (current && count < limit) {
+    const el = current as HTMLElement;
+    const style = window.getComputedStyle(el);
+    chain.push({
+      tag: el.tagName.toLowerCase(),
+      id: el.id || '',
+      className: el.className || '',
+      transform: style.transform,
+      position: style.position,
+      zoom: (style as any).zoom || '',
+    });
+    current = current.parentElement;
+    count += 1;
+  }
+  return chain;
+}
+
+function inspectSelectionVisualAnomaly(view: EditorView) {
+  const scroller = view.scrollDOM;
+  const scrollerRect = snapshotRect(scroller?.getBoundingClientRect() ?? null);
+  const selectionLayer = view.dom.querySelector('.cm-selectionLayer');
+  const selectionLayerRect = snapshotRect(
+    (selectionLayer as HTMLElement | null)?.getBoundingClientRect() ?? null,
+  );
+  const selectionBackgrounds = Array.from(view.dom.querySelectorAll('.cm-selectionBackground'));
+  const selectionBridges = Array.from(view.dom.querySelectorAll('.cm-selection-bridge'));
+  const selectionGaps = Array.from(view.dom.querySelectorAll('.cm-selection-gap'));
+
+  const overlayRects = [
+    ...selectionBackgrounds.map((node, index) => ({ node, index, kind: 'background' as const })),
+    ...selectionBridges.map((node, index) => ({ node, index, kind: 'bridge' as const })),
+    ...selectionGaps.map((node, index) => ({ node, index, kind: 'gap' as const })),
+  ].map((entry) => {
+    const rect = (entry.node as HTMLElement).getBoundingClientRect();
+    const widthRatio = scrollerRect && scrollerRect.width > 0 ? rect.width / scrollerRect.width : 0;
+    const heightRatio =
+      scrollerRect && scrollerRect.height > 0 ? rect.height / scrollerRect.height : 0;
+    return {
+      index: entry.index,
+      kind: entry.kind,
+      rect: snapshotRect(rect),
+      widthRatio,
+      heightRatio,
+    };
+  });
+
+  const fullLikeRects = overlayRects.filter(
+    (item) => item.widthRatio >= 0.95 && item.heightRatio >= 0.8,
+  );
+  const oversizedRects = overlayRects.filter(
+    (item) => item.widthRatio >= 1.2 || item.heightRatio >= 1.2,
+  );
+
+  const main = view.state.selection.main;
+  const partialSelection = !(main.from === 0 && main.to === view.state.doc.length);
+  const isAnomaly = partialSelection && (fullLikeRects.length > 0 || oversizedRects.length > 0);
+
+  const visualViewport =
+    typeof window !== 'undefined' && window.visualViewport
+      ? {
+          width: window.visualViewport.width,
+          height: window.visualViewport.height,
+          offsetLeft: window.visualViewport.offsetLeft,
+          offsetTop: window.visualViewport.offsetTop,
+          scale: window.visualViewport.scale,
+        }
+      : null;
+
+  const ownerSelection = view.dom.ownerDocument.getSelection();
+  const inspect = inspectSelectAllUpgrade(view, ownerSelection);
+  const activeElement = view.dom.ownerDocument.activeElement;
+  const activeTag = activeElement
+    ? `${activeElement.tagName.toLowerCase()}${(activeElement as HTMLElement).className ? `.${(activeElement as HTMLElement).className}` : ''}`
+    : 'none';
+
+  return {
+    isAnomaly,
+    fullLikeCount: fullLikeRects.length,
+    oversizedCount: oversizedRects.length,
+    selectionBackgroundCount: selectionBackgrounds.length,
+    selectionBridgeCount: selectionBridges.length,
+    selectionGapCount: selectionGaps.length,
+    selection: {
+      from: main.from,
+      to: main.to,
+      docLength: view.state.doc.length,
+      ranges: view.state.selection.ranges.length,
+      mouseSelecting: view.state.field(mouseSelectingField, false),
+      viewport: view.viewport,
+      inspect,
+    },
+    viewMetrics: {
+      scrollTop: scroller?.scrollTop ?? null,
+      scrollLeft: scroller?.scrollLeft ?? null,
+      devicePixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio : null,
+      visualViewport,
+      activeTag,
+    },
+    scroller: describeElement(scroller),
+    selectionLayer: describeElement(selectionLayer),
+    selectionLayerRect,
+    overlayRects,
+    transformChains: {
+      scroller: collectTransformChain(scroller),
+      selectionLayer: collectTransformChain(selectionLayer),
+    },
+  };
 }
 
 function logSelectAll(view: EditorView, label: string, data: Record<string, unknown> = {}) {
@@ -981,7 +1400,9 @@ function logSelectAll(view: EditorView, label: string, data: Record<string, unkn
   const selection = view.state.selection.main;
   const docLength = view.state.doc.length;
   const active = view.dom.ownerDocument.activeElement as HTMLElement | null;
-  const activeTag = active ? `${active.tagName.toLowerCase()}${active.className ? `.${active.className}` : ""}` : "none";
+  const activeTag = active
+    ? `${active.tagName.toLowerCase()}${active.className ? `.${active.className}` : ''}`
+    : 'none';
   console.log(`[cm-selectAll] ${label}`, {
     from: selection.from,
     to: selection.to,
@@ -1001,7 +1422,7 @@ function isViewActive(view: EditorView, target: EventTarget | null) {
 }
 
 function applyChangesToContent(base: string, changes: ChangeSet): string {
-  let next = "";
+  let next = '';
   let cursor = 0;
   changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
     if (fromA > cursor) {
@@ -1016,12 +1437,26 @@ function applyChangesToContent(base: string, changes: ChangeSet): string {
   return next;
 }
 
-function shouldUpgradeSelectAll(view: EditorView, selection: Selection | null) {
-  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return false;
+function inspectSelectAllUpgrade(view: EditorView, selection: Selection | null) {
+  const base = {
+    shouldUpgrade: false,
+    reason: 'unknown',
+    from: null as number | null,
+    to: null as number | null,
+    coversViewport: false,
+    alreadyFull: false,
+    viewportFrom: view.viewport.from,
+    viewportTo: view.viewport.to,
+    docLength: view.state.doc.length,
+  };
+  if (!selection || selection.rangeCount === 0) return { ...base, reason: 'no-selection' };
+  if (selection.isCollapsed) return { ...base, reason: 'collapsed' };
   const anchorNode = selection.anchorNode;
   const focusNode = selection.focusNode;
-  if (!anchorNode || !focusNode) return false;
-  if (!view.contentDOM.contains(anchorNode) || !view.contentDOM.contains(focusNode)) return false;
+  if (!anchorNode || !focusNode) return { ...base, reason: 'missing-anchor-focus' };
+  if (!view.contentDOM.contains(anchorNode) || !view.contentDOM.contains(focusNode)) {
+    return { ...base, reason: 'outside-content' };
+  }
   const range = selection.getRangeAt(0);
   let domFrom = 0;
   let domTo = 0;
@@ -1029,37 +1464,58 @@ function shouldUpgradeSelectAll(view: EditorView, selection: Selection | null) {
     domFrom = view.posAtDOM(range.startContainer, range.startOffset);
     domTo = view.posAtDOM(range.endContainer, range.endOffset);
   } catch {
-    return false;
+    return { ...base, reason: 'posAtDOM-failed' };
   }
   const from = Math.min(domFrom, domTo);
   const to = Math.max(domFrom, domTo);
-  const viewport = view.viewport;
-  const coversViewport = from <= viewport.from && to >= viewport.to;
+  const coversViewport = from <= view.viewport.from && to >= view.viewport.to;
   const alreadyFull = from === 0 && to === view.state.doc.length;
-  return coversViewport && !alreadyFull;
+  return {
+    ...base,
+    shouldUpgrade: coversViewport && !alreadyFull,
+    reason: coversViewport
+      ? alreadyFull
+        ? 'already-full'
+        : 'covers-viewport'
+      : 'not-cover-viewport',
+    from,
+    to,
+    coversViewport,
+    alreadyFull,
+  };
 }
 
+const SELECT_ALL_INTENT_WINDOW_MS = 1200;
 
 // Workaround: ensure Cmd/Ctrl+A selects the full document even when native selectAll is triggered.
-const selectAllDomHandlers = Prec.highest(EditorView.domEventHandlers({
-  beforeinput(event, view) {
-    if (event.inputType !== "selectAll") return false;
-    logSelectAll(view, "dom-beforeinput", { inputType: event.inputType, viewActive: isViewActive(view, event.target) });
-    selectEntireDocument(view);
-    event.preventDefault();
-    return true;
-  },
-  keydown(event, view) {
-    const isMod = event.metaKey || event.ctrlKey;
-    if (!isMod || event.shiftKey || event.altKey) return false;
-    const key = event.key?.toLowerCase?.() ?? "";
-    if (key !== "a" && event.code !== "KeyA") return false;
-    logSelectAll(view, "dom-keydown", { key: event.key, code: event.code, viewActive: isViewActive(view, event.target) });
-    selectEntireDocument(view);
-    event.preventDefault();
-    return true;
-  }
-}));
+const selectAllDomHandlers = Prec.highest(
+  EditorView.domEventHandlers({
+    beforeinput(event, view) {
+      if (event.inputType !== 'selectAll') return false;
+      logSelectAll(view, 'dom-beforeinput', {
+        inputType: event.inputType,
+        viewActive: isViewActive(view, event.target),
+      });
+      selectEntireDocument(view);
+      event.preventDefault();
+      return true;
+    },
+    keydown(event, view) {
+      const isMod = event.metaKey || event.ctrlKey;
+      if (!isMod || event.shiftKey || event.altKey) return false;
+      const key = event.key?.toLowerCase?.() ?? '';
+      if (key !== 'a' && event.code !== 'KeyA') return false;
+      logSelectAll(view, 'dom-keydown', {
+        key: event.key,
+        code: event.code,
+        viewActive: isViewActive(view, event.target),
+      });
+      selectEntireDocument(view);
+      event.preventDefault();
+      return true;
+    },
+  }),
+);
 
 function buildSelectionBridgeDecorations(state: EditorState): DecorationSet {
   if (!state.facet(collapseOnSelectionFacet)) return Decoration.none;
@@ -1083,8 +1539,8 @@ function buildSelectionBridgeDecorations(state: EditorState): DecorationSet {
 
   const decorations: any[] = [];
   const seen = new Set<string>();
-  const blockTypes = new Set(["HeaderMark", "ListMark", "QuoteMark"]);
-  const inlineTypes = new Set(["EmphasisMark", "StrikethroughMark", "CodeMark"]);
+  const blockTypes = new Set(['HeaderMark', 'ListMark', 'QuoteMark']);
+  const inlineTypes = new Set(['EmphasisMark', 'StrikethroughMark', 'CodeMark']);
 
   syntaxTree(state).iterate({
     from: scanFrom,
@@ -1099,14 +1555,18 @@ function buildSelectionBridgeDecorations(state: EditorState): DecorationSet {
         const key = `${node.from}:${node.to}:bridge`;
         if (!seen.has(key)) {
           seen.add(key);
-          decorations.push(Decoration.mark({ class: "cm-selection-bridge" }).range(node.from, node.to));
+          decorations.push(
+            Decoration.mark({ class: 'cm-selection-bridge' }).range(node.from, node.to),
+          );
         }
         const nextChar = state.doc.sliceString(node.to, node.to + 1);
-        if (nextChar === " ") {
+        if (nextChar === ' ') {
           const gapKey = `${node.to}:${node.to + 1}:gap`;
           if (!seen.has(gapKey)) {
             seen.add(gapKey);
-            decorations.push(Decoration.mark({ class: "cm-selection-gap" }).range(node.to, node.to + 1));
+            decorations.push(
+              Decoration.mark({ class: 'cm-selection-gap' }).range(node.to, node.to + 1),
+            );
           }
         }
         return;
@@ -1117,8 +1577,8 @@ function buildSelectionBridgeDecorations(state: EditorState): DecorationSet {
       const inlineKey = `${node.from}:${node.to}:bridge`;
       if (seen.has(inlineKey)) return;
       seen.add(inlineKey);
-      decorations.push(Decoration.mark({ class: "cm-selection-bridge" }).range(node.from, node.to));
-      }
+      decorations.push(Decoration.mark({ class: 'cm-selection-bridge' }).range(node.from, node.to));
+    },
   });
 
   return Decoration.set(decorations, true);
@@ -1127,42 +1587,47 @@ function buildSelectionBridgeDecorations(state: EditorState): DecorationSet {
 // Table Keymap
 const tableKeymap = [
   {
-    key: "Tab",
+    key: 'Tab',
     run: (view: EditorView) => {
       const { state } = view;
       const { head } = state.selection.main;
       const line = state.doc.lineAt(head);
-      if (!line.text.includes("|")) return false;
+      if (!line.text.includes('|')) return false;
       const rest = line.text.slice(head - line.from);
-      const nextPipe = rest.indexOf("|");
-      if (nextPipe !== -1) { view.dispatch({ selection: { anchor: head + nextPipe + 2 } }); return true; }
+      const nextPipe = rest.indexOf('|');
+      if (nextPipe !== -1) {
+        view.dispatch({ selection: { anchor: head + nextPipe + 2 } });
+        return true;
+      }
       return false;
-    }
+    },
   },
   {
-    key: "Enter",
+    key: 'Enter',
     run: (view: EditorView) => {
       const { state } = view;
       const { head } = state.selection.main;
       const line = state.doc.lineAt(head);
-      if (!line.text.includes("|")) return false;
+      if (!line.text.includes('|')) return false;
       const pipes = (line.text.match(/\|/g) || []).length;
       if (pipes < 2) return false;
-      const row = "\n" + "|  ".repeat(Math.max(1, pipes - 1)) + "|";
+      const row = '\n' + '|  '.repeat(Math.max(1, pipes - 1)) + '|';
       view.dispatch({
         changes: { from: head, insert: row },
         selection: { anchor: head + 4 },
-        scrollIntoView: true
+        scrollIntoView: true,
       });
       return true;
-    }
-  }
+    },
+  },
 ];
 
 const wikiLinkStateField = StateField.define<DecorationSet>({
   create: buildWikiLinkDecorations,
-  update(deco, tr) { return tr.docChanged ? buildWikiLinkDecorations(tr.state) : deco.map(tr.changes); },
-  provide: f => EditorView.decorations.from(f),
+  update(deco, tr) {
+    return tr.docChanged ? buildWikiLinkDecorations(tr.state) : deco.map(tr.changes);
+  },
+  provide: (f) => EditorView.decorations.from(f),
 });
 
 function buildWikiLinkDecorations(state: EditorState): DecorationSet {
@@ -1170,18 +1635,64 @@ function buildWikiLinkDecorations(state: EditorState): DecorationSet {
   const regex = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
   let match;
   while ((match = regex.exec(docString(state))) !== null) {
-    decorations.push(Decoration.mark({ class: "cm-wikilink", attributes: { "data-wikilink": match[1].trim() } }).range(match.index, match.index + match[0].length));
+    decorations.push(
+      Decoration.mark({
+        class: 'cm-wikilink',
+        attributes: { 'data-wikilink': match[1].trim() },
+      }).range(match.index, match.index + match[0].length),
+    );
   }
   return Decoration.set(decorations);
 }
 
 const calloutStateField = StateField.define<DecorationSet>({
   create: buildCalloutDecorations,
-  update(deco, tr) { return tr.docChanged ? buildCalloutDecorations(tr.state) : deco.map(tr.changes); },
-  provide: f => EditorView.decorations.from(f),
+  update(deco, tr) {
+    return tr.docChanged ? buildCalloutDecorations(tr.state) : deco.map(tr.changes);
+  },
+  provide: (f) => EditorView.decorations.from(f),
 });
-const CALLOUT_COLORS: Record<string, string> = { note: "blue", abstract: "blue", info: "blue", tip: "green", success: "green", question: "yellow", warning: "yellow", danger: "red", failure: "red", bug: "red", example: "purple", quote: "gray", summary: "blue" };
-const CALLOUT_ICONS: Record<string, string> = { note: "📝", abstract: "📄", summary: "📄", info: "ℹ️", tip: "💡", hint: "💡", success: "✅", check: "✅", done: "✅", question: "❓", help: "❓", faq: "❓", warning: "⚠️", caution: "⚠️", attention: "⚠️", danger: "🔴", error: "❌", failure: "❌", fail: "❌", missing: "❌", bug: "🐛", example: "📋", quote: "💬", cite: "💬" };
+const CALLOUT_COLORS: Record<string, string> = {
+  note: 'blue',
+  abstract: 'blue',
+  info: 'blue',
+  tip: 'green',
+  success: 'green',
+  question: 'yellow',
+  warning: 'yellow',
+  danger: 'red',
+  failure: 'red',
+  bug: 'red',
+  example: 'purple',
+  quote: 'gray',
+  summary: 'blue',
+};
+const CALLOUT_ICONS: Record<string, string> = {
+  note: '📝',
+  abstract: '📄',
+  summary: '📄',
+  info: 'ℹ️',
+  tip: '💡',
+  hint: '💡',
+  success: '✅',
+  check: '✅',
+  done: '✅',
+  question: '❓',
+  help: '❓',
+  faq: '❓',
+  warning: '⚠️',
+  caution: '⚠️',
+  attention: '⚠️',
+  danger: '🔴',
+  error: '❌',
+  failure: '❌',
+  fail: '❌',
+  missing: '❌',
+  bug: '🐛',
+  example: '📋',
+  quote: '💬',
+  cite: '💬',
+};
 function buildCalloutDecorations(state: EditorState): DecorationSet {
   const decorations: any[] = [];
   const doc = state.doc;
@@ -1189,34 +1700,48 @@ function buildCalloutDecorations(state: EditorState): DecorationSet {
   while (lineNo <= doc.lines) {
     const line = doc.line(lineNo);
     const match = line.text.match(/^>\s*\[!([^\]]+)\]/);
-    if (!match) { lineNo++; continue; }
+    if (!match) {
+      lineNo++;
+      continue;
+    }
     const rawType = match[1].trim();
     const type = rawType.toLowerCase();
     const isEmojiType = !/^\w+$/.test(rawType);
-    const color = isEmojiType ? "blue" : (CALLOUT_COLORS[type] || "gray");
-    const icon = isEmojiType ? rawType : (CALLOUT_ICONS[type] || "📝");
+    const color = isEmojiType ? 'blue' : CALLOUT_COLORS[type] || 'gray';
+    const icon = isEmojiType ? rawType : CALLOUT_ICONS[type] || '📝';
     const calloutLines = [{ from: line.from }];
     let nextLineNo = lineNo + 1;
     while (nextLineNo <= doc.lines) {
       const nextLine = doc.line(nextLineNo);
-      if (/^>\s*/.test(nextLine.text) || nextLine.text.trim() === "") { calloutLines.push({ from: nextLine.from }); nextLineNo++; } else break;
+      if (/^>\s*/.test(nextLine.text) || nextLine.text.trim() === '') {
+        calloutLines.push({ from: nextLine.from });
+        nextLineNo++;
+      } else break;
     }
     calloutLines.forEach((l, idx) => {
       let cls = `callout callout-${color}`;
       if (idx === 0) {
-        cls += " callout-first";
+        cls += ' callout-first';
         const hMatch = doc.line(lineNo).text.match(/^(>\s*)(\[![^\]]+\])(\s*)/);
         if (hMatch) {
           const s = line.from + hMatch[1].length;
-          decorations.push(Decoration.replace({ widget: new CalloutIconWidget(icon) }).range(s, s + hMatch[2].length));
+          decorations.push(
+            Decoration.replace({ widget: new CalloutIconWidget(icon) }).range(
+              s,
+              s + hMatch[2].length,
+            ),
+          );
         }
       }
-      if (idx === calloutLines.length - 1) cls += " callout-last";
+      if (idx === calloutLines.length - 1) cls += ' callout-last';
       decorations.push(Decoration.line({ class: cls }).range(l.from));
     });
     lineNo = nextLineNo;
   }
-  return Decoration.set(decorations.sort((a, b) => a.from - b.from), true);
+  return Decoration.set(
+    decorations.sort((a, b) => a.from - b.from),
+    true,
+  );
 }
 
 // ============ 7. Image StateField ============
@@ -1229,10 +1754,11 @@ function selectionTouchesCachedRange(
   selection: { from: number; to: number },
   ranges: { from: number; to: number }[],
 ) {
-  return ranges.some((r) =>
-    (selection.from >= r.from && selection.from <= r.to) ||
-    (selection.to >= r.from && selection.to <= r.to) ||
-    (selection.from <= r.from && selection.to >= r.to),
+  return ranges.some(
+    (r) =>
+      (selection.from >= r.from && selection.from <= r.to) ||
+      (selection.to >= r.from && selection.to <= r.to) ||
+      (selection.from <= r.from && selection.to >= r.to),
   );
 }
 
@@ -1256,7 +1782,11 @@ function createImageStateField(vaultPath: string) {
   return StateField.define<DecorationSet>({
     create: (state) => buildImageDecorations(state, vaultPath),
     update(deco, tr) {
-      if (tr.docChanged || tr.reconfigured || tr.effects.some(e => e.is(setMouseSelecting) || e.is(setImageShowInfo))) {
+      if (
+        tr.docChanged ||
+        tr.reconfigured ||
+        tr.effects.some((e) => e.is(setMouseSelecting) || e.is(setImageShowInfo))
+      ) {
         return buildImageDecorations(tr.state, vaultPath);
       }
       if (tr.selection) {
@@ -1264,13 +1794,16 @@ function createImageStateField(vaultPath: string) {
         const newSel = tr.state.selection.main;
         const oldTouches = selectionTouchesCachedRange(oldSel, imagePositionsCache);
         const newTouches = selectionTouchesCachedRange(newSel, imagePositionsCache);
-        if (oldTouches !== newTouches || (newTouches && (oldSel.from !== newSel.from || oldSel.to !== newSel.to))) {
+        if (
+          oldTouches !== newTouches ||
+          (newTouches && (oldSel.from !== newSel.from || oldSel.to !== newSel.to))
+        ) {
           return buildImageDecorations(tr.state, vaultPath);
         }
       }
       return deco.map(tr.changes);
     },
-    provide: f => EditorView.decorations.from(f),
+    provide: (f) => EditorView.decorations.from(f),
   });
 }
 
@@ -1284,29 +1817,37 @@ function buildImageDecorations(state: EditorState, vaultPath: string): Decoratio
   const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
   let match;
   while ((match = imageRegex.exec(doc)) !== null) {
-    const from = match.index, to = from + match[0].length;
+    const from = match.index,
+      to = from + match[0].length;
     const alt = match[1];
     const src = match[2];
     imagePositionsCache.push({ from, to });
 
     if (shouldShowSource(state, from, to)) {
       // 编辑模式：显示源码 + 图片预览
-      decorations.push(Decoration.mark({ class: "cm-image-source" }).range(from, to));
-      decorations.push(Decoration.widget({
-        widget: new ImageWidget(src, alt, true, vaultPath),
-        side: 1,
-        block: true
-      }).range(to));
+      decorations.push(Decoration.mark({ class: 'cm-image-source' }).range(from, to));
+      decorations.push(
+        Decoration.widget({
+          widget: new ImageWidget(src, alt, true, vaultPath),
+          side: 1,
+          block: true,
+        }).range(to),
+      );
     } else {
       // 预览模式：替换为图片
       const showInfo = showInfoSet.has(src);
-      decorations.push(Decoration.replace({
-        widget: new ImageWidget(src, alt, showInfo, vaultPath),
-        block: true
-      }).range(from, to));
+      decorations.push(
+        Decoration.replace({
+          widget: new ImageWidget(src, alt, showInfo, vaultPath),
+          block: true,
+        }).range(from, to),
+      );
     }
   }
-  return Decoration.set(decorations.sort((a, b) => a.from - b.from), true);
+  return Decoration.set(
+    decorations.sort((a, b) => a.from - b.from),
+    true,
+  );
 }
 
 // ============ 8. Horizontal Rule StateField ============
@@ -1324,19 +1865,23 @@ const horizontalRuleStateField = StateField.define<DecorationSet>({
     if (tr.selection) {
       const oldSel = tr.startState.selection.main;
       const newSel = tr.state.selection.main;
-      const touches = (sel: { from: number, to: number }) =>
-        horizontalRulePositionsCache.some(h =>
-          (sel.from >= h.from && sel.from <= h.to) ||
-          (sel.to >= h.from && sel.to <= h.to) ||
-          (sel.from <= h.from && sel.to >= h.to)
+      const touches = (sel: { from: number; to: number }) =>
+        horizontalRulePositionsCache.some(
+          (h) =>
+            (sel.from >= h.from && sel.from <= h.to) ||
+            (sel.to >= h.from && sel.to <= h.to) ||
+            (sel.from <= h.from && sel.to >= h.to),
         );
-      if (touches(oldSel) !== touches(newSel) || (touches(newSel) && (oldSel.from !== newSel.from || oldSel.to !== newSel.to))) {
+      if (
+        touches(oldSel) !== touches(newSel) ||
+        (touches(newSel) && (oldSel.from !== newSel.from || oldSel.to !== newSel.to))
+      ) {
         return buildHorizontalRuleDecorations(tr.state);
       }
     }
     return deco;
   },
-  provide: f => EditorView.decorations.from(f),
+  provide: (f) => EditorView.decorations.from(f),
 });
 
 function buildHorizontalRuleDecorations(state: EditorState): DecorationSet {
@@ -1345,74 +1890,106 @@ function buildHorizontalRuleDecorations(state: EditorState): DecorationSet {
 
   syntaxTree(state).iterate({
     enter: (node) => {
-      if (node.name === "HorizontalRule") {
+      if (node.name === 'HorizontalRule') {
         horizontalRulePositionsCache.push({ from: node.from, to: node.to });
 
         if (shouldShowSource(state, node.from, node.to)) {
           // 编辑模式：显示源码
-          decorations.push(Decoration.mark({ class: "cm-hr-source" }).range(node.from, node.to));
+          decorations.push(Decoration.mark({ class: 'cm-hr-source' }).range(node.from, node.to));
         } else {
           // 预览模式：替换为水平线
-          decorations.push(Decoration.replace({
-            widget: new HorizontalRuleWidget(),
-            block: true
-          }).range(node.from, node.to));
+          decorations.push(
+            Decoration.replace({
+              widget: new HorizontalRuleWidget(),
+              block: true,
+            }).range(node.from, node.to),
+          );
         }
       }
-    }
+    },
   });
 
   return Decoration.set(decorations);
 }
 
-const readingModePlugin = ViewPlugin.fromClass(class {
-  decorations: DecorationSet;
-  constructor(view: EditorView) { this.decorations = this.build(view.state); }
-  update(u: ViewUpdate) {
-    if (u.docChanged || u.transactions.some(tr => tr.reconfigured)) this.decorations = this.build(u.state);
-  }
-  build(state: EditorState) {
-    const d: any[] = [];
-    syntaxTree(state).iterate({
-      enter: (node) => {
-        if (["HeaderMark", "EmphasisMark", "StrikethroughMark", "CodeMark", "ListMark", "QuoteMark"].includes(node.name)) {
-          this.hide(state, node.from, node.to, d);
-        }
-      }
-    });
-    return Decoration.set(d, true);
-  }
-  hide(state: EditorState, from: number, to: number, d: any[]) {
-    if (from >= to || state.doc.sliceString(from, to).includes('\n')) return;
-    d.push(Decoration.mark({ class: "cm-formatting-hidden" }).range(from, to));
-  }
-}, { decorations: v => v.decorations });
+const readingModePlugin = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) {
+      this.decorations = this.build(view.state);
+    }
+    update(u: ViewUpdate) {
+      if (u.docChanged || u.transactions.some((tr) => tr.reconfigured))
+        this.decorations = this.build(u.state);
+    }
+    build(state: EditorState) {
+      const d: any[] = [];
+      syntaxTree(state).iterate({
+        enter: (node) => {
+          if (
+            [
+              'HeaderMark',
+              'EmphasisMark',
+              'StrikethroughMark',
+              'CodeMark',
+              'ListMark',
+              'QuoteMark',
+            ].includes(node.name)
+          ) {
+            this.hide(state, node.from, node.to, d);
+          }
+        },
+      });
+      return Decoration.set(d, true);
+    }
+    hide(state: EditorState, from: number, to: number, d: any[]) {
+      if (from >= to || state.doc.sliceString(from, to).includes('\n')) return;
+      d.push(Decoration.mark({ class: 'cm-formatting-hidden' }).range(from, to));
+    }
+  },
+  { decorations: (v) => v.decorations },
+);
 
-const markdownStylePlugin = ViewPlugin.fromClass(class {
-  decorations: DecorationSet;
-  constructor(view: EditorView) { this.decorations = this.build(view); }
-  update(u: ViewUpdate) { if (u.docChanged || u.viewportChanged) this.decorations = this.build(u.view); }
-  build(view: EditorView) {
-    const d: any[] = [];
-    syntaxTree(view.state).iterate({
-      enter: (node) => {
-        const type = node.name;
-        const map: Record<string, string> = {
-          "ATXHeading1": "cm-header-1", "ATXHeading2": "cm-header-2", "ATXHeading3": "cm-header-3", "ATXHeading4": "cm-header-4",
-          "StrongEmphasis": "cm-strong", "Emphasis": "cm-emphasis", "Strikethrough": "cm-strikethrough", "InlineCode": "cm-code", "Link": "cm-link", "URL": "cm-url"
-        };
-        if (type.startsWith("ATXHeading")) {
-          const cls = map[type] || "cm-header-4";
-          d.push(Decoration.mark({ class: cls }).range(node.from, node.to));
-          d.push(Decoration.line({ class: "cm-heading-line" }).range(node.from));
-        } else if (map[type]) {
-          d.push(Decoration.mark({ class: map[type] }).range(node.from, node.to));
-        }
-      }
-    });
-    return Decoration.set(d, true);
-  }
-}, { decorations: v => v.decorations });
+const markdownStylePlugin = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) {
+      this.decorations = this.build(view);
+    }
+    update(u: ViewUpdate) {
+      if (u.docChanged || u.viewportChanged) this.decorations = this.build(u.view);
+    }
+    build(view: EditorView) {
+      const d: any[] = [];
+      syntaxTree(view.state).iterate({
+        enter: (node) => {
+          const type = node.name;
+          const map: Record<string, string> = {
+            ATXHeading1: 'cm-header-1',
+            ATXHeading2: 'cm-header-2',
+            ATXHeading3: 'cm-header-3',
+            ATXHeading4: 'cm-header-4',
+            StrongEmphasis: 'cm-strong',
+            Emphasis: 'cm-emphasis',
+            Strikethrough: 'cm-strikethrough',
+            InlineCode: 'cm-code',
+            Link: 'cm-link',
+            URL: 'cm-url',
+          };
+          if (type.startsWith('ATXHeading')) {
+            const cls = map[type] || 'cm-header-4';
+            d.push(Decoration.mark({ class: cls }).range(node.from, node.to));
+            d.push(Decoration.line({ class: 'cm-heading-line' }).range(node.from));
+          } else if (map[type]) {
+            d.push(Decoration.mark({ class: map[type] }).range(node.from, node.to));
+          }
+        },
+      });
+      return Decoration.set(d, true);
+    }
+  },
+  { decorations: (v) => v.decorations },
+);
 
 const setVoicePreview = StateEffect.define<{ from: number; text: string }>();
 const clearVoicePreview = StateEffect.define<null | void>();
@@ -1421,18 +1998,25 @@ const voicePreviewField = StateField.define<DecorationSet>({
   update(val, tr) {
     let deco = val;
     for (const e of tr.effects) {
-      if (e.is(setVoicePreview)) deco = e.value.text ? Decoration.set([Decoration.widget({ widget: new VoicePreviewWidget(e.value.text), side: 1 }).range(e.value.from)]) : Decoration.none;
+      if (e.is(setVoicePreview))
+        deco = e.value.text
+          ? Decoration.set([
+              Decoration.widget({ widget: new VoicePreviewWidget(e.value.text), side: 1 }).range(
+                e.value.from,
+              ),
+            ])
+          : Decoration.none;
       if (e.is(clearVoicePreview)) deco = Decoration.none;
     }
     return tr.docChanged && deco !== Decoration.none ? deco.map(tr.changes) : deco;
   },
-  provide: f => EditorView.decorations.from(f),
+  provide: (f) => EditorView.decorations.from(f),
 });
 
 // ============ 10. React 组件 ============
 
 export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditorProps>(
-  function CodeMirrorEditor({ content, onChange, className = "", viewMode, livePreview }, ref) {
+  function CodeMirrorEditor({ content, onChange, className = '', viewMode, livePreview }, ref) {
     const { t } = useLocaleStore();
 
     const effectiveMode: ViewMode = viewMode ?? (livePreview === false ? 'source' : 'live');
@@ -1450,53 +2034,71 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
         fileTree: state.fileTree,
         openFile: state.openFile,
         vaultPath: state.vaultPath,
-      }))
+      })),
     );
     const { openSecondaryPdf } = useSplitStore();
     const { setSplitView, editorFontSize } = useUIStore();
 
-    const getModeExtensions = useCallback((mode: ViewMode) => {
-      const imageField = vaultPath ? createImageStateField(vaultPath) : null;
-      const widgets = [mathStateField, mermaidStateField, calloutStateField, highlightStateField, horizontalRuleStateField];
-      if (imageField) widgets.push(imageField);
-      switch (mode) {
-        case 'reading':
-          return [
-            collapseOnSelectionFacet.of(false),
-            readingModePlugin,
-            tableField,
-            codeBlockField({ copyButton: true }),
-            ...widgets,
-          ];
-        case 'live':
-          return [
-            collapseOnSelectionFacet.of(true),
-            livePreviewPlugin,
-            tableEditorPlugin(),
-            codeBlockField({ interaction: "inline", copyButton: true }),
-            ...widgets,
-          ];
-        case 'source':
-        default:
-          return [calloutStateField];
-      }
-    }, [vaultPath]);
-
-    useImperativeHandle(ref, () => ({
-      getScrollLine: () => {
-        if (!viewRef.current) return 1;
-        const pos = viewRef.current.lineBlockAtHeight(viewRef.current.scrollDOM.scrollTop).from;
-        return viewRef.current.state.doc.lineAt(pos).number;
+    const getModeExtensions = useCallback(
+      (mode: ViewMode) => {
+        const imageField = vaultPath ? createImageStateField(vaultPath) : null;
+        const widgets = [
+          mathStateField,
+          mermaidStateField,
+          calloutStateField,
+          highlightStateField,
+          horizontalRuleStateField,
+        ];
+        if (imageField) widgets.push(imageField);
+        switch (mode) {
+          case 'reading':
+            return [
+              collapseOnSelectionFacet.of(false),
+              readingModePlugin,
+              tableField,
+              codeBlockField({ copyButton: true }),
+              ...widgets,
+            ];
+          case 'live':
+            return [
+              collapseOnSelectionFacet.of(true),
+              livePreviewPlugin,
+              tableEditorPlugin(),
+              codeBlockField({ interaction: 'inline', copyButton: true }),
+              ...widgets,
+            ];
+          case 'source':
+          default:
+            return [calloutStateField];
+        }
       },
-      scrollToLine: (line: number) => {
-        if (!viewRef.current) return;
-        const target = Math.min(Math.max(1, line), viewRef.current.state.doc.lines);
-        viewRef.current.dispatch({ effects: EditorView.scrollIntoView(viewRef.current.state.doc.line(target).from, { y: "start" }) });
-      }
-    }), []);
+      [vaultPath],
+    );
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        getScrollLine: () => {
+          if (!viewRef.current) return 1;
+          const pos = viewRef.current.lineBlockAtHeight(viewRef.current.scrollDOM.scrollTop).from;
+          return viewRef.current.state.doc.lineAt(pos).number;
+        },
+        scrollToLine: (line: number) => {
+          if (!viewRef.current) return;
+          const target = Math.min(Math.max(1, line), viewRef.current.state.doc.lines);
+          viewRef.current.dispatch({
+            effects: EditorView.scrollIntoView(viewRef.current.state.doc.line(target).from, {
+              y: 'start',
+            }),
+          });
+        },
+      }),
+      [],
+    );
 
     useEffect(() => {
       if (!containerRef.current) return;
+      const disableCustomDrawSelection = shouldDisableDrawSelectionForTauriWebKit();
 
       const state = EditorState.create({
         doc: content,
@@ -1510,7 +2112,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
           selectAllDomHandlers,
           markdown({ base: markdownLanguage, extensions: [Table] }),
           EditorView.lineWrapping,
-          drawSelection(),
+          ...(disableCustomDrawSelection ? [] : [drawSelection()]),
           fontSizeCompartment.of(createEditorTheme(editorFontSize)),
           mouseSelectingField,
           selectionStatePlugin,
@@ -1547,14 +2149,71 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
         });
       });
 
+      let selectionProbeFrame = 0;
+      let selectionProbeActive = false;
+      let lastSelectionAnomalyAt = 0;
+      let selectionAnomalySeq = 0;
+
+      const reportSelectionVisualAnomaly = (source: string) => {
+        const v = viewRef.current;
+        if (!v || !selectionVisualDebugEnabled()) return;
+        const details = inspectSelectionVisualAnomaly(v);
+        if (!details.isAnomaly) return;
+        const now = Date.now();
+        if (now - lastSelectionAnomalyAt < CM_SELECTION_ANOMALY_THROTTLE_MS) return;
+        lastSelectionAnomalyAt = now;
+        selectionAnomalySeq += 1;
+        console.warn(`[cm-selection-anomaly] ${source}`, {
+          seq: selectionAnomalySeq,
+          at: new Date(now).toISOString(),
+          ...details,
+        });
+      };
+
+      const stopSelectionProbe = () => {
+        selectionProbeActive = false;
+        if (selectionProbeFrame) {
+          cancelAnimationFrame(selectionProbeFrame);
+          selectionProbeFrame = 0;
+        }
+      };
+
+      const runSelectionProbe = () => {
+        if (!selectionProbeActive) return;
+        reportSelectionVisualAnomaly('drag-frame');
+        selectionProbeFrame = requestAnimationFrame(runSelectionProbe);
+      };
+
+      const startSelectionProbe = () => {
+        if (!selectionVisualDebugEnabled() || selectionProbeActive) return;
+        selectionProbeActive = true;
+        runSelectionProbe();
+      };
+
+      if (selectionVisualDebugEnabled()) {
+        console.log('[cm-selection-anomaly] visual probe enabled', {
+          storageKey: CM_SELECTION_VISUAL_DEBUG_STORAGE_KEY,
+        });
+        if (disableCustomDrawSelection) {
+          console.warn('[cm-selection-anomaly] drawSelection-disabled-for-tauri-webkit');
+        }
+      }
+
       // 拖动选择检测：mousedown 时设为 true，mouseup 时设为 false
       const handleMouseDown = () => {
         view.dispatch({ effects: setMouseSelecting.of(true) });
+        startSelectionProbe();
+        reportSelectionVisualAnomaly('mousedown');
       };
       const handleMouseUp = () => {
         // 延迟一帧确保选择已更新
         requestAnimationFrame(() => {
           view.dispatch({ effects: setMouseSelecting.of(false) });
+          reportSelectionVisualAnomaly('mouseup');
+          requestAnimationFrame(() => {
+            reportSelectionVisualAnomaly('mouseup-next-frame');
+            stopSelectionProbe();
+          });
         });
       };
       view.contentDOM.addEventListener('mousedown', handleMouseDown);
@@ -1562,12 +2221,20 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
 
       const handleSelectAllBeforeInput = (event: InputEvent) => {
         const v = viewRef.current;
-        if (!v || event.inputType !== "selectAll") return;
+        if (!v || event.inputType !== 'selectAll') return;
         if (!isViewActive(v, event.target)) {
-          logSelectAll(v, "doc-beforeinput-skip", { inputType: event.inputType, reason: "inactive", target: event.target?.constructor?.name });
+          logSelectAll(v, 'doc-beforeinput-skip', {
+            inputType: event.inputType,
+            reason: 'inactive',
+            target: event.target?.constructor?.name,
+          });
           return;
         }
-        logSelectAll(v, "doc-beforeinput", { inputType: event.inputType, target: event.target?.constructor?.name });
+        selectAllIntentAt = Date.now();
+        logSelectAll(v, 'doc-beforeinput', {
+          inputType: event.inputType,
+          target: event.target?.constructor?.name,
+        });
         selectEntireDocument(v);
         event.preventDefault();
         event.stopPropagation();
@@ -1578,41 +2245,74 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
         if (!v) return;
         const isMod = event.metaKey || event.ctrlKey;
         if (!isMod || event.shiftKey || event.altKey) return;
-        const key = event.key?.toLowerCase?.() ?? "";
-        if (key !== "a" && event.code !== "KeyA") return;
+        const key = event.key?.toLowerCase?.() ?? '';
+        if (key !== 'a' && event.code !== 'KeyA') return;
         if (!isViewActive(v, event.target)) {
-          logSelectAll(v, "doc-keydown-skip", { key: event.key, code: event.code, reason: "inactive", target: event.target?.constructor?.name });
+          logSelectAll(v, 'doc-keydown-skip', {
+            key: event.key,
+            code: event.code,
+            reason: 'inactive',
+            target: event.target?.constructor?.name,
+          });
           return;
         }
-        logSelectAll(v, "doc-keydown", { key: event.key, code: event.code, target: event.target?.constructor?.name });
+        selectAllIntentAt = Date.now();
+        logSelectAll(v, 'doc-keydown', {
+          key: event.key,
+          code: event.code,
+          target: event.target?.constructor?.name,
+        });
         selectEntireDocument(v);
         event.preventDefault();
         event.stopPropagation();
       };
 
       let suppressSelectionChange = false;
+      let selectAllIntentAt = 0;
       const handleSelectionChange = () => {
         const v = viewRef.current;
         if (!v || suppressSelectionChange) return;
         if (!isViewActive(v, v.dom.ownerDocument.activeElement)) return;
         const selection = ownerDoc.getSelection();
-        if (v.state.field(mouseSelectingField, false)) return;
-        if (!shouldUpgradeSelectAll(v, selection)) {
+        if (v.state.field(mouseSelectingField, false)) {
+          reportSelectionVisualAnomaly('selectionchange-while-dragging');
+          return;
+        }
+        reportSelectionVisualAnomaly('selectionchange');
+        const inspect = inspectSelectAllUpgrade(v, selection);
+        const hasRecentIntent =
+          selectAllIntentAt > 0 && Date.now() - selectAllIntentAt <= SELECT_ALL_INTENT_WINDOW_MS;
+        if (!hasRecentIntent) {
           if (selectAllDebugEnabled()) {
-            logSelectAll(v, "doc-selectionchange-skip", {
+            logSelectAll(v, 'doc-selectionchange-skip', {
+              reason: 'no-selectall-intent',
               rangeCount: selection?.rangeCount ?? 0,
               domCollapsed: selection?.isCollapsed ?? true,
+              inspect,
+            });
+          }
+          return;
+        }
+        if (!inspect.shouldUpgrade) {
+          if (selectAllDebugEnabled()) {
+            logSelectAll(v, 'doc-selectionchange-skip', {
+              reason: `not-upgradable:${inspect.reason}`,
+              rangeCount: selection?.rangeCount ?? 0,
+              domCollapsed: selection?.isCollapsed ?? true,
+              inspect,
             });
           }
           return;
         }
 
-        logSelectAll(v, "doc-selectionchange-upgrade", {
+        logSelectAll(v, 'doc-selectionchange-upgrade', {
           rangeCount: selection?.rangeCount ?? 0,
+          inspect,
         });
 
         suppressSelectionChange = true;
         selectEntireDocument(v);
+        selectAllIntentAt = 0;
         requestAnimationFrame(() => {
           suppressSelectionChange = false;
         });
@@ -1659,8 +2359,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
                 changes: { from: pos, insert: imageMarkdown },
                 selection: { anchor: pos + imageMarkdown.length },
               });
-            } catch (err) {
-            }
+            } catch (err) {}
             return;
           }
         }
@@ -1694,7 +2393,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
                   v.focus();
                   v.dispatch({
                     selection: { anchor: pos + 2 }, // 定位到 alt 文本位置
-                    effects: setImageShowInfo.of({ src, show: false })
+                    effects: setImageShowInfo.of({ src, show: false }),
                   });
                   return;
                 }
@@ -1722,18 +2421,33 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
         // 2. Links
         const link = target.closest('a[href]');
         if (link?.getAttribute('href')?.startsWith('lumina://pdf')) {
-          e.preventDefault(); e.stopPropagation();
+          e.preventDefault();
+          e.stopPropagation();
           const parsed = parseLuminaLink(link.getAttribute('href')!);
-          if (parsed?.file) (e.ctrlKey || e.metaKey) ? (setSplitView(true), openSecondaryPdf(parsed.file, parsed.page || 1, parsed.id)) : openPDFTab(parsed.file);
+          if (parsed?.file)
+            e.ctrlKey || e.metaKey
+              ? (setSplitView(true), openSecondaryPdf(parsed.file, parsed.page || 1, parsed.id))
+              : openPDFTab(parsed.file);
           return;
         }
 
-        const wikiEl = target.closest(".cm-wikilink");
+        const wikiEl = target.closest('.cm-wikilink');
         if (wikiEl && (e.ctrlKey || e.metaKey)) {
-          e.preventDefault(); e.stopPropagation();
-          const name = wikiEl.getAttribute("data-wikilink");
+          e.preventDefault();
+          e.stopPropagation();
+          const name = wikiEl.getAttribute('data-wikilink');
           if (name) {
-            const find = (arr: any[]): string | null => { for (const i of arr) { if (!i.is_dir && i.name.replace(".md", "").toLowerCase() === name.toLowerCase()) return i.path; if (i.is_dir) { const r = find(i.children); if (r) return r; } } return null; };
+            const find = (arr: any[]): string | null => {
+              for (const i of arr) {
+                if (!i.is_dir && i.name.replace('.md', '').toLowerCase() === name.toLowerCase())
+                  return i.path;
+                if (i.is_dir) {
+                  const r = find(i.children);
+                  if (r) return r;
+                }
+              }
+              return null;
+            };
             const path = find(fileTree);
             path ? openFile(path) : console.log(`Not found: ${name}`);
           }
@@ -1742,13 +2456,19 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
 
         if ((e.ctrlKey || e.metaKey) && link) {
           const h = link.getAttribute('href')!;
-          if (h.includes('bilibili') || h.includes('b23.tv')) { e.preventDefault(); e.stopPropagation(); openVideoNoteTab(h); return; }
+          if (h.includes('bilibili') || h.includes('b23.tv')) {
+            e.preventDefault();
+            e.stopPropagation();
+            openVideoNoteTab(h);
+            return;
+          }
         }
       };
 
       view.contentDOM.addEventListener('mousedown', handleClick);
       view.contentDOM.addEventListener('paste', handlePaste);
       return () => {
+        stopSelectionProbe();
         view.contentDOM.removeEventListener('mousedown', handleMouseDown);
         view.contentDOM.removeEventListener('mousedown', handleClick);
         view.contentDOM.removeEventListener('paste', handlePaste);
@@ -1759,7 +2479,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
         unbindPluginExtensions();
         view.destroy();
         _cachedDoc = null;
-        _cachedDocString = "";
+        _cachedDocString = '';
         viewRef.current = null;
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1771,8 +2491,8 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
       view.dispatch({
         effects: [
           viewModeCompartment.reconfigure(getModeExtensions(effectiveMode)),
-          readOnlyCompartment.reconfigure(EditorState.readOnly.of(isReadOnly))
-        ]
+          readOnlyCompartment.reconfigure(EditorState.readOnly.of(isReadOnly)),
+        ],
       });
     }, [effectiveMode, isReadOnly, getModeExtensions]);
 
@@ -1780,7 +2500,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
       const view = viewRef.current;
       if (!view) return;
       view.dispatch({
-        effects: fontSizeCompartment.reconfigure(createEditorTheme(editorFontSize))
+        effects: fontSizeCompartment.reconfigure(createEditorTheme(editorFontSize)),
       });
     }, [editorFontSize]);
 
@@ -1791,28 +2511,65 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
       if (current !== content) {
         isExternalChange.current = true;
         const sel = view.state.selection.main.head;
-        view.dispatch({ changes: { from: 0, to: current.length, insert: content }, selection: { anchor: Math.min(sel, content.length) } });
+        view.dispatch({
+          changes: { from: 0, to: current.length, insert: content },
+          selection: { anchor: Math.min(sel, content.length) },
+        });
         lastInternalContent.current = content;
         isExternalChange.current = false;
       }
     }, [content]);
 
     useEffect(() => {
-      const onVoiceInt = (e: any) => viewRef.current?.dispatch({ effects: e.detail?.text ? setVoicePreview.of({ from: viewRef.current.state.selection.main.head, text: e.detail.text }) : clearVoicePreview.of(null) });
-      const onVoiceFin = (e: any) => { if (e.detail?.text && viewRef.current) { const p = viewRef.current.state.selection.main.head; viewRef.current.dispatch({ changes: { from: p, to: p, insert: e.detail.text }, selection: { anchor: p + e.detail.text.length }, effects: clearVoicePreview.of(null) }); } };
+      const onVoiceInt = (e: any) =>
+        viewRef.current?.dispatch({
+          effects: e.detail?.text
+            ? setVoicePreview.of({
+                from: viewRef.current.state.selection.main.head,
+                text: e.detail.text,
+              })
+            : clearVoicePreview.of(null),
+        });
+      const onVoiceFin = (e: any) => {
+        if (e.detail?.text && viewRef.current) {
+          const p = viewRef.current.state.selection.main.head;
+          viewRef.current.dispatch({
+            changes: { from: p, to: p, insert: e.detail.text },
+            selection: { anchor: p + e.detail.text.length },
+            effects: clearVoicePreview.of(null),
+          });
+        }
+      };
       const onAi = (e: any) => {
         if (!viewRef.current || !e.detail?.text) return;
         const { mode, text, description } = e.detail;
-        const s = viewRef.current.state, doc = s.doc.toString(), sel = s.selection.main;
+        const s = viewRef.current.state,
+          doc = s.doc.toString(),
+          sel = s.selection.main;
         let mod = doc;
-        if (mode === "replace_selection") mod = doc.slice(0, sel.from) + text + doc.slice(sel.to);
-        else if (mode === "append_callout") mod = doc.slice(0, sel.to) + text + doc.slice(sel.to);
+        if (mode === 'replace_selection') mod = doc.slice(0, sel.from) + text + doc.slice(sel.to);
+        else if (mode === 'append_callout') mod = doc.slice(0, sel.to) + text + doc.slice(sel.to);
         if (mod !== doc) {
           const f = useFileStore.getState().currentFile;
-          if (f) useAIStore.getState().setPendingDiff({ fileName: f.split('/').pop()!, filePath: f, original: doc, modified: mod, description: description || "AI Edit" });
+          if (f)
+            useAIStore.getState().setPendingDiff({
+              fileName: f.split('/').pop()!,
+              filePath: f,
+              original: doc,
+              modified: mod,
+              description: description || 'AI Edit',
+            });
         }
       };
-      const onSum = (e: any) => { if (viewRef.current && e.detail?.callout) { const p = viewRef.current.state.selection.main.to; viewRef.current.dispatch({ changes: { from: p, to: p, insert: e.detail.callout }, selection: { anchor: p + e.detail.callout.length } }); } };
+      const onSum = (e: any) => {
+        if (viewRef.current && e.detail?.callout) {
+          const p = viewRef.current.state.selection.main.to;
+          viewRef.current.dispatch({
+            changes: { from: p, to: p, insert: e.detail.callout },
+            selection: { anchor: p + e.detail.callout.length },
+          });
+        }
+      };
 
       // 处理右键菜单格式化
       const onFormat = (e: any) => {
@@ -1852,13 +2609,22 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
             cursorOffset = -4; // 光标移到 url 位置
             break;
           case 'ul':
-            replacement = selectedText.split('\n').map(line => `- ${line}`).join('\n');
+            replacement = selectedText
+              .split('\n')
+              .map((line) => `- ${line}`)
+              .join('\n');
             break;
           case 'ol':
-            replacement = selectedText.split('\n').map((line, i) => `${i + 1}. ${line}`).join('\n');
+            replacement = selectedText
+              .split('\n')
+              .map((line, i) => `${i + 1}. ${line}`)
+              .join('\n');
             break;
           case 'task':
-            replacement = selectedText.split('\n').map(line => `- [ ] ${line}`).join('\n');
+            replacement = selectedText
+              .split('\n')
+              .map((line) => `- [ ] ${line}`)
+              .join('\n');
             break;
           case 'h1':
             replacement = `# ${selectedText}`;
@@ -1879,7 +2645,10 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
             replacement = `###### ${selectedText}`;
             break;
           case 'quote':
-            replacement = selectedText.split('\n').map(line => `> ${line}`).join('\n');
+            replacement = selectedText
+              .split('\n')
+              .map((line) => `> ${line}`)
+              .join('\n');
             break;
           default:
             return;
@@ -1888,22 +2657,22 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
         const newPos = sel.from + replacement.length + cursorOffset;
         view.dispatch({
           changes: { from: sel.from, to: sel.to, insert: replacement },
-          selection: { anchor: newPos }
+          selection: { anchor: newPos },
         });
         view.focus();
       };
 
-      window.addEventListener("voice-input-interim", onVoiceInt);
-      window.addEventListener("voice-input-final", onVoiceFin);
-      window.addEventListener("selection-ai-edit", onAi);
-      window.addEventListener("insert-summary-callout", onSum);
-      window.addEventListener("editor-format-text", onFormat);
+      window.addEventListener('voice-input-interim', onVoiceInt);
+      window.addEventListener('voice-input-final', onVoiceFin);
+      window.addEventListener('selection-ai-edit', onAi);
+      window.addEventListener('insert-summary-callout', onSum);
+      window.addEventListener('editor-format-text', onFormat);
       return () => {
-        window.removeEventListener("voice-input-interim", onVoiceInt);
-        window.removeEventListener("voice-input-final", onVoiceFin);
-        window.removeEventListener("selection-ai-edit", onAi);
-        window.removeEventListener("insert-summary-callout", onSum);
-        window.removeEventListener("editor-format-text", onFormat);
+        window.removeEventListener('voice-input-interim', onVoiceInt);
+        window.removeEventListener('voice-input-final', onVoiceFin);
+        window.removeEventListener('selection-ai-edit', onAi);
+        window.removeEventListener('insert-summary-callout', onSum);
+        window.removeEventListener('editor-format-text', onFormat);
       };
     }, []);
 
@@ -1932,11 +2701,14 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
 
     return (
       <>
-        <div ref={containerRef} className={`codemirror-wrapper h-full overflow-auto ${className}`} />
+        <div
+          ref={containerRef}
+          className={`codemirror-wrapper h-full overflow-auto ${className}`}
+        />
         <SlashMenu view={viewRef.current} />
       </>
     );
-  }
+  },
 );
 
 export default CodeMirrorEditor;
