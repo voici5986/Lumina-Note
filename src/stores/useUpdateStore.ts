@@ -20,6 +20,34 @@ export interface UpdateInfo {
   date: string | null;
 }
 
+export type UpdateInstallPhase = "idle" | "downloading" | "installing" | "ready" | "error";
+
+export interface UpdateInstallTelemetry {
+  sessionId: number;
+  phase: UpdateInstallPhase;
+  attempt: number;
+  progress: number;
+  downloadedBytes: number;
+  contentLength: number;
+  startedAt: number | null;
+  updatedAt: number | null;
+  finishedAt: number | null;
+  error: string | null;
+}
+
+const createInitialInstallTelemetry = (): UpdateInstallTelemetry => ({
+  sessionId: 0,
+  phase: "idle",
+  attempt: 0,
+  progress: 0,
+  downloadedBytes: 0,
+  contentLength: 0,
+  startedAt: null,
+  updatedAt: null,
+  finishedAt: null,
+  error: null,
+});
+
 interface UpdateState {
   // 持久化数据
   lastCheckTime: number;
@@ -31,6 +59,7 @@ interface UpdateState {
   updateHandle: Update | null;
   hasUnreadUpdate: boolean;
   isChecking: boolean;
+  installTelemetry: UpdateInstallTelemetry;
 
   // Actions
   setLastCheckTime: (time: number) => void;
@@ -43,6 +72,14 @@ interface UpdateState {
   isVersionSkipped: (version: string) => boolean;
   markUpdateAsRead: () => void;
   clearUpdate: () => void;
+  beginInstallTelemetry: () => number;
+  recordInstallStarted: (contentLength?: number) => void;
+  recordInstallProgress: (chunkLength: number) => void;
+  recordInstallInstalling: () => void;
+  recordInstallRetry: (nextAttempt: number) => void;
+  recordInstallReady: () => void;
+  recordInstallError: (message: string) => void;
+  resetInstallTelemetry: () => void;
 }
 
 export const useUpdateStore = create<UpdateState>()(
@@ -58,6 +95,7 @@ export const useUpdateStore = create<UpdateState>()(
       updateHandle: null,
       hasUnreadUpdate: false,
       isChecking: false,
+      installTelemetry: createInitialInstallTelemetry(),
 
       setLastCheckTime: (time) => set({ lastCheckTime: time }),
 
@@ -99,6 +137,117 @@ export const useUpdateStore = create<UpdateState>()(
           updateHandle: null,
           hasUnreadUpdate: false,
         }),
+
+      beginInstallTelemetry: () => {
+        const nextSessionId = get().installTelemetry.sessionId + 1;
+        const now = Date.now();
+        set({
+          installTelemetry: {
+            sessionId: nextSessionId,
+            phase: "downloading",
+            attempt: 1,
+            progress: 0,
+            downloadedBytes: 0,
+            contentLength: 0,
+            startedAt: now,
+            updatedAt: now,
+            finishedAt: null,
+            error: null,
+          },
+        });
+        return nextSessionId;
+      },
+
+      recordInstallStarted: (contentLength = 0) =>
+        set((state) => ({
+          installTelemetry: {
+            ...state.installTelemetry,
+            phase: "downloading",
+            contentLength: Number.isFinite(contentLength) && contentLength > 0 ? contentLength : state.installTelemetry.contentLength,
+            updatedAt: Date.now(),
+            error: null,
+          },
+        })),
+
+      recordInstallProgress: (chunkLength) =>
+        set((state) => {
+          const delta = Number.isFinite(chunkLength) && chunkLength > 0 ? chunkLength : 0;
+          const downloadedBytes = state.installTelemetry.downloadedBytes + delta;
+          const contentLength = state.installTelemetry.contentLength;
+          const progress =
+            contentLength > 0 ? Math.min(100, (downloadedBytes / contentLength) * 100) : state.installTelemetry.progress;
+          return {
+            installTelemetry: {
+              ...state.installTelemetry,
+              phase: "downloading",
+              downloadedBytes,
+              progress,
+              updatedAt: Date.now(),
+              error: null,
+            },
+          };
+        }),
+
+      recordInstallInstalling: () =>
+        set((state) => ({
+          installTelemetry: {
+            ...state.installTelemetry,
+            phase: "installing",
+            updatedAt: Date.now(),
+            error: null,
+          },
+        })),
+
+      recordInstallRetry: (nextAttempt) =>
+        set((state) => ({
+          installTelemetry: {
+            ...state.installTelemetry,
+            phase: "downloading",
+            attempt: Math.max(1, nextAttempt),
+            progress: 0,
+            downloadedBytes: 0,
+            contentLength: 0,
+            updatedAt: Date.now(),
+            error: null,
+          },
+        })),
+
+      recordInstallReady: () =>
+        set((state) => {
+          const now = Date.now();
+          return {
+            installTelemetry: {
+              ...state.installTelemetry,
+              phase: "ready",
+              progress: 100,
+              updatedAt: now,
+              finishedAt: now,
+              error: null,
+            },
+          };
+        }),
+
+      recordInstallError: (message) =>
+        set((state) => {
+          const now = Date.now();
+          return {
+            installTelemetry: {
+              ...state.installTelemetry,
+              phase: "error",
+              updatedAt: now,
+              finishedAt: now,
+              error: message,
+            },
+          };
+        }),
+
+      resetInstallTelemetry: () =>
+        set((state) => ({
+          installTelemetry: {
+            ...createInitialInstallTelemetry(),
+            sessionId: state.installTelemetry.sessionId,
+          },
+        })),
     }),
     {
       name: "lumina-update",

@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { Loader2, RefreshCw, Download, RotateCcw, CheckCircle2, AlertCircle, SkipForward } from "lucide-react";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 import { useUpdateStore, checkForUpdate, getUpdateHandle } from "@/stores/useUpdateStore";
-import { reportOperationError } from "@/lib/reportError";
+import { normalizeErrorMessage, reportOperationError } from "@/lib/reportError";
 import { retryWithExponentialBackoff } from "@/lib/retry";
 
 type DownloadEvent = {
@@ -29,15 +29,28 @@ export function UpdateChecker() {
         skipVersion,
         clearSkippedVersion,
         markUpdateAsRead,
+        installTelemetry,
+        beginInstallTelemetry,
+        recordInstallStarted,
+        recordInstallProgress,
+        recordInstallInstalling,
+        recordInstallRetry,
+        recordInstallReady,
+        recordInstallError,
     } = useUpdateStore();
 
-    const [status, setStatus] = useState<"idle" | "downloading" | "installing" | "ready" | "error" | "up-to-date">("idle");
-    const [error, setError] = useState<string | null>(null);
-    const [progress, setProgress] = useState<number>(0);
-    const [downloadedSize, setDownloadedSize] = useState<string>("");
+    const [checkStatus, setCheckStatus] = useState<"idle" | "up-to-date" | "error">("idle");
+    const [checkError, setCheckError] = useState<string | null>(null);
 
-    const contentLengthRef = useRef<number>(0);
-    const downloadedRef = useRef<number>(0);
+    const status = installTelemetry.phase !== "idle" ? installTelemetry.phase : checkStatus;
+    const error = status === "error" ? installTelemetry.error || checkError : checkError;
+    const progress = installTelemetry.progress;
+    const downloadedSize =
+        installTelemetry.downloadedBytes > 0
+            ? installTelemetry.contentLength > 0
+                ? `${(installTelemetry.downloadedBytes / 1024 / 1024).toFixed(1)} MB / ${(installTelemetry.contentLength / 1024 / 1024).toFixed(1)} MB`
+                : `${(installTelemetry.downloadedBytes / 1024 / 1024).toFixed(1)} MB`
+            : "";
 
     // 打开设置时标记更新为已读
     useEffect(() => {
@@ -48,19 +61,19 @@ export function UpdateChecker() {
 
     // 同步 store 中的更新状态到本地 status
     useEffect(() => {
-        if (availableUpdate && status === "up-to-date") {
-            setStatus("idle");
+        if (availableUpdate && checkStatus === "up-to-date") {
+            setCheckStatus("idle");
         }
-    }, [availableUpdate, status]);
+    }, [availableUpdate, checkStatus]);
 
     const handleCheckForUpdates = async () => {
-        setError(null);
-        setStatus("idle");
+        setCheckError(null);
+        setCheckStatus("idle");
 
         try {
             const hasUpdate = await checkForUpdate(true); // force check
             if (!hasUpdate) {
-                setStatus("up-to-date");
+                setCheckStatus("up-to-date");
             }
         } catch (err) {
             reportOperationError({
@@ -69,8 +82,8 @@ export function UpdateChecker() {
                 error: err,
                 level: "warning",
             });
-            setError(err instanceof Error ? err.message : String(err));
-            setStatus("error");
+            setCheckError(err instanceof Error ? err.message : String(err));
+            setCheckStatus("error");
         }
     };
 
@@ -78,12 +91,10 @@ export function UpdateChecker() {
         const updateHandle = getUpdateHandle();
         if (!updateHandle) return;
 
+        const sessionId = beginInstallTelemetry();
+
         try {
-            setStatus("downloading");
-            setProgress(0);
-            setDownloadedSize("");
-            contentLengthRef.current = 0;
-            downloadedRef.current = 0;
+            console.info("[Update] Install flow started", { sessionId });
 
             await retryWithExponentialBackoff(
                 () =>
@@ -92,24 +103,14 @@ export function UpdateChecker() {
                             switch (event.event) {
                                 case "Started":
                                     const len = (event.data as any).contentLength;
-                                    if (len) contentLengthRef.current = len;
+                                    recordInstallStarted(len);
                                     break;
                                 case "Progress":
                                     const chunk = (event.data as any).chunkLength;
-                                    downloadedRef.current += chunk;
-
-                                    if (contentLengthRef.current > 0) {
-                                        const pct = (downloadedRef.current / contentLengthRef.current) * 100;
-                                        setProgress(pct);
-                                        setDownloadedSize(
-                                            `${(downloadedRef.current / 1024 / 1024).toFixed(1)} MB / ${(contentLengthRef.current / 1024 / 1024).toFixed(1)} MB`
-                                        );
-                                    } else {
-                                        setDownloadedSize(`${(downloadedRef.current / 1024 / 1024).toFixed(1)} MB`);
-                                    }
+                                    recordInstallProgress(chunk);
                                     break;
                                 case "Finished":
-                                    setStatus("installing");
+                                    recordInstallInstalling();
                                     break;
                             }
                         },
@@ -127,31 +128,29 @@ export function UpdateChecker() {
                             timeoutMs: UPDATE_DOWNLOAD_TIMEOUT_MS,
                             error,
                         });
-                        setStatus("downloading");
-                        setProgress(0);
-                        setDownloadedSize("");
-                        contentLengthRef.current = 0;
-                        downloadedRef.current = 0;
+                        recordInstallRetry(attempt + 1);
                     },
                 }
             );
 
-            setStatus("ready");
+            recordInstallReady();
+            console.info("[Update] Install flow finished", { sessionId, phase: "ready" });
         } catch (err) {
+            const message = normalizeErrorMessage(err);
             reportOperationError({
                 source: "UpdateChecker.installUpdate",
                 action: "Download and install update",
                 error: err,
+                context: { sessionId },
             });
-            setError(err instanceof Error ? err.message : String(err));
-            setStatus("error");
+            recordInstallError(message);
         }
     };
 
     const handleSkipVersion = () => {
         if (availableUpdate) {
             skipVersion(availableUpdate.version);
-            setStatus("idle");
+            setCheckStatus("idle");
         }
     };
 
@@ -164,7 +163,7 @@ export function UpdateChecker() {
                 action: "Relaunch app after update",
                 error: err,
             });
-            setError(err instanceof Error ? err.message : String(err));
+            setCheckError(err instanceof Error ? err.message : String(err));
         }
     };
 
@@ -273,6 +272,20 @@ export function UpdateChecker() {
                 <div className="flex items-center gap-2 text-sm text-green-600 bg-green-500/10 p-3 rounded-lg">
                     <CheckCircle2 className="w-4 h-4" />
                     <span>{t.updateChecker.readyHint}</span>
+                </div>
+            )}
+
+            {/* 观测信息（用于排查设置页关闭后的下载状态） */}
+            {installTelemetry.phase !== "idle" && (
+                <div className="text-xs text-muted-foreground bg-background/50 p-3 rounded-lg border border-border/50 space-y-1">
+                    <p className="font-medium text-foreground/80">Update telemetry</p>
+                    <p>
+                        session #{installTelemetry.sessionId} · phase {installTelemetry.phase} · attempt {installTelemetry.attempt}
+                    </p>
+                    {installTelemetry.startedAt && <p>started: {new Date(installTelemetry.startedAt).toLocaleString()}</p>}
+                    {installTelemetry.updatedAt && <p>last event: {new Date(installTelemetry.updatedAt).toLocaleString()}</p>}
+                    {installTelemetry.finishedAt && <p>finished: {new Date(installTelemetry.finishedAt).toLocaleString()}</p>}
+                    {downloadedSize && <p>bytes: {downloadedSize}</p>}
                 </div>
             )}
 

@@ -23,6 +23,18 @@ describe("useUpdateStore.checkForUpdate", () => {
       updateHandle: null,
       hasUnreadUpdate: false,
       isChecking: false,
+      installTelemetry: {
+        sessionId: 0,
+        phase: "idle",
+        attempt: 0,
+        progress: 0,
+        downloadedBytes: 0,
+        contentLength: 0,
+        startedAt: null,
+        updatedAt: null,
+        finishedAt: null,
+        error: null,
+      },
     });
   });
 
