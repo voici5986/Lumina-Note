@@ -73,7 +73,8 @@
   },
   "overrides": {
     "lodash-es": "4.17.23",
-    "dompurify": "3.3.1"
+    "dompurify": "3.3.1",
+    "immutable": "4.3.8"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",
