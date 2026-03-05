@@ -1,6 +1,5 @@
 //! Agent 类型定义
 
-use crate::langgraph::state::GraphState as LangGraphState;
 use forge::runtime::state::GraphState as ForgeGraphState;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -417,30 +416,6 @@ pub struct TaskContext {
     pub skills: Vec<SkillContext>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mobile_session_id: Option<String>,
-}
-
-// ============ 实现 LangGraph GraphState trait ============
-
-impl LangGraphState for GraphState {
-    fn get_next(&self) -> Option<&str> {
-        if self.goto.is_empty() {
-            None
-        } else {
-            Some(&self.goto)
-        }
-    }
-
-    fn set_next(&mut self, next: Option<String>) {
-        self.goto = next.unwrap_or_default();
-    }
-
-    fn is_complete(&self) -> bool {
-        self.status == AgentStatus::Completed || self.status == AgentStatus::Error
-    }
-
-    fn mark_complete(&mut self) {
-        self.status = AgentStatus::Completed;
-    }
 }
 
 // ============ 实现 Forge GraphState trait ============
