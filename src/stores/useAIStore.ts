@@ -24,9 +24,12 @@ import {
   type MessageContent,
 } from "@/services/llm";
 import { getCurrentTranslations } from "@/stores/useLocaleStore";
+import { formatUserFriendlyError } from "./aiErrorFormatting";
+
 import { encryptApiKey, decryptApiKey } from "@/lib/crypto";
 import { reportOperationError } from "@/lib/reportError";
 import type { AttachedImage, QuoteReference } from "@/types/chat";
+
 // 流式状态现在完全由 Zustand 管理，不再需要额外的 streamingStore
 
 // Pending diff for preview
@@ -365,7 +368,7 @@ export const useAIStore = create<AIState>()(
         // 使用内存中的配置（已解密），而不是 store 中可能未同步的配置
         const config = getAIConfig();
 
-        if (!config.apiKey && config.provider !== "ollama" && config.provider !== "custom") {
+        if (!config.apiKey?.trim() && config.provider !== "ollama" && config.provider !== "custom") {
           set({ error: t.ai.apiKeyRequired });
           return;
         }
@@ -527,7 +530,7 @@ export const useAIStore = create<AIState>()(
             },
           });
           set({
-            error: error instanceof Error ? error.message : t.ai.sendFailed,
+            error: formatUserFriendlyError(error),
             isLoading: false,
           });
         }
@@ -625,7 +628,7 @@ export const useAIStore = create<AIState>()(
           _abortController: abortController,
         });
 
-        if (!runtimeConfig.apiKey && runtimeConfig.provider !== "ollama" && runtimeConfig.provider !== "custom") {
+        if (!runtimeConfig.apiKey?.trim() && runtimeConfig.provider !== "ollama" && runtimeConfig.provider !== "custom") {
           set({ error: t.ai.apiKeyRequired, isStreaming: false, streamingReasoningStatus: "idle" });
           return;
         }
@@ -805,7 +808,7 @@ export const useAIStore = create<AIState>()(
             },
           });
           set({
-            error: error instanceof Error ? error.message : t.ai.sendFailed,
+            error: formatUserFriendlyError(error),
             isStreaming: false,
             streamingReasoning: "",
             streamingReasoningStatus: "idle",

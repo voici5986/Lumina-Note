@@ -24,6 +24,7 @@ import {
 import { getRecommendedTemperature } from "@/services/llm/temperature";
 import type { MessageAttachment } from "@/services/llm";
 import { getCurrentTranslations } from "@/stores/useLocaleStore";
+import { formatUserFriendlyError } from "./aiErrorFormatting";
 import type { SelectedSkill } from "@/types/skills";
 
 // ============ 类型定义 ============
@@ -723,23 +724,6 @@ export const useRustAgentStore = create<RustAgentState>()(
       startTask: async (task: string, context: TaskContext) => {
         const aiConfig = getAIConfig();
         const streamingThinkingEnabled = shouldStreamThinkingForAgent(aiConfig);
-
-        if (!aiConfig.apiKey && aiConfig.provider !== "ollama" && aiConfig.provider !== "custom") {
-          const t = getCurrentTranslations();
-          set({
-            status: "error",
-            error: t.ai.apiKeyRequired,
-          });
-          return;
-        }
-        
-        // 调试：打印配置
-        console.log("[RustAgent] 当前配置:", {
-          provider: aiConfig.provider,
-          model: aiConfig.model,
-          hasApiKey: !!aiConfig.apiKey,
-          baseUrl: aiConfig.baseUrl,
-        });
         
         // 获取当前历史消息（发送前的消息）
         const currentMessages = get().messages;
@@ -747,6 +731,8 @@ export const useRustAgentStore = create<RustAgentState>()(
         const stats = get().taskStats;
         const currentStatus = get().status;
         const isBusy = currentStatus === "running" || currentStatus === "waiting_approval";
+        
+        // 先显示用户消息
         set({
           ...(isBusy
             ? { error: null }
@@ -770,6 +756,26 @@ export const useRustAgentStore = create<RustAgentState>()(
                 : {}),
             },
           ],
+        });
+
+        if (!aiConfig.apiKey?.trim() && aiConfig.provider !== "ollama" && aiConfig.provider !== "custom") {
+          const t = getCurrentTranslations();
+          set({
+            status: "error",
+            error: t.ai.apiKeyRequired,
+          });
+          return;
+        }
+        
+        // 调试：打印配置
+        console.log("[RustAgent] 当前配置:", {
+          provider: aiConfig.provider,
+          model: aiConfig.model,
+          hasApiKey: !!aiConfig.apiKey,
+          baseUrl: aiConfig.baseUrl,
+        });
+        
+        set({
           taskStats: {
             ...stats,
             ...(isBusy
@@ -784,7 +790,7 @@ export const useRustAgentStore = create<RustAgentState>()(
         });
         
         // 将历史消息转换为后端格式并传入
-        const historyForBackend = currentMessages
+        const historyForBackend = get().messages // 使用最新的 messages
           .filter(m => m.role === "user" || m.role === "assistant")
           .map(m => ({
             role: m.role,
@@ -820,7 +826,7 @@ export const useRustAgentStore = create<RustAgentState>()(
           console.error("[RustAgent] agent_start_task failed:", e);
           set({
             status: "error",
-            error: e instanceof Error ? e.message : String(e),
+            error: formatUserFriendlyError(e),
           });
         }
       },
@@ -1396,7 +1402,7 @@ export const useRustAgentStore = create<RustAgentState>()(
             const stats = state.taskStats;
             set({
               status: "error",
-              error,
+              error: formatUserFriendlyError(error),
               streamingContent: "",
               streamingReasoning: "",
               streamingReasoningStatus: "idle",
@@ -1833,7 +1839,7 @@ export const useRustAgentStore = create<RustAgentState>()(
             const stats = state.taskStats;
             console.error("[RustAgent] error event:", message);
             set({
-              error: message,
+              error: formatUserFriendlyError(message),
               streamingContent: "",
               streamingReasoning: "",
               streamingReasoningStatus: "idle",
