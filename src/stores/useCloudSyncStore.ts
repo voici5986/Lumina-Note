@@ -25,6 +25,7 @@ interface CloudSyncState {
   authStatus: CloudAuthStatus;
   isLoading: boolean;
   error: string | null;
+  clearError: () => void;
   setServerBaseUrl: (value: string) => void;
   setEmail: (value: string) => void;
   setPassword: (value: string) => void;
@@ -105,6 +106,7 @@ export const useCloudSyncStore = create<CloudSyncState>()(
       authStatus: 'anonymous',
       isLoading: false,
       error: null,
+      clearError: () => set({ error: null }),
       setServerBaseUrl: (value) => set({ serverBaseUrl: normalizeCloudBaseUrl(value) }),
       setEmail: (value) => set({ email: value }),
       setPassword: (value) => set({ password: value }),

@@ -38,7 +38,7 @@ export function WebDAVSettings({ compact = false }: WebDAVSettingsProps) {
     computeSyncPlan,
     executeSync,
     quickSync,
-    clearError,
+    clearError: clearConnectionError,
   } = useWebDAVStore();
   const {
     serverBaseUrl,
@@ -50,6 +50,7 @@ export function WebDAVSettings({ compact = false }: WebDAVSettingsProps) {
     error,
     autoSync,
     syncIntervalSecs,
+    clearError: clearCloudError,
     setServerBaseUrl,
     setEmail,
     setPassword,
@@ -82,7 +83,8 @@ export function WebDAVSettings({ compact = false }: WebDAVSettingsProps) {
 
   const handleAuth = async (mode: 'register' | 'login') => {
     if (combinedError) {
-      clearError();
+      clearCloudError();
+      clearConnectionError();
     }
 
     if (mode === 'register') {
@@ -142,12 +144,18 @@ export function WebDAVSettings({ compact = false }: WebDAVSettingsProps) {
 
   const handleTestConnection = async () => {
     setIsTesting(true);
-    clearError();
+    clearCloudError();
+    clearConnectionError();
     try {
       await testConnection();
     } finally {
       setIsTesting(false);
     }
+  };
+
+  const handleDismissError = () => {
+    clearCloudError();
+    clearConnectionError();
   };
 
   const formatTime = (timestamp: number | null) => {
@@ -200,7 +208,7 @@ export function WebDAVSettings({ compact = false }: WebDAVSettingsProps) {
         <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
           <AlertCircle size={16} className="text-red-400 shrink-0" />
           <span className="text-sm text-red-400">{combinedError}</span>
-          <button onClick={clearError} className="ml-auto p-1 hover:bg-red-500/20 rounded">
+          <button onClick={handleDismissError} className="ml-auto p-1 hover:bg-red-500/20 rounded">
             <X size={14} className="text-red-400" />
           </button>
         </div>

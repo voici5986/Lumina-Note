@@ -107,4 +107,20 @@ describe('WebDAVSettings cloud sync flow', () => {
     expect(useWebDAVStore.getState().config.remote_base_path).toBe('/workspace-2');
     expect(screen.getByDisplayValue('https://sync.example.com/dav')).toBeDisabled();
   });
+
+  it('dismisses cloud auth errors from the shared banner', () => {
+    useCloudSyncStore.setState({ error: 'Wrong password' });
+    useWebDAVStore.setState({ connectionError: 'Connection failed' });
+
+    const { container } = render(<WebDAVSettings compact />);
+
+    const alert = screen.getByText('Wrong password').closest('div');
+    const closeButton = alert?.querySelector('button');
+
+    expect(closeButton).not.toBeNull();
+    fireEvent.click(closeButton!);
+
+    expect(useCloudSyncStore.getState().error).toBeNull();
+    expect(container).not.toHaveTextContent('Wrong password');
+  });
 });
