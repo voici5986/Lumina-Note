@@ -2,6 +2,7 @@ import "@excalidraw/excalidraw/index.css";
 import { CaptureUpdateAction, Excalidraw, restore, serializeAsJSON } from "@excalidraw/excalidraw";
 import type { ExcalidrawImperativeAPI, ExcalidrawInitialDataState } from "@excalidraw/excalidraw/types";
 import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
+import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, MessageSquareQuote, RotateCcw, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -344,7 +345,6 @@ export function DiagramView({
 
     const setup = async () => {
       try {
-        const { listen } = await import("@tauri-apps/api/event");
         unlisten = await listen<FsChangePayload | null>("fs:change", (event) => {
           const changedPath = getFsChangePath(event.payload);
           if (!changedPath || normalizeFsPath(changedPath) !== targetPath) {
