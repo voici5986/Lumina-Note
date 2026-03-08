@@ -290,6 +290,111 @@ function withErrorBoundary(fn) {
 
 const MAX_RUNTIME_ISSUES = 8;
 const RUNTIME_ISSUE_DEDUPE_WINDOW_MS = 2500;
+const MAX_DEBUG_EVENTS = 80;
+const DEBUG_EVENT_DEDUPE_WINDOW_MS = 1000;
+
+function truncateDebugString(value, maxLength = 180) {
+  const text = String(value ?? "");
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength - 1)}…`;
+}
+
+function summarizeDebugValue(value, depth = 0) {
+  if (value == null || typeof value === "boolean" || typeof value === "number") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return truncateDebugString(value);
+  }
+
+  if (typeof value === "bigint") {
+    return `${value}n`;
+  }
+
+  if (typeof value === "function") {
+    return `[Function ${value.name || "anonymous"}]`;
+  }
+
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: truncateDebugString(value.message),
+      stack: value.stack ? truncateDebugString(value.stack, 320) : null,
+    };
+  }
+
+  if (Array.isArray(value)) {
+    if (depth >= 3) {
+      return `[Array(${value.length})]`;
+    }
+    return {
+      type: "array",
+      length: value.length,
+      items: value.slice(0, 4).map((item) => summarizeDebugValue(item, depth + 1)),
+    };
+  }
+
+  if (typeof value === "object") {
+    if (depth >= 3) {
+      const objectType = value?.constructor?.name;
+      return objectType && objectType !== "Object" ? `[${objectType}]` : "[Object]";
+    }
+
+    const entries = Object.entries(value).slice(0, 12);
+    const summary = {};
+    for (const [key, entryValue] of entries) {
+      summary[key] = summarizeDebugValue(entryValue, depth + 1);
+    }
+    const remainingKeys = Object.keys(value).length - entries.length;
+    if (remainingKeys > 0) {
+      summary.__remainingKeys = remainingKeys;
+    }
+    return summary;
+  }
+
+  return truncateDebugString(value);
+}
+
+function buildDebugEventSignature(event) {
+  return JSON.stringify([
+    event.category ?? "",
+    event.direction ?? "",
+    event.viewType ?? "",
+    event.level ?? "",
+    event.summary ?? null,
+  ]);
+}
+
+function toSerializableDebugEvent(event) {
+  if (!event) return null;
+  const { signature: _signature, ...rest } = event;
+  return rest;
+}
+
+function recordDebugEvent(state, event) {
+  const now = Date.now();
+  const signature = buildDebugEventSignature(event);
+  const existing = state.debugEvents.find(
+    (item) => item.signature === signature && now - item.lastSeenAt <= DEBUG_EVENT_DEDUPE_WINDOW_MS,
+  );
+  if (existing) {
+    existing.count += 1;
+    existing.lastSeenAt = now;
+    return existing;
+  }
+
+  const next = {
+    id: state.nextDebugEventId++,
+    createdAt: now,
+    lastSeenAt: now,
+    count: 1,
+    signature,
+    ...event,
+  };
+  state.debugEvents = [next, ...state.debugEvents].slice(0, MAX_DEBUG_EVENTS);
+  return next;
+}
 
 function buildRuntimeIssueSignature(issue) {
   return JSON.stringify([
@@ -326,6 +431,15 @@ function recordRuntimeIssue(state, issue) {
   };
 
   state.runtimeIssues = [next, ...state.runtimeIssues].slice(0, MAX_RUNTIME_ISSUES);
+  recordDebugEvent(state, {
+    category: "runtimeIssue",
+    summary: {
+      viewType: next.viewType,
+      kind: next.kind,
+      message: next.message,
+      detail: summarizeDebugValue(next.detail),
+    },
+  });
   return next;
 }
 
@@ -519,7 +633,8 @@ function injectCspFontDataCompatibility(html, origin) {
 
     const quote = contentMatch[1];
     const content = contentMatch[2];
-    const nextPolicy = ensureDirectiveSources(content, "font-src", [origin, "data:"]);
+    let nextPolicy = ensureDirectiveSources(content, "font-src", [origin, "data:"]);
+    nextPolicy = ensureDirectiveSources(nextPolicy, "script-src", [origin, "'unsafe-eval'"]);
     return tag.replace(contentMatch[0], `content=${quote}${nextPolicy}${quote}`);
   });
 }
@@ -609,6 +724,8 @@ async function main() {
     activeDocument: null, // { path, languageId, content, version }
     runtimeIssues: [],
     nextRuntimeIssueId: 1,
+    debugEvents: [],
+    nextDebugEventId: 1,
   };
 
   const server = http.createServer(
@@ -641,11 +758,16 @@ async function main() {
               }
             : null,
           latestRuntimeIssue: toSerializableRuntimeIssue(latestRuntimeIssue),
+          debugEventCount: state.debugEvents.length,
         });
       }
 
       if (u.pathname === "/debug/registered") {
         return json(res, 200, { viewTypes: [...state.viewProviders.keys()] });
+      }
+
+      if (u.pathname === "/debug/traffic") {
+        return json(res, 200, { events: state.debugEvents.map((event) => toSerializableDebugEvent(event)) });
       }
 
       if (u.pathname === "/vscode/api.js" && req.method === "GET") {
@@ -745,6 +867,12 @@ async function main() {
         const entry = state.views.get(viewType);
         if (!entry) return json(res, 404, { ok: false, error: "unknown viewType" });
         if (entry.token !== token) return json(res, 403, { ok: false, error: "bad token" });
+        recordDebugEvent(state, {
+          category: "webviewMessage",
+          direction: "webview->host",
+          viewType,
+          summary: summarizeDebugValue(message),
+        });
         if (message?.type === "__luminaRuntimeIssue" && message.payload && typeof message.payload === "object") {
           recordRuntimeIssue(state, {
             viewType,
@@ -953,6 +1081,10 @@ function createVscodeApi(state, originForApi) {
       async openExternal(uri) {
         const url = uri?.toString?.() ?? uri;
         logger.info("openExternal", url);
+        recordDebugEvent(state, {
+          category: "openExternal",
+          summary: { url: summarizeDebugValue(url) },
+        });
         return openExternalUrl(url);
       },
     },
@@ -964,12 +1096,32 @@ function createVscodeApi(state, originForApi) {
     commands: {
       registerCommand(command, callback) {
         state.commands.set(command, callback);
+        recordDebugEvent(state, {
+          category: "commandRegistration",
+          summary: { command },
+        });
         return new Disposable(() => state.commands.delete(command));
       },
       async executeCommand(command, ...args) {
         const cb = state.commands.get(command);
+        recordDebugEvent(state, {
+          category: "command",
+          summary: {
+            command,
+            handled: Boolean(cb),
+            args: summarizeDebugValue(args),
+          },
+        });
         if (!cb) return undefined;
-        return await cb(...args);
+        const result = await cb(...args);
+        recordDebugEvent(state, {
+          category: "commandResult",
+          summary: {
+            command,
+            result: summarizeDebugValue(result),
+          },
+        });
+        return result;
       },
     },
     extensions: {
@@ -1115,6 +1267,10 @@ function createVscodeApi(state, originForApi) {
       },
       registerWebviewViewProvider(viewType, provider) {
         state.viewProviders.set(viewType, provider);
+        recordDebugEvent(state, {
+          category: "viewProviderRegistration",
+          summary: { viewType },
+        });
         return new Disposable(() => state.viewProviders.delete(viewType));
       },
       createOutputChannel(name) {
@@ -1135,12 +1291,27 @@ function createVscodeApi(state, originForApi) {
       },
       showInformationMessage(message) {
         logger.info("info", message);
+        recordDebugEvent(state, {
+          category: "notification",
+          level: "info",
+          summary: { message: summarizeDebugValue(message) },
+        });
       },
       showWarningMessage(message) {
         logger.warn("warn", message);
+        recordDebugEvent(state, {
+          category: "notification",
+          level: "warning",
+          summary: { message: summarizeDebugValue(message) },
+        });
       },
       showErrorMessage(message) {
         logger.error("error", message);
+        recordDebugEvent(state, {
+          category: "notification",
+          level: "error",
+          summary: { message: summarizeDebugValue(message) },
+        });
       },
     },
     ColorThemeKind,
@@ -1178,6 +1349,10 @@ async function ensureView({ state, viewType, token, origin }) {
   if (state.views.has(viewType)) {
     const existing = state.views.get(viewType);
     existing.token = token;
+    recordDebugEvent(state, {
+      category: "viewLifecycle",
+      summary: { viewType, event: "reuse" },
+    });
     return existing;
   }
 
@@ -1194,15 +1369,31 @@ async function ensureView({ state, viewType, token, origin }) {
 
   const queue = createQueue();
   const webview = new Webview({
-    postMessageSink: (msg) => queue.push(msg),
+    postMessageSink: (msg) => {
+      recordDebugEvent(state, {
+        category: "webviewMessage",
+        direction: "host->webview",
+        viewType,
+        summary: summarizeDebugValue(msg),
+      });
+      queue.push(msg);
+    },
     asWebviewUri,
     cspSource: origin,
   });
 
   const view = new WebviewView(webview);
   const cancellationToken = { isCancellationRequested: false };
+  recordDebugEvent(state, {
+    category: "viewLifecycle",
+    summary: { viewType, event: "resolve:start" },
+  });
 
   await provider.resolveWebviewView?.(view, {}, cancellationToken);
+  recordDebugEvent(state, {
+    category: "viewLifecycle",
+    summary: { viewType, event: "resolve:done", htmlLength: view.webview.html.length },
+  });
 
   const entry = { webview, view, queue, token };
   state.views.set(viewType, entry);
