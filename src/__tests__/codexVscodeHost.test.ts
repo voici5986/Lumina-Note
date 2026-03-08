@@ -239,6 +239,12 @@ exports.activate = async function activate() {
         }),
       ]),
     );
+
+    const reset = await fetch(`${origin}/debug/traffic/reset`, { method: "POST" }).then((r) => r.json());
+    expect(reset).toEqual({ ok: true });
+
+    const clearedTraffic = await fetch(`${origin}/debug/traffic`).then((r) => r.json());
+    expect(clearedTraffic.events).toEqual([]);
   });
 
   it("reflects active document in health and fires without crashing", async () => {

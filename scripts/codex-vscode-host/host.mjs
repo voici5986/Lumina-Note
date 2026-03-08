@@ -293,6 +293,16 @@ const RUNTIME_ISSUE_DEDUPE_WINDOW_MS = 2500;
 const MAX_DEBUG_EVENTS = 80;
 const DEBUG_EVENT_DEDUPE_WINDOW_MS = 1000;
 
+function isThreadStreamBroadcastEvent(event) {
+  const summary = event?.summary;
+  return (
+    event?.category === "webviewMessage" &&
+    event?.direction === "host->webview" &&
+    summary?.type === "ipc-broadcast" &&
+    summary?.method === "thread-stream-state-changed"
+  );
+}
+
 function truncateDebugString(value, maxLength = 180) {
   const text = String(value ?? "");
   if (text.length <= maxLength) return text;
@@ -357,6 +367,15 @@ function summarizeDebugValue(value, depth = 0) {
 }
 
 function buildDebugEventSignature(event) {
+  if (isThreadStreamBroadcastEvent(event)) {
+    return JSON.stringify([
+      event.category ?? "",
+      event.direction ?? "",
+      event.viewType ?? "",
+      "ipc-broadcast",
+      "thread-stream-state-changed",
+    ]);
+  }
   return JSON.stringify([
     event.category ?? "",
     event.direction ?? "",
@@ -375,12 +394,14 @@ function toSerializableDebugEvent(event) {
 function recordDebugEvent(state, event) {
   const now = Date.now();
   const signature = buildDebugEventSignature(event);
+  const dedupeWindowMs = isThreadStreamBroadcastEvent(event) ? Number.POSITIVE_INFINITY : DEBUG_EVENT_DEDUPE_WINDOW_MS;
   const existing = state.debugEvents.find(
-    (item) => item.signature === signature && now - item.lastSeenAt <= DEBUG_EVENT_DEDUPE_WINDOW_MS,
+    (item) => item.signature === signature && now - item.lastSeenAt <= dedupeWindowMs,
   );
   if (existing) {
     existing.count += 1;
     existing.lastSeenAt = now;
+    existing.summary = event.summary;
     return existing;
   }
 
@@ -669,7 +690,7 @@ function createAcquireVsCodeApiJs({ origin, viewType, token }) {
         const { cursor: next, messages } = await poll(cursor);
         cursor = next ?? cursor;
         for (const msg of messages ?? []) {
-          window.dispatchEvent(new MessageEvent("message", { data: msg }));
+          window.postMessage(msg, window.location.origin);
         }
       } catch {
         // ignore
@@ -768,6 +789,12 @@ async function main() {
 
       if (u.pathname === "/debug/traffic") {
         return json(res, 200, { events: state.debugEvents.map((event) => toSerializableDebugEvent(event)) });
+      }
+
+      if (u.pathname === "/debug/traffic/reset" && req.method === "POST") {
+        state.debugEvents = [];
+        state.nextDebugEventId = 1;
+        return json(res, 200, { ok: true });
       }
 
       if (u.pathname === "/vscode/api.js" && req.method === "GET") {
@@ -894,6 +921,17 @@ async function main() {
         if (!entry) return json(res, 404, { ok: false, error: "unknown viewType" });
         if (entry.token !== token) return json(res, 403, { ok: false, error: "bad token" });
         const { nextCursor, messages } = entry.queue.drain(cursor);
+        recordDebugEvent(state, {
+          category: "poll",
+          direction: "webview->host",
+          viewType,
+          summary: {
+            cursor,
+            nextCursor,
+            messageCount: messages.length,
+            messageTypes: messages.slice(0, 8).map((message) => message?.type ?? typeof message),
+          },
+        });
         return json(res, 200, { cursor: nextCursor, messages });
       }
 
