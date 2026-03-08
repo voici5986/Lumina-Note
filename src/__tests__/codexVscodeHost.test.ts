@@ -166,6 +166,7 @@ exports.activate = async function activate() {
 
     expect(html).toContain(`font-src ${origin} data:`);
     expect(html).toContain(`script-src ${origin} 'unsafe-eval'`);
+    expect(html).toContain(`connect-src ${origin}`);
     expect(html).toContain(`img-src https:`);
   });
 

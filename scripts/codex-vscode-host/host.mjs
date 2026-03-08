@@ -656,6 +656,7 @@ function injectCspFontDataCompatibility(html, origin) {
     const content = contentMatch[2];
     let nextPolicy = ensureDirectiveSources(content, "font-src", [origin, "data:"]);
     nextPolicy = ensureDirectiveSources(nextPolicy, "script-src", [origin, "'unsafe-eval'"]);
+    nextPolicy = ensureDirectiveSources(nextPolicy, "connect-src", [origin]);
     return tag.replace(contentMatch[0], `content=${quote}${nextPolicy}${quote}`);
   });
 }
