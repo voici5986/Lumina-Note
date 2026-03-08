@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-03-09
+
+### 修复
+- 修复 Codex 在开发环境下优先命中不兼容 PATH Node 时仍反复下载运行时的问题，已优先复用本地兼容 runtime
+- 修复 Codex host 启动和侧栏注册超时的用户提示，避免直接暴露内部错误信息
+- 修复严格 CSP 下 Codex webview bridge 的脚本注入与网络连接放行问题
+
 ## [1.0.3] - 2026-03-08
 
 ### 新功能
