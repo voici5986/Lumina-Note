@@ -10,6 +10,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { reportOperationError } from "@/lib/reportError";
 import { retryWithExponentialBackoff } from "@/lib/retry";
+import { isTauriAvailable } from "@/lib/tauri";
 
 export const UPDATE_CHECK_TIMEOUT_MS = 15_000;
 const UPDATE_CHECK_MAX_ATTEMPTS = 3;
@@ -387,7 +388,10 @@ export const useUpdateStore = create<UpdateState>()(
         set((state) => ({
           installTelemetry: status
             ? buildTelemetryFromResumable(state.installTelemetry, status)
-            : state.installTelemetry,
+            : {
+                ...createInitialInstallTelemetry(),
+                sessionId: state.installTelemetry.sessionId,
+              },
         })),
 
       resetInstallTelemetry: () =>
@@ -483,6 +487,7 @@ export const isResumableUpdaterEnabled = (): boolean => {
 
 export async function initResumableUpdateListeners(): Promise<void> {
   if (!isResumableUpdaterEnabled()) return;
+  if (!isTauriAvailable()) return;
   if (resumableInitPromise) return resumableInitPromise;
 
   resumableInitPromise = (async () => {
@@ -559,6 +564,10 @@ export function shouldCheckForUpdate(): boolean {
  * @returns 是否有可用更新
  */
 export async function checkForUpdate(force = false): Promise<boolean> {
+  if (!isTauriAvailable()) {
+    return false;
+  }
+
   const store = useUpdateStore.getState();
 
   // 检查冷却时间
@@ -632,6 +641,8 @@ export async function checkForUpdate(force = false): Promise<boolean> {
  * 应在 App 启动时调用，会延迟执行以避免影响启动性能
  */
 export function initAutoUpdateCheck(delayMs = 5000): void {
+  if (!isTauriAvailable()) return;
+
   setTimeout(async () => {
     const hasUpdate = await checkForUpdate();
     if (hasUpdate) {

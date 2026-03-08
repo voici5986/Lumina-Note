@@ -80,4 +80,36 @@ describe("UpdateChecker", () => {
     expect(telemetry.phase).toBe("ready");
     expect(telemetry.progress).toBe(100);
   });
+
+  it("does not surface stale ready telemetry when there is no current update", () => {
+    useUpdateStore.setState({
+      availableUpdate: null,
+      hasUnreadUpdate: false,
+      installTelemetry: {
+        sessionId: 3,
+        taskId: "task-stale",
+        phase: "ready",
+        attempt: 1,
+        progress: 100,
+        downloadedBytes: 42,
+        contentLength: 42,
+        startedAt: 1,
+        updatedAt: 1,
+        finishedAt: 1,
+        error: null,
+        errorCode: null,
+        resumable: true,
+        retryDelayMs: null,
+        lastHttpStatus: 200,
+        canResumeAfterRestart: true,
+        capability: "supported",
+      },
+    });
+
+    render(<UpdateChecker />);
+
+    expect(screen.getByRole("button", { name: "检查更新" })).toBeInTheDocument();
+    expect(screen.queryByText("重启应用")).not.toBeInTheDocument();
+    expect(screen.queryByText("Update telemetry")).not.toBeInTheDocument();
+  });
 });

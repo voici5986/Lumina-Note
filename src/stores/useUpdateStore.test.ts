@@ -1,19 +1,45 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 
-const { checkMock } = vi.hoisted(() => ({
+const { checkMock, invokeMock, listenMock, isTauriAvailableMock } = vi.hoisted(() => ({
   checkMock: vi.fn(),
+  invokeMock: vi.fn(),
+  listenMock: vi.fn(),
+  isTauriAvailableMock: vi.fn(),
 }));
 
 vi.mock("@tauri-apps/plugin-updater", () => ({
   check: checkMock,
 }));
 
-import { checkForUpdate, useUpdateStore } from "./useUpdateStore";
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: invokeMock,
+}));
+
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: listenMock,
+}));
+
+vi.mock("@/lib/tauri", () => ({
+  isTauriAvailable: isTauriAvailableMock,
+}));
+
+import {
+  checkForUpdate,
+  initAutoUpdateCheck,
+  initResumableUpdateListeners,
+  useUpdateStore,
+} from "./useUpdateStore";
 
 describe("useUpdateStore.checkForUpdate", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     checkMock.mockReset();
+    invokeMock.mockReset();
+    listenMock.mockReset();
+    isTauriAvailableMock.mockReset();
+    listenMock.mockResolvedValue(vi.fn());
+    invokeMock.mockResolvedValue(null);
+    isTauriAvailableMock.mockReturnValue(true);
     useUpdateStore.persist?.clearStorage?.();
     useUpdateStore.setState({
       lastCheckTime: 0,
@@ -132,5 +158,54 @@ describe("useUpdateStore.checkForUpdate", () => {
     expect(telemetry.phase).toBe("downloading");
     expect(telemetry.downloadedBytes).toBe(768);
     expect(telemetry.progress).toBe(75);
+  });
+
+  it("clears persisted resumable telemetry when backend reports no active task", () => {
+    const state = useUpdateStore.getState() as any;
+    state.hydrateResumableStatus({
+      taskId: "task-stale",
+      version: "9.9.9",
+      attempt: 1,
+      downloadedBytes: 1024,
+      totalBytes: 1024,
+      resumable: true,
+      stage: "ready",
+      status: "ready",
+      timestamp: Date.now(),
+    });
+
+    state.hydrateResumableStatus(null);
+
+    const telemetry = (useUpdateStore.getState() as any).installTelemetry;
+    expect(telemetry.phase).toBe("idle");
+    expect(telemetry.taskId).toBe(null);
+    expect(telemetry.progress).toBe(0);
+  });
+
+  it("skips resumable listener init when Tauri bridge is unavailable", async () => {
+    isTauriAvailableMock.mockReturnValue(false);
+
+    await initResumableUpdateListeners();
+
+    expect(listenMock).not.toHaveBeenCalled();
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("skips update checks during startup when Tauri bridge is unavailable", async () => {
+    isTauriAvailableMock.mockReturnValue(false);
+
+    initAutoUpdateCheck(5000);
+    await vi.runAllTimersAsync();
+
+    expect(checkMock).not.toHaveBeenCalled();
+  });
+
+  it("returns false without invoking updater check when Tauri bridge is unavailable", async () => {
+    isTauriAvailableMock.mockReturnValue(false);
+
+    const hasUpdate = await checkForUpdate(true);
+
+    expect(hasUpdate).toBe(false);
+    expect(checkMock).not.toHaveBeenCalled();
   });
 });

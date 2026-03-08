@@ -49,7 +49,20 @@ export function UpdateChecker() {
     const [checkStatus, setCheckStatus] = useState<"idle" | "up-to-date" | "error">("idle");
     const [checkError, setCheckError] = useState<string | null>(null);
 
-    const status = installTelemetry.phase !== "idle" ? installTelemetry.phase : checkStatus;
+    const hasUpdate = availableUpdate !== null;
+    const hasActionableUpdate = hasUpdate || hasUnreadUpdate;
+    const hasActiveInstallPhase =
+        installTelemetry.phase === "downloading" ||
+        installTelemetry.phase === "verifying" ||
+        installTelemetry.phase === "installing";
+    const hasActionableTerminalPhase =
+        (installTelemetry.phase === "ready" ||
+            installTelemetry.phase === "error" ||
+            installTelemetry.phase === "cancelled") &&
+        hasActionableUpdate;
+    const effectiveInstallPhase =
+        hasActiveInstallPhase || hasActionableTerminalPhase ? installTelemetry.phase : "idle";
+    const status = effectiveInstallPhase !== "idle" ? effectiveInstallPhase : checkStatus;
     const error = status === "error" ? installTelemetry.error || checkError : checkError;
     const progress = installTelemetry.progress;
     const downloadedSize =
@@ -198,8 +211,6 @@ export function UpdateChecker() {
         }
     };
 
-    const hasUpdate = availableUpdate !== null;
-
     return (
         <div className="space-y-4 p-4 rounded-xl bg-muted/30 border border-border/50">
             <div className="flex items-center justify-between">
@@ -309,7 +320,7 @@ export function UpdateChecker() {
             )}
 
             {/* 观测信息（用于排查设置页关闭后的下载状态） */}
-            {installTelemetry.phase !== "idle" && (
+            {effectiveInstallPhase !== "idle" && (
                 <div className="text-xs text-muted-foreground bg-background/50 p-3 rounded-lg border border-border/50 space-y-1">
                     <p className="font-medium text-foreground/80">Update telemetry</p>
                     <p>
