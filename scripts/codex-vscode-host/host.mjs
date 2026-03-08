@@ -356,6 +356,50 @@ body {
   return `${style}\n${html}`;
 }
 
+function ensureDirectiveSources(policy, directiveName, nextSources) {
+  const directives = String(policy ?? "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const normalizedDirectiveName = directiveName.toLowerCase();
+  let found = false;
+
+  const rewritten = directives.map((directive) => {
+    const parts = directive.split(/\s+/).filter(Boolean);
+    if ((parts[0] ?? "").toLowerCase() !== normalizedDirectiveName) {
+      return directive;
+    }
+    found = true;
+    const merged = new Set(parts.slice(1));
+    for (const source of nextSources) merged.add(source);
+    return [parts[0], ...merged].join(" ");
+  });
+
+  if (!found) {
+    rewritten.push([directiveName, ...nextSources].join(" "));
+  }
+
+  return rewritten.join("; ");
+}
+
+function injectCspFontDataCompatibility(html, origin) {
+  return html.replace(/<meta\b[^>]*>/gi, (tag) => {
+    if (!/http-equiv\s*=\s*(["'])Content-Security-Policy\1/i.test(tag)) {
+      return tag;
+    }
+
+    const contentMatch = tag.match(/content\s*=\s*(["'])([\s\S]*?)\1/i);
+    if (!contentMatch) {
+      return tag;
+    }
+
+    const quote = contentMatch[1];
+    const content = contentMatch[2];
+    const nextPolicy = ensureDirectiveSources(content, "font-src", [origin, "data:"]);
+    return tag.replace(contentMatch[0], `content=${quote}${nextPolicy}${quote}`);
+  });
+}
+
 function createAcquireVsCodeApiJs({ origin, viewType, token }) {
   return `
 (() => {
@@ -555,7 +599,8 @@ async function main() {
 
         const theme = u.searchParams.get("theme") || state.theme;
         const raw = entry.webview.html;
-        const withApi = injectAcquireVsCodeApi(raw, { origin: `http://127.0.0.1:${server.address().port}`, viewType, token });
+        const withCsp = injectCspFontDataCompatibility(raw, `http://127.0.0.1:${server.address().port}`);
+        const withApi = injectAcquireVsCodeApi(withCsp, { origin: `http://127.0.0.1:${server.address().port}`, viewType, token });
         const withBase = injectBaseLayout(withApi);
         const html = injectTheme(withBase, theme);
         res.statusCode = 200;

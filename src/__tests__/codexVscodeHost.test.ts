@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it } from "vitest";
 import { spawn } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 function startHost(extensionPath: string, workspacePath?: string) {
@@ -133,6 +135,37 @@ describe("codex-vscode-host", () => {
     const { origin } = await host.ready;
     const html = await fetch(`${origin}/view/${encodeURIComponent("hello.view")}?token=t`).then((r) => r.text());
     expect(html).toContain("data-lumina-webview-base");
+  });
+
+  it("adds data: to font-src in extension CSP without broadening other directives", async () => {
+    const extensionPath = fs.mkdtempSync(path.join(os.tmpdir(), "lumina-csp-ext-"));
+    fs.writeFileSync(
+      path.join(extensionPath, "package.json"),
+      JSON.stringify({ name: "csp-ext", version: "0.0.0", main: "./extension.js" }),
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(extensionPath, "extension.js"),
+      `"use strict";
+exports.activate = async function activate() {
+  const vscode = require("vscode");
+  vscode.window.registerWebviewViewProvider("csp.view", {
+    resolveWebviewView(view) {
+      view.webview.html = \`<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https:; font-src \${view.webview.cspSource};"></head><body>CSP</body></html>\`;
+    },
+  });
+};`,
+      "utf8",
+    );
+
+    const host = startHost(extensionPath);
+    running.push(host);
+
+    const { origin } = await host.ready;
+    const html = await fetch(`${origin}/view/${encodeURIComponent("csp.view")}?token=t`).then((r) => r.text());
+
+    expect(html).toContain(`font-src ${origin} data:`);
+    expect(html).toContain(`img-src https:`);
   });
 
   it("reflects active document in health and fires without crashing", async () => {
