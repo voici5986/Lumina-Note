@@ -244,8 +244,7 @@ export function Ribbon({ showMacTrafficLightSafeArea = false, flushTopSpacing = 
   return (
     <div
       className={cn(
-        "w-11 h-full bg-background/55 backdrop-blur-md border-r border-border/60 shadow-[inset_-1px_0_0_hsl(var(--border)/0.6)] flex flex-col items-center pb-2 gap-0.5",
-        showMacTrafficLightSafeArea || flushTopSpacing ? "pt-0" : "pt-2",
+        "w-11 h-full bg-background/55 backdrop-blur-md flex flex-col items-center",
       )}
     >
       {showMacTrafficLightSafeArea ? (
@@ -255,195 +254,203 @@ export function Ribbon({ showMacTrafficLightSafeArea = false, flushTopSpacing = 
           data-testid="mac-ribbon-traffic-lights-safe-area"
         />
       ) : null}
-      {/* Top icons */}
-      <div className="flex flex-col items-center gap-0.5">
-        {/* Search */}
-        <button
-          onClick={() => window.dispatchEvent(new CustomEvent("open-global-search"))}
-          className="w-8 h-8 ui-icon-btn"
-          title={t.ribbon.globalSearch}
-        >
-          <Search size={18} />
-        </button>
+      <div
+        data-testid="ribbon-content"
+        className={cn(
+          "w-full min-h-0 flex-1 border-r border-border/60 shadow-[inset_-1px_0_0_hsl(var(--border)/0.6)] flex flex-col items-center pb-2 gap-0.5",
+          showMacTrafficLightSafeArea || flushTopSpacing ? "pt-0" : "pt-2",
+        )}
+      >
+        {/* Top icons */}
+        <div className="flex flex-col items-center gap-0.5">
+          {/* Search */}
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent("open-global-search"))}
+            className="w-8 h-8 ui-icon-btn"
+            title={t.ribbon.globalSearch}
+          >
+            <Search size={18} />
+          </button>
 
-        {/* AI Chat - Main View */}
-        <button
-          onClick={() => {
-            openAIMainTab();
-            setRightPanelTab("outline");
-          }}
-          className={cn(
-            "w-8 h-8 ui-icon-btn",
-            activeSection === "ai"
-              ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
-              : ""
-          )}
-          title={t.ribbon.aiChatMain}
-        >
-          <Bot size={18} />
-        </button>
+          {/* AI Chat - Main View */}
+          <button
+            onClick={() => {
+              openAIMainTab();
+              setRightPanelTab("outline");
+            }}
+            className={cn(
+              "w-8 h-8 ui-icon-btn",
+              activeSection === "ai"
+                ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
+                : ""
+            )}
+            title={t.ribbon.aiChatMain}
+          >
+            <Bot size={18} />
+          </button>
 
-        {/* Files/Editor */}
-        <button
-          onClick={handleSwitchToFiles}
-          className={cn(
-            "w-8 h-8 ui-icon-btn",
-            activeSection === "file"
-              ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
-              : ""
-          )}
-          title={t.ribbon.fileEditor}
-        >
-          <FileText size={18} />
-        </button>
+          {/* Files/Editor */}
+          <button
+            onClick={handleSwitchToFiles}
+            className={cn(
+              "w-8 h-8 ui-icon-btn",
+              activeSection === "file"
+                ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
+                : ""
+            )}
+            title={t.ribbon.fileEditor}
+          >
+            <FileText size={18} />
+          </button>
 
-        {/* Card Flow */}
-        <button
-          onClick={openCardFlowTab}
-          className={cn(
-            "w-8 h-8 ui-icon-btn",
-            activeSection === "cardflow"
-              ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
-              : ""
-          )}
-          title={t.ribbon.cardView}
-        >
-          <LayoutGrid size={18} />
-        </button>
+          {/* Card Flow */}
+          <button
+            onClick={openCardFlowTab}
+            className={cn(
+              "w-8 h-8 ui-icon-btn",
+              activeSection === "cardflow"
+                ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
+                : ""
+            )}
+            title={t.ribbon.cardView}
+          >
+            <LayoutGrid size={18} />
+          </button>
 
-        {/* Graph */}
-        <button
-          onClick={openGraphTab}
-          className={cn(
-            "w-8 h-8 ui-icon-btn",
-            activeSection === "graph"
-              ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
-              : ""
-          )}
-          title={t.graph.title}
-        >
-          <Network size={18} />
-        </button>
+          {/* Graph */}
+          <button
+            onClick={openGraphTab}
+            className={cn(
+              "w-8 h-8 ui-icon-btn",
+              activeSection === "graph"
+                ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
+                : ""
+            )}
+            title={t.graph.title}
+          >
+            <Network size={18} />
+          </button>
 
-        {/* Database */}
-        <button
-          onClick={() => window.dispatchEvent(new CustomEvent("open-create-database"))}
-          className={cn(
-            "w-8 h-8 ui-icon-btn",
-            activeSection === "database"
-              ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
-              : ""
-          )}
-          title={t.ribbon.database}
-        >
-          <Database size={18} />
-        </button>
+          {/* Database */}
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent("open-create-database"))}
+            className={cn(
+              "w-8 h-8 ui-icon-btn",
+              activeSection === "database"
+                ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
+                : ""
+            )}
+            title={t.ribbon.database}
+          >
+            <Database size={18} />
+          </button>
 
-        {/* Flashcard */}
-        <button
-          onClick={() => openFlashcardTab()}
-          className={cn(
-            "w-8 h-8 ui-icon-btn",
-            activeSection === "flashcard"
-              ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
-              : ""
-          )}
-          title={t.ribbon.flashcardReview}
-        >
-          <Brain size={18} />
-        </button>
+          {/* Flashcard */}
+          <button
+            onClick={() => openFlashcardTab()}
+            className={cn(
+              "w-8 h-8 ui-icon-btn",
+              activeSection === "flashcard"
+                ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
+                : ""
+            )}
+            title={t.ribbon.flashcardReview}
+          >
+            <Brain size={18} />
+          </button>
 
-        {/* Plugins */}
-        <button
-          onClick={() => setShowPlugins(true)}
-          className="w-8 h-8 ui-icon-btn"
-          title={t.ribbon.plugins}
-        >
-          <Puzzle size={18} />
-        </button>
+          {/* Plugins */}
+          <button
+            onClick={() => setShowPlugins(true)}
+            className="w-8 h-8 ui-icon-btn"
+            title={t.ribbon.plugins}
+          >
+            <Puzzle size={18} />
+          </button>
 
-        {topPluginRibbonItems.map((item) => (
-            <button
-              key={`${item.pluginId}:${item.itemId}`}
-              onClick={() => item.run()}
-              className={cn(
-                "w-8 h-8 ui-icon-btn text-xs",
-                isPluginRibbonItemActive(item)
-                  ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
-                  : ""
-              )}
-              title={item.title}
-            >
-              {renderPluginRibbonIcon(item)}
-            </button>
-          ))}
-      </div>
+          {topPluginRibbonItems.map((item) => (
+              <button
+                key={`${item.pluginId}:${item.itemId}`}
+                onClick={() => item.run()}
+                className={cn(
+                  "w-8 h-8 ui-icon-btn text-xs",
+                  isPluginRibbonItemActive(item)
+                    ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
+                    : ""
+                )}
+                title={item.title}
+              >
+                {renderPluginRibbonIcon(item)}
+              </button>
+            ))}
+        </div>
 
-      {/* Spacer */}
-      <div className="flex-1" />
+        {/* Spacer */}
+        <div className="flex-1" />
 
-      {/* Bottom icons */}
-      <div className="flex flex-col items-center gap-0.5">
-        <button
-          onClick={handleOpenUpdateModal}
-          className={updateButtonClassName}
-          title={updateTitle}
-          aria-label={updateTitle}
-        >
-          {renderUpdateIcon()}
-          {showUpdateDot && (
-            <span
-              aria-hidden="true"
-              className={cn("absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full", updateDotClassName)}
-            />
-          )}
-        </button>
+        {/* Bottom icons */}
+        <div className="flex flex-col items-center gap-0.5">
+          <button
+            onClick={handleOpenUpdateModal}
+            className={updateButtonClassName}
+            title={updateTitle}
+            aria-label={updateTitle}
+          >
+            {renderUpdateIcon()}
+            {showUpdateDot && (
+              <span
+                aria-hidden="true"
+                className={cn("absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full", updateDotClassName)}
+              />
+            )}
+          </button>
 
-        {/* Star on GitHub */}
-        <button
-          onClick={() => {
-            void handleOpenRepository();
-          }}
-          className="w-8 h-8 ui-icon-btn"
-          title={t.ribbon.starProject}
-          aria-label={t.ribbon.starProject}
-        >
-          <Star size={18} />
-        </button>
+          {/* Star on GitHub */}
+          <button
+            onClick={() => {
+              void handleOpenRepository();
+            }}
+            className="w-8 h-8 ui-icon-btn"
+            title={t.ribbon.starProject}
+            aria-label={t.ribbon.starProject}
+          >
+            <Star size={18} />
+          </button>
 
-        {bottomPluginRibbonItems.map((item) => (
-            <button
-              key={`${item.pluginId}:${item.itemId}`}
-              onClick={() => item.run()}
-              className={cn(
-                "w-8 h-8 ui-icon-btn text-xs",
-                isPluginRibbonItemActive(item)
-                  ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
-                  : ""
-              )}
-              title={item.title}
-            >
-              {renderPluginRibbonIcon(item)}
-            </button>
-          ))}
+          {bottomPluginRibbonItems.map((item) => (
+              <button
+                key={`${item.pluginId}:${item.itemId}`}
+                onClick={() => item.run()}
+                className={cn(
+                  "w-8 h-8 ui-icon-btn text-xs",
+                  isPluginRibbonItemActive(item)
+                    ? "bg-primary/12 text-primary border border-primary/25 hover:bg-primary/18"
+                    : ""
+                )}
+                title={item.title}
+              >
+                {renderPluginRibbonIcon(item)}
+              </button>
+            ))}
 
-        {/* Theme toggle */}
-        <button
-          onClick={toggleTheme}
-          className="w-8 h-8 ui-icon-btn"
-          title={isDarkMode ? t.ribbon.switchToLight : t.ribbon.switchToDark}
-        >
-          {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
+          {/* Theme toggle */}
+          <button
+            onClick={toggleTheme}
+            className="w-8 h-8 ui-icon-btn"
+            title={isDarkMode ? t.ribbon.switchToLight : t.ribbon.switchToDark}
+          >
+            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
 
-        {/* Settings */}
-        <button
-          onClick={handleOpenSettings}
-          className="w-8 h-8 ui-icon-btn"
-          title={t.ribbon.settings}
-        >
-          <Settings size={18} />
-        </button>
+          {/* Settings */}
+          <button
+            onClick={handleOpenSettings}
+            className="w-8 h-8 ui-icon-btn"
+            title={t.ribbon.settings}
+          >
+            <Settings size={18} />
+          </button>
+        </div>
       </div>
 
       {/* Settings Modal */}

@@ -139,17 +139,26 @@ describe("Ribbon", () => {
   });
 
   it("renders a dedicated macOS traffic-light safe area when requested", () => {
-    render(<Ribbon showMacTrafficLightSafeArea />);
+    const { container } = render(<Ribbon showMacTrafficLightSafeArea />);
 
     expect(screen.getByTestId("mac-ribbon-traffic-lights-safe-area")).toHaveAttribute("data-tauri-drag-region", "true");
+    expect(container.firstElementChild).not.toHaveClass("border-r");
+    expect(screen.getByTestId("ribbon-content")).toHaveClass("border-r");
     expect(screen.getByRole("button", { name: "Global Search" })).toBeInTheDocument();
   });
 
   it("removes extra top padding when left macOS top chrome already owns the top row", () => {
-    const { container } = render(<Ribbon flushTopSpacing />);
+    render(<Ribbon flushTopSpacing />);
 
-    expect(container.firstElementChild).toHaveClass("pt-0");
-    expect(container.firstElementChild).not.toHaveClass("pt-2");
+    expect(screen.getByTestId("ribbon-content")).toHaveClass("pt-0");
+    expect(screen.getByTestId("ribbon-content")).not.toHaveClass("pt-2");
+  });
+
+  it("keeps the macOS safe area free of the vertical divider when collapsed", () => {
+    render(<Ribbon showMacTrafficLightSafeArea />);
+
+    expect(screen.getByTestId("mac-ribbon-traffic-lights-safe-area")).not.toHaveClass("border-r");
+    expect(screen.getByTestId("ribbon-content")).toHaveClass("shadow-[inset_-1px_0_0_hsl(var(--border)/0.6)]");
   });
 
   it("renders in StrictMode without triggering a zustand selector loop", () => {
