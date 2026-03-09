@@ -2,7 +2,7 @@ import { useCallback, useState, useRef, useEffect } from "react";
 import { useFileStore, Tab } from "@/stores/useFileStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 import { useUIStore } from "@/stores/useUIStore";
-import { X, FileText, Network, Video, Database, Globe, Brain, Pin, User, Puzzle, Shapes, Command, FolderOpen, Search } from "lucide-react";
+import { X, FileText, Network, Video, Database, Globe, Brain, Pin, User, Puzzle, Shapes } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { reportOperationError } from "@/lib/reportError";
 import { useShallow } from "zustand/react/shallow";
@@ -142,10 +142,6 @@ export function TabBar() {
   const leftSidebarOpen = useUIStore((state) => state.leftSidebarOpen);
   const showMacTrafficLightInset = showMacTopActions && !leftSidebarOpen;
 
-  const dispatchWindowEvent = useCallback((eventName: string) => {
-    window.dispatchEvent(new CustomEvent(eventName));
-  }, []);
-
   const handleContextMenu = useCallback((e: React.MouseEvent, index: number) => {
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY, tabIndex: index });
@@ -248,42 +244,6 @@ export function TabBar() {
             />
           ))}
         </div>
-
-        {showMacTopActions ? (
-          <div
-            className="flex shrink-0 items-center gap-1 border-l border-border/50 px-2"
-            data-tauri-drag-region="false"
-            data-testid="mac-tabbar-top-actions"
-          >
-              <button
-                type="button"
-                onClick={() => dispatchWindowEvent("open-command-palette")}
-                className="h-8 w-8 ui-icon-btn"
-                title={t.overview.commandPalette}
-                aria-label={t.overview.commandPalette}
-              >
-                <Command className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => dispatchWindowEvent("open-global-search")}
-                className="h-8 w-8 ui-icon-btn"
-                title={t.globalSearch.title}
-                aria-label={t.globalSearch.title}
-              >
-                <Search className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => dispatchWindowEvent("open-vault")}
-                className="h-8 w-8 ui-icon-btn"
-                title={t.welcome.openFolder}
-                aria-label={t.welcome.openFolder}
-              >
-                <FolderOpen className="h-4 w-4" />
-              </button>
-          </div>
-        ) : null}
       </div>
 
       {/* Context Menu */}

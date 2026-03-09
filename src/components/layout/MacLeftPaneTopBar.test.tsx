@@ -3,21 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MacLeftPaneTopBar } from "./MacLeftPaneTopBar";
 
-const openAIMainTab = vi.fn();
-const setRightPanelTab = vi.fn();
 const toggleLeftSidebar = vi.fn();
-
-vi.mock("@/stores/useFileStore", () => ({
-  useFileStore: (selector: (state: unknown) => unknown) =>
-    selector({
-      openAIMainTab,
-    }),
-}));
 
 vi.mock("@/stores/useUIStore", () => ({
   useUIStore: (selector: (state: unknown) => unknown) =>
     selector({
-      setRightPanelTab,
       toggleLeftSidebar,
     }),
 }));
@@ -25,15 +15,6 @@ vi.mock("@/stores/useUIStore", () => ({
 vi.mock("@/stores/useLocaleStore", () => ({
   useLocaleStore: () => ({
     t: {
-      welcome: {
-        openFolder: "Open Folder",
-      },
-      globalSearch: {
-        title: "Global Search",
-      },
-      ribbon: {
-        aiChatMain: "AI Chat",
-      },
       sidebar: {
         files: "Files",
       },
@@ -44,14 +25,10 @@ vi.mock("@/stores/useLocaleStore", () => ({
 describe("MacLeftPaneTopBar", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    openAIMainTab.mockReset();
-    setRightPanelTab.mockReset();
     toggleLeftSidebar.mockReset();
   });
 
-  it("reserves a dedicated traffic-light safe area and keeps controls interactive", () => {
-    const dispatchEventSpy = vi.spyOn(window, "dispatchEvent");
-
+  it("reserves a dedicated traffic-light safe area and keeps the collapse control interactive", () => {
     render(<MacLeftPaneTopBar />);
 
     expect(screen.getByTestId("mac-left-pane-traffic-lights-safe-area")).toHaveAttribute(
@@ -59,18 +36,9 @@ describe("MacLeftPaneTopBar", () => {
       "true",
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Open Folder" }));
-    fireEvent.click(screen.getByRole("button", { name: "Global Search" }));
-    fireEvent.click(screen.getByRole("button", { name: "AI Chat" }));
     fireEvent.click(screen.getByRole("button", { name: "Files" }));
 
-    expect(dispatchEventSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "open-vault" }));
-    expect(dispatchEventSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "open-global-search" }));
-    expect(openAIMainTab).toHaveBeenCalledTimes(1);
-    expect(setRightPanelTab).toHaveBeenCalledWith("outline");
     expect(toggleLeftSidebar).toHaveBeenCalledTimes(1);
-
-    dispatchEventSpy.mockRestore();
   });
 
   it("uses a full-height control row so left controls align like the right top bar", () => {
@@ -80,6 +48,7 @@ describe("MacLeftPaneTopBar", () => {
     expect(container.firstElementChild).toHaveClass("items-stretch");
     expect(screen.getByTestId("mac-left-pane-controls")).toHaveClass("h-full");
     expect(screen.getByTestId("mac-left-pane-controls")).toHaveClass("items-center");
+    expect(screen.getByTestId("mac-left-pane-controls")).toHaveClass("pl-2");
   });
 
   it("keeps the custom controls vertically centered within the 44px top bar", () => {
