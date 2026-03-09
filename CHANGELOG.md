@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-03-10
+
+### 修复
+- 修复 macOS 左侧文件树折叠后 Ribbon 顶部分割线贯穿安全区的问题
+- 修复 macOS 左侧文件树折叠后 Ribbon 顶部缺少与 traffic lights 区域的横向分隔线问题
+- 修复 macOS 左侧文件树折叠后 TabBar 与原生 traffic lights 按钮发生重叠的问题，为按钮保留安全留白
+
 ## [1.0.4] - 2026-03-09
 
 ### 修复
