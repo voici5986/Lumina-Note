@@ -131,15 +131,9 @@ export function TitleBar() {
     await withWindow((appWindow) => appWindow.close(), "Failed to close:");
   };
 
-  // Tauri macOS 使用原生 overlay 标题栏；这里只保留拖拽/避让空间，避免出现第二条网页顶栏
+  // Tauri macOS 使用原生 overlay 标题栏；这里不再渲染网页层顶栏，避免留下空白条
   if (usesNativeMacTitleBar) {
-    return (
-      <div
-        className="h-8 shrink-0 bg-transparent select-none"
-        data-tauri-drag-region
-        data-testid="macos-titlebar-spacer"
-      />
-    );
+    return null;
   }
 
   // 浏览器环境保留轻量标题条，便于本地调试和预览
