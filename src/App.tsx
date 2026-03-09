@@ -870,7 +870,10 @@ function App() {
           <div className="flex min-h-0 flex-1">
             {/* Left Ribbon (Icon Bar) */}
             <div ref={ribbonRef} className="flex-shrink-0">
-              <Ribbon showMacTrafficLightSafeArea={showMacRibbonTrafficLightSafeArea} />
+              <Ribbon
+                showMacTrafficLightSafeArea={showMacRibbonTrafficLightSafeArea}
+                flushTopSpacing={showMacLeftPaneTopBar}
+              />
             </div>
 
             {/* Left Sidebar (File Tree) */}

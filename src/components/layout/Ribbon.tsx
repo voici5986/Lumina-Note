@@ -38,9 +38,10 @@ import { getRibbonUpdateState } from "./ribbonUpdateState";
 
 interface RibbonProps {
   showMacTrafficLightSafeArea?: boolean;
+  flushTopSpacing?: boolean;
 }
 
-export function Ribbon({ showMacTrafficLightSafeArea = false }: RibbonProps) {
+export function Ribbon({ showMacTrafficLightSafeArea = false, flushTopSpacing = false }: RibbonProps) {
   const REPO_URL = "https://github.com/blueberrycongee/Lumina-Note";
   const [showSettings, setShowSettings] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
@@ -244,7 +245,7 @@ export function Ribbon({ showMacTrafficLightSafeArea = false }: RibbonProps) {
     <div
       className={cn(
         "w-11 h-full bg-background/55 backdrop-blur-md border-r border-border/60 shadow-[inset_-1px_0_0_hsl(var(--border)/0.6)] flex flex-col items-center pb-2 gap-0.5",
-        showMacTrafficLightSafeArea ? "pt-0" : "pt-2",
+        showMacTrafficLightSafeArea || flushTopSpacing ? "pt-0" : "pt-2",
       )}
     >
       {showMacTrafficLightSafeArea ? (

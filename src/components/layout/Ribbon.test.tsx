@@ -145,6 +145,13 @@ describe("Ribbon", () => {
     expect(screen.getByRole("button", { name: "Global Search" })).toBeInTheDocument();
   });
 
+  it("removes extra top padding when left macOS top chrome already owns the top row", () => {
+    const { container } = render(<Ribbon flushTopSpacing />);
+
+    expect(container.firstElementChild).toHaveClass("pt-0");
+    expect(container.firstElementChild).not.toHaveClass("pt-2");
+  });
+
   it("renders in StrictMode without triggering a zustand selector loop", () => {
 
     render(
