@@ -197,93 +197,12 @@ export function TabBar() {
   }, []);
 
   // 监听全局鼠标移动和松开
-  useEffect(() => {
-    if (draggedIndex === null) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (dragStartPos.current === null || draggedIndex === null) return;
-
-      const dx = e.clientX - dragStartPos.current.x;
-      const dy = e.clientY - dragStartPos.current.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      // 移动超过 5px 才算拖拽
-      if (distance > 5) {
-        isDragging.current = true;
-      }
-
-      if (!isDragging.current) return;
-
-      // 找到鼠标下的标签页
-      const container = containerRef.current;
-      if (!container) return;
-
-      const tabElements = container.querySelectorAll('[data-tab-index]');
-      let foundTarget = false;
-
-      tabElements.forEach((el) => {
-        const rect = el.getBoundingClientRect();
-        if (e.clientX >= rect.left && e.clientX <= rect.right) {
-          const tabIndex = parseInt(el.getAttribute('data-tab-index') || '-1');
-          if (tabIndex !== -1 && tabIndex !== draggedIndex) {
-            setDropTargetIndex(tabIndex);
-            // 判断是放在左边还是右边
-            const midX = rect.left + rect.width / 2;
-            setDropPosition(e.clientX < midX ? 'left' : 'right');
-            foundTarget = true;
-          }
-        }
-      });
-
-      if (!foundTarget) {
-        setDropTargetIndex(null);
-        setDropPosition(null);
-      }
-    };
-
-    const handleMouseUp = () => {
-      if (isDragging.current && draggedIndex !== null && dropTargetIndex !== null) {
-        // 计算目标位置
-        let targetIndex = dropTargetIndex;
-        if (dropPosition === 'right') {
-          targetIndex = dropTargetIndex + 1;
-        }
-        // 如果从左边拖到右边，需要调整索引
-        if (draggedIndex < targetIndex) {
-          targetIndex -= 1;
-        }
-        if (targetIndex !== draggedIndex) {
-          reorderTabs(draggedIndex, targetIndex);
-        }
-      }
-
-      // 清理状态
-      setDraggedIndex(null);
-      setDropTargetIndex(null);
-      setDropPosition(null);
-      dragStartPos.current = null;
-      isDragging.current = false;
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [draggedIndex, dropTargetIndex, dropPosition, reorderTabs]);
-
-  // Close context menu when clicking outside
-  const handleClickOutside = useCallback(() => {
-    setContextMenu(null);
-  }, []);
 
   // 即使没有标签页也显示空的标签栏（保持 UI 一致性）
   return (
     <>
       <div
-        className="flex h-11 items-stretch border-b border-border/60 bg-background/55 backdrop-blur-md shadow-[0_1px_0_hsl(var(--border)/0.5)]"
+        className="flex h-11 shrink-0 items-stretch border-b border-border/60 bg-background/55 backdrop-blur-md shadow-[0_1px_0_hsl(var(--border)/0.5)]"
         data-tauri-drag-region={showMacTopActions ? true : undefined}
       >
         <div

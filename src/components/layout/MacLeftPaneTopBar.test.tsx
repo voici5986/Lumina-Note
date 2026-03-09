@@ -85,6 +85,6 @@ describe("MacLeftPaneTopBar", () => {
   it("applies a subtle upward optical offset so custom controls center against native traffic lights", () => {
     render(<MacLeftPaneTopBar />);
 
-    expect(screen.getByTestId("mac-left-pane-controls")).toHaveClass("-translate-y-px");
+    expect(screen.getByTestId("mac-left-pane-controls")).toHaveClass("-translate-y-[6px]");
   });
 });
