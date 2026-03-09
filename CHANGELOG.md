@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.6] - 2026-03-10
+
+### 修复
+- 修复某些交互后浏览器子 WebView 残留覆盖左侧区域，导致文件树宽度拖拽光标与拖拽行为失效的问题
+- 修复 macOS 顶部栏冗余快捷按钮，简化 traffic lights 周边控件布局
+- 修复左侧文件树滚动条常驻显示的问题，改为滚动时淡入、静止后淡出
+- 修复 Linux `src-tauri` CI 因 `macos-private-api` 特性作用域错误而失败的问题
+
 ## [1.0.5] - 2026-03-10
 
 ### 修复
