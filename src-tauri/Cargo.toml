@@ -13,7 +13,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.0.0", features = [] }
 
 [dependencies]
-tauri = { version = "2.0.0", features = ["protocol-asset", "unstable", "test", "macos-private-api"] }
+tauri = { version = "2.0.0", features = ["protocol-asset", "unstable", "test"] }
 tauri-plugin-dialog = "2.6.0"
 tauri-plugin-fs = "2.4.5"
 tauri-plugin-shell = "2.3.5"
@@ -60,6 +60,7 @@ minisign-verify = "0.2"
 tempfile = "3"
 
 [target.'cfg(target_os = "macos")'.dependencies]
+tauri = { version = "2.0.0", features = ["macos-private-api"] }
 objc2-app-kit = { version = "0.3.2", features = ["NSButton", "NSView", "NSWindow"] }
 
 [profile.dev]
