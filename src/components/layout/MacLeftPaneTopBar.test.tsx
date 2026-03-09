@@ -72,4 +72,13 @@ describe("MacLeftPaneTopBar", () => {
 
     dispatchEventSpy.mockRestore();
   });
+
+  it("uses a full-height control row so left controls align like the right top bar", () => {
+    const { container } = render(<MacLeftPaneTopBar />);
+
+    expect(container.firstElementChild).toHaveClass("h-11");
+    expect(container.firstElementChild).toHaveClass("items-stretch");
+    expect(screen.getByTestId("mac-left-pane-controls")).toHaveClass("h-full");
+    expect(screen.getByTestId("mac-left-pane-controls")).toHaveClass("items-center");
+  });
 });

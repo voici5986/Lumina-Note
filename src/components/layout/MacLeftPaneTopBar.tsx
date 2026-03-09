@@ -21,14 +21,14 @@ export function MacLeftPaneTopBar() {
   }, []);
 
   return (
-    <div className="flex h-11 items-center border-b border-r border-border/60 bg-background/55 backdrop-blur-md shadow-[inset_-1px_0_0_hsl(var(--border)/0.6)]">
+    <div className="flex h-11 items-stretch border-b border-r border-border/60 bg-background/55 backdrop-blur-md shadow-[inset_-1px_0_0_hsl(var(--border)/0.6),0_1px_0_hsl(var(--border)/0.5)]">
       <div
         className="h-full w-[72px] shrink-0"
         data-tauri-drag-region
         data-testid="mac-left-pane-traffic-lights-safe-area"
       />
 
-      <div className="flex min-w-0 flex-1 items-center gap-1 pr-2" data-tauri-drag-region>
+      <div className="flex h-full min-w-0 flex-1 items-center gap-1 pr-2" data-tauri-drag-region data-testid="mac-left-pane-controls">
         <button
           type="button"
           onClick={() => dispatchWindowEvent("open-vault")}
