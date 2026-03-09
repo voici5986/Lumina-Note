@@ -42,11 +42,13 @@ fn align_macos_traffic_lights(window: &tauri::WebviewWindow) -> tauri::Result<()
         let Some(close) = ns_window.standardWindowButton(NSWindowButton::CloseButton) else {
             return Ok(());
         };
-        let Some(miniaturize) = ns_window.standardWindowButton(NSWindowButton::MiniaturizeButton) else {
+        let Some(miniaturize) = ns_window.standardWindowButton(NSWindowButton::MiniaturizeButton)
+        else {
             return Ok(());
         };
         let zoom = ns_window.standardWindowButton(NSWindowButton::ZoomButton);
-        let Some(title_bar_container_view) = close.superview().and_then(|view| view.superview()) else {
+        let Some(title_bar_container_view) = close.superview().and_then(|view| view.superview())
+        else {
             return Ok(());
         };
 
@@ -233,6 +235,7 @@ fn main() {
         .manage(mobile_gateway::MobileGatewayState::new())
         .manage(cloud_relay::CloudRelayState::new())
         .manage(update_manager::UpdateManagerState::default())
+        .manage(commands::ChildWebviewBoundsState::default())
         .setup(|app| {
             if let Err(err) = mobile_gateway::hydrate_state(&app.handle()) {
                 eprintln!("[MobileGateway] Failed to hydrate state: {}", err);
@@ -261,12 +264,17 @@ fn main() {
                 window.on_window_event(move |event| {
                     if matches!(
                         event,
-                        tauri::WindowEvent::Resized(_) | tauri::WindowEvent::ScaleFactorChanged { .. }
+                        tauri::WindowEvent::Resized(_)
+                            | tauri::WindowEvent::ScaleFactorChanged { .. }
                     ) {
-                        if let Some(window_for_alignment) = app_handle_for_events.get_webview_window("main") {
+                        if let Some(window_for_alignment) =
+                            app_handle_for_events.get_webview_window("main")
+                        {
                             let window_for_main_thread = window_for_alignment.clone();
                             let _ = window_for_alignment.run_on_main_thread(move || {
-                                if let Err(err) = align_macos_traffic_lights(&window_for_main_thread) {
+                                if let Err(err) =
+                                    align_macos_traffic_lights(&window_for_main_thread)
+                                {
                                     eprintln!("[macOS] Failed to realign traffic lights: {}", err);
                                 }
                             });

@@ -5,13 +5,15 @@ use crate::typesetting::{
     layout_text_paragraph, shape_mixed_text, write_empty_pdf, FontManager, Glyph, PageBox,
     PageMargins, PageSize, PageStyle, ParagraphAlign, TextLayoutOptions,
 };
+use std::collections::HashMap;
 use std::io::Read;
 use std::path::PathBuf;
+use std::sync::Mutex;
 use tauri::webview::NewWindowResponse;
 use tauri::Emitter;
 use tauri::WebviewUrl;
 use tauri::{
-    AppHandle, LogicalPosition, LogicalSize, Manager, Position, Size, WebviewBuilder,
+    AppHandle, LogicalPosition, LogicalSize, Manager, Position, Size, State, WebviewBuilder,
     WebviewWindowBuilder,
 };
 use uuid::Uuid;
@@ -23,6 +25,38 @@ fn browser_debug_log(app: &AppHandle, message: String) {
         let content = format!("[Browser-Rust] {}\n", message);
         let _ = crate::llm::append_debug_log(app_clone, content).await;
     });
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ChildWebviewBounds {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+}
+
+#[derive(Default)]
+pub struct ChildWebviewBoundsState(Mutex<HashMap<String, ChildWebviewBounds>>);
+
+impl ChildWebviewBoundsState {
+    fn remember(&self, webview_id: &str, bounds: ChildWebviewBounds) {
+        if let Ok(mut store) = self.0.lock() {
+            store.insert(webview_id.to_string(), bounds);
+        }
+    }
+
+    fn get(&self, webview_id: &str) -> Option<ChildWebviewBounds> {
+        self.0
+            .lock()
+            .ok()
+            .and_then(|store| store.get(webview_id).copied())
+    }
+
+    fn forget(&self, webview_id: &str) {
+        if let Ok(mut store) = self.0.lock() {
+            store.remove(webview_id);
+        }
+    }
 }
 
 #[derive(serde::Serialize, Clone, Copy, Debug)]
@@ -529,12 +563,19 @@ pub async fn show_in_explorer(path: String) -> Result<(), AppError> {
 #[tauri::command]
 pub async fn create_embedded_webview(
     app: AppHandle,
+    bounds_state: State<'_, ChildWebviewBoundsState>,
     url: String,
     x: f64,
     y: f64,
     width: f64,
     height: f64,
 ) -> Result<(), AppError> {
+    let bounds = ChildWebviewBounds {
+        x,
+        y,
+        width,
+        height,
+    };
     // 获取主窗口（通过 Manager::windows()）
     let windows = app.windows();
     let main_window = windows
@@ -563,6 +604,7 @@ pub async fn create_embedded_webview(
             Size::Logical(LogicalSize::new(width, height)),
         )
         .map_err(|e| AppError::InvalidPath(e.to_string()))?;
+    bounds_state.remember("video-webview", bounds);
 
     println!(
         "[EmbeddedWebview] 创建成功: {} at ({}, {}) size {}x{}",
@@ -576,12 +618,22 @@ pub async fn create_embedded_webview(
 #[tauri::command]
 pub async fn update_webview_bounds(
     app: AppHandle,
+    bounds_state: State<'_, ChildWebviewBoundsState>,
     x: f64,
     y: f64,
     width: f64,
     height: f64,
 ) -> Result<(), AppError> {
     if let Some(webview) = app.get_webview("video-webview") {
+        bounds_state.remember(
+            "video-webview",
+            ChildWebviewBounds {
+                x,
+                y,
+                width,
+                height,
+            },
+        );
         webview
             .set_position(Position::Logical(LogicalPosition::new(x, y)))
             .map_err(|e| AppError::InvalidPath(e.to_string()))?;
@@ -594,12 +646,16 @@ pub async fn update_webview_bounds(
 
 /// 关闭内嵌 WebView
 #[tauri::command]
-pub async fn close_embedded_webview(app: AppHandle) -> Result<(), AppError> {
+pub async fn close_embedded_webview(
+    app: AppHandle,
+    bounds_state: State<'_, ChildWebviewBoundsState>,
+) -> Result<(), AppError> {
     if let Some(webview) = app.get_webview("video-webview") {
         webview
             .close()
             .map_err(|e| AppError::InvalidPath(e.to_string()))?;
     }
+    bounds_state.forget("video-webview");
     Ok(())
 }
 
@@ -991,6 +1047,7 @@ pub struct BrowserNewTabEventPayload {
 #[tauri::command]
 pub async fn create_browser_webview(
     app: AppHandle,
+    bounds_state: State<'_, ChildWebviewBoundsState>,
     tab_id: String,
     url: String,
     x: f64,
@@ -998,6 +1055,12 @@ pub async fn create_browser_webview(
     width: f64,
     height: f64,
 ) -> Result<(), AppError> {
+    let bounds = ChildWebviewBounds {
+        x,
+        y,
+        width,
+        height,
+    };
     let windows = app.windows();
     let main_window = windows
         .get("main")
@@ -1057,6 +1120,7 @@ pub async fn create_browser_webview(
             Size::Logical(LogicalSize::new(width, height)),
         )
         .map_err(|e| AppError::InvalidPath(e.to_string()))?;
+    bounds_state.remember(&webview_id, bounds);
 
     println!(
         "[Browser] WebView 创建成功: {} -> {} at ({}, {}) size {}x{}",
@@ -1070,6 +1134,7 @@ pub async fn create_browser_webview(
 #[tauri::command]
 pub async fn update_browser_webview_bounds(
     app: AppHandle,
+    bounds_state: State<'_, ChildWebviewBoundsState>,
     tab_id: String,
     x: f64,
     y: f64,
@@ -1078,6 +1143,15 @@ pub async fn update_browser_webview_bounds(
 ) -> Result<(), AppError> {
     let webview_id = format!("browser-{}", tab_id);
     if let Some(webview) = app.get_webview(&webview_id) {
+        bounds_state.remember(
+            &webview_id,
+            ChildWebviewBounds {
+                x,
+                y,
+                width,
+                height,
+            },
+        );
         browser_debug_log(
             &app,
             format!(
@@ -1097,7 +1171,11 @@ pub async fn update_browser_webview_bounds(
 
 /// 关闭浏览器 WebView
 #[tauri::command]
-pub async fn close_browser_webview(app: AppHandle, tab_id: String) -> Result<(), AppError> {
+pub async fn close_browser_webview(
+    app: AppHandle,
+    bounds_state: State<'_, ChildWebviewBoundsState>,
+    tab_id: String,
+) -> Result<(), AppError> {
     let webview_id = format!("browser-{}", tab_id);
     if let Some(webview) = app.get_webview(&webview_id) {
         webview
@@ -1106,6 +1184,7 @@ pub async fn close_browser_webview(app: AppHandle, tab_id: String) -> Result<(),
         println!("[Browser] WebView 已关闭: {}", webview_id);
         browser_debug_log(&app, format!("close_browser_webview: tab_id={}", tab_id));
     }
+    bounds_state.forget(&webview_id);
     Ok(())
 }
 
@@ -1180,6 +1259,7 @@ pub async fn browser_webview_reload(app: AppHandle, tab_id: String) -> Result<()
 #[tauri::command]
 pub async fn set_browser_webview_visible(
     app: AppHandle,
+    bounds_state: State<'_, ChildWebviewBoundsState>,
     tab_id: String,
     visible: bool,
 ) -> Result<(), AppError> {
@@ -1193,9 +1273,14 @@ pub async fn set_browser_webview_visible(
             ),
         );
         if visible {
-            webview
-                .set_position(Position::Logical(LogicalPosition::new(0.0, 0.0)))
-                .map_err(|e| AppError::InvalidPath(e.to_string()))?;
+            if let Some(bounds) = bounds_state.get(&webview_id) {
+                webview
+                    .set_position(Position::Logical(LogicalPosition::new(bounds.x, bounds.y)))
+                    .map_err(|e| AppError::InvalidPath(e.to_string()))?;
+                webview
+                    .set_size(Size::Logical(LogicalSize::new(bounds.width, bounds.height)))
+                    .map_err(|e| AppError::InvalidPath(e.to_string()))?;
+            }
         } else {
             // 移到屏幕外隐藏
             webview
@@ -1309,6 +1394,23 @@ mod tests {
 
     fn approx_eq(value: f32, expected: f32) {
         assert!((value - expected).abs() < 0.01);
+    }
+
+    #[test]
+    fn child_webview_bounds_state_round_trips_saved_bounds() {
+        let state = ChildWebviewBoundsState::default();
+        let bounds = ChildWebviewBounds {
+            x: 12.0,
+            y: 34.0,
+            width: 560.0,
+            height: 720.0,
+        };
+
+        state.remember("browser-tab-1", bounds);
+        assert_eq!(state.get("browser-tab-1"), Some(bounds));
+
+        state.forget("browser-tab-1");
+        assert_eq!(state.get("browser-tab-1"), None);
     }
 
     #[tokio::test]
