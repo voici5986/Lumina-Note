@@ -39,13 +39,14 @@ describe("MacTopChrome", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders a draggable top chrome with actions on macOS tauri", async () => {
+  it("renders a draggable compact top chrome with actions on macOS tauri", async () => {
     tauriMocks.isTauri.mockReturnValue(true);
     tauriMocks.platform.mockReturnValue("macos");
 
     render(
       <MacTopChrome
         title="Current Thread"
+        subtitle="Should stay hidden"
         actions={<button type="button">Open</button>}
       />,
     );
@@ -54,9 +55,12 @@ describe("MacTopChrome", () => {
       expect(tauriMocks.platform).toHaveBeenCalled();
     });
 
-    expect(screen.getByTestId("mac-top-chrome")).toHaveAttribute("data-tauri-drag-region", "true");
+    const chrome = screen.getByTestId("mac-top-chrome");
+    expect(chrome).toHaveAttribute("data-tauri-drag-region", "true");
+    expect(chrome).toHaveClass("h-10");
     expect(screen.getByTestId("mac-top-chrome-actions")).toHaveAttribute("data-tauri-drag-region", "false");
     expect(screen.getByText("Current Thread")).toBeInTheDocument();
+    expect(screen.queryByText("Should stay hidden")).not.toBeInTheDocument();
     expect(screen.getByText("Open")).toBeInTheDocument();
   });
 });
