@@ -249,7 +249,7 @@ export function Ribbon({ showMacTrafficLightSafeArea = false, flushTopSpacing = 
     >
       {showMacTrafficLightSafeArea ? (
         <div
-          className="h-11 w-full shrink-0"
+          className="h-11 w-full shrink-0 border-b border-border/60 shadow-[0_1px_0_hsl(var(--border)/0.5)]"
           data-tauri-drag-region
           data-testid="mac-ribbon-traffic-lights-safe-area"
         />

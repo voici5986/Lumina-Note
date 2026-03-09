@@ -142,6 +142,7 @@ describe("Ribbon", () => {
     const { container } = render(<Ribbon showMacTrafficLightSafeArea />);
 
     expect(screen.getByTestId("mac-ribbon-traffic-lights-safe-area")).toHaveAttribute("data-tauri-drag-region", "true");
+    expect(screen.getByTestId("mac-ribbon-traffic-lights-safe-area")).toHaveClass("border-b");
     expect(container.firstElementChild).not.toHaveClass("border-r");
     expect(screen.getByTestId("ribbon-content")).toHaveClass("border-r");
     expect(screen.getByRole("button", { name: "Global Search" })).toBeInTheDocument();
@@ -158,6 +159,7 @@ describe("Ribbon", () => {
     render(<Ribbon showMacTrafficLightSafeArea />);
 
     expect(screen.getByTestId("mac-ribbon-traffic-lights-safe-area")).not.toHaveClass("border-r");
+    expect(screen.getByTestId("mac-ribbon-traffic-lights-safe-area")).toHaveClass("shadow-[0_1px_0_hsl(var(--border)/0.5)]");
     expect(screen.getByTestId("ribbon-content")).toHaveClass("shadow-[inset_-1px_0_0_hsl(var(--border)/0.6)]");
   });
 
