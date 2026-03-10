@@ -15,7 +15,21 @@ pub struct FileEntry {
     pub name: String,
     pub path: String,
     pub is_dir: bool,
+    pub size: Option<u64>,
+    pub modified_at: Option<u64>,
+    pub created_at: Option<u64>,
     pub children: Option<Vec<FileEntry>>,
+}
+
+fn metadata_timestamp(metadata: &fs::Metadata, field: &str) -> Option<u64> {
+    let system_time = match field {
+        "created" => metadata.created().ok()?,
+        _ => metadata.modified().ok()?,
+    };
+    system_time
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()
+        .map(|duration| duration.as_millis().min(u64::MAX as u128) as u64)
 }
 
 fn absolute_path(path: &Path) -> Result<PathBuf, AppError> {
@@ -193,20 +207,28 @@ pub fn list_dir_recursive(path: &str) -> Result<Vec<FileEntry>, AppError> {
         }
 
         if path.is_dir() {
+            let metadata = entry.metadata()?;
             let children = list_dir_recursive(&path.to_string_lossy())?;
             // Include all directories (including empty ones)
             entries.push(FileEntry {
                 name,
                 path: path.to_string_lossy().to_string(),
                 is_dir: true,
+                size: None,
+                modified_at: metadata_timestamp(&metadata, "modified"),
+                created_at: metadata_timestamp(&metadata, "created"),
                 children: Some(children),
             });
         } else {
+            let metadata = entry.metadata()?;
             // Include all files
             entries.push(FileEntry {
                 name,
                 path: path.to_string_lossy().to_string(),
                 is_dir: false,
+                size: Some(metadata.len()),
+                modified_at: metadata_timestamp(&metadata, "modified"),
+                created_at: metadata_timestamp(&metadata, "created"),
                 children: None,
             });
         }

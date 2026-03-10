@@ -11,6 +11,9 @@ export interface FileEntry {
   path: string;
   is_dir: boolean;
   isDirectory?: boolean; // Alias
+  size?: number | null;
+  modified_at?: number | null;
+  created_at?: number | null;
   children: FileEntry[] | null;
 }
 
@@ -388,6 +391,9 @@ export async function readDir(
     path: `${path}/${entry.name}`,
     is_dir: entry.isDirectory,
     isDirectory: entry.isDirectory,
+    size: null,
+    modified_at: null,
+    created_at: null,
     children: null,
   }));
 }
