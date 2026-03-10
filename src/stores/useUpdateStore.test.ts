@@ -216,6 +216,37 @@ describe("useUpdateStore.checkForUpdate", () => {
     expect(telemetry.sessionId).toBe(4);
   });
 
+  it("clears stale ready telemetry after the app version moves past it", () => {
+    useUpdateStore.setState({
+      installTelemetry: {
+        sessionId: 5,
+        taskId: "task-old-ready",
+        version: "1.0.2",
+        phase: "ready",
+        attempt: 1,
+        progress: 100,
+        downloadedBytes: 1024,
+        contentLength: 1024,
+        startedAt: 1,
+        updatedAt: 1,
+        finishedAt: 1,
+        error: null,
+        errorCode: null,
+        resumable: true,
+        retryDelayMs: null,
+        lastHttpStatus: 200,
+        canResumeAfterRestart: false,
+        capability: "supported",
+      },
+    });
+
+    useUpdateStore.getState().setCurrentVersion("1.0.10");
+
+    const telemetry = useUpdateStore.getState().installTelemetry;
+    expect(telemetry.phase).toBe("idle");
+    expect(telemetry.sessionId).toBe(5);
+  });
+
   it("clears legacy terminal telemetry that was persisted without a version", () => {
     useUpdateStore.setState({
       installTelemetry: {

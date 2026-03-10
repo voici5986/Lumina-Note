@@ -45,6 +45,17 @@ describe("getRibbonUpdateState", () => {
     ).toBe("idle");
   });
 
+  it("treats ready as idle once the app version moves past the pending update", () => {
+    expect(
+      getRibbonUpdateState({
+        ...baseSnapshot,
+        installPhase: "ready",
+        installVersion: "1.0.2",
+        currentVersion: "1.0.10",
+      }),
+    ).toBe("idle");
+  });
+
   it("treats legacy ready telemetry without a version as idle", () => {
     expect(
       getRibbonUpdateState({

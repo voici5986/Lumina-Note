@@ -124,6 +124,41 @@ const normalizeTelemetryVersion = (
   return trimmed.length > 0 ? trimmed : null;
 };
 
+const parseComparableVersion = (version: string): number[] | null => {
+  const normalized = version.trim().replace(/^v/i, "").split("-")[0]?.split("+")[0] ?? "";
+  if (!/^\d+(?:\.\d+)*$/.test(normalized)) {
+    return null;
+  }
+  return normalized.split(".").map((part) => Number.parseInt(part, 10));
+};
+
+const isCurrentVersionCaughtUp = (
+  currentVersion: string | null,
+  targetVersion: string | null,
+): boolean => {
+  const normalizedCurrent = normalizeTelemetryVersion(currentVersion);
+  const normalizedTarget = normalizeTelemetryVersion(targetVersion);
+  if (!normalizedCurrent || !normalizedTarget) {
+    return false;
+  }
+
+  const currentParts = parseComparableVersion(normalizedCurrent);
+  const targetParts = parseComparableVersion(normalizedTarget);
+  if (!currentParts || !targetParts) {
+    return normalizedCurrent === normalizedTarget;
+  }
+
+  const maxLen = Math.max(currentParts.length, targetParts.length);
+  for (let index = 0; index < maxLen; index += 1) {
+    const currentPart = currentParts[index] ?? 0;
+    const targetPart = targetParts[index] ?? 0;
+    if (currentPart > targetPart) return true;
+    if (currentPart < targetPart) return false;
+  }
+
+  return true;
+};
+
 interface PersistedUpdateState {
   lastCheckTime?: number;
   skippedVersions?: string[];
@@ -184,7 +219,7 @@ export const hasActionableTerminalInstallPhase = (
   if (!isTerminalInstallPhase(telemetry.phase)) return false;
   const telemetryVersion = normalizeTelemetryVersion(telemetry.version);
   if (!telemetryVersion) return false;
-  if (currentVersion && telemetryVersion === currentVersion) {
+  if (isCurrentVersionCaughtUp(currentVersion, telemetryVersion)) {
     return false;
   }
   return true;
@@ -321,9 +356,8 @@ export const useUpdateStore = create<UpdateState>()(
         set((state) => ({
           currentVersion: version,
           installTelemetry:
-            version &&
-            state.installTelemetry.version === version &&
-            isTerminalInstallPhase(state.installTelemetry.phase)
+            isTerminalInstallPhase(state.installTelemetry.phase) &&
+            isCurrentVersionCaughtUp(version, state.installTelemetry.version)
               ? resetInstallTelemetryWithSession(state.installTelemetry.sessionId)
               : state.installTelemetry,
         })),

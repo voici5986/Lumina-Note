@@ -7,7 +7,9 @@ use reqwest::header::{
     IF_UNMODIFIED_SINCE, LAST_MODIFIED, RANGE,
 };
 use reqwest::StatusCode;
+use semver::Version;
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -216,15 +218,25 @@ pub async fn update_get_resumable_status(
     manager_state: State<'_, UpdateManagerState>,
     task_id: Option<String>,
 ) -> Result<Option<ResumableUpdateStatus>, AppError> {
+    let current_version = app.package_info().version.to_string();
+    if task_id.is_none() {
+        prune_stale_persisted_terminal_states(&app, &current_version).await?;
+    }
+
     {
         let runtime = manager_state.inner.lock().await;
         if let Some(task_id) = task_id.as_ref() {
             if let Some(status) = runtime.statuses.get(task_id) {
-                return Ok(Some(status.clone()));
+                return Ok(
+                    is_status_actionable_for_current_version(status, &current_version)
+                        .then_some(status.clone()),
+                );
             }
         } else if let Some(active_task_id) = runtime.active_task_id.as_ref() {
             if let Some(status) = runtime.statuses.get(active_task_id) {
-                return Ok(Some(status.clone()));
+                if is_status_actionable_for_current_version(status, &current_version) {
+                    return Ok(Some(status.clone()));
+                }
             }
         }
 
@@ -232,6 +244,7 @@ pub async fn update_get_resumable_status(
             if let Some(status) = runtime
                 .statuses
                 .values()
+                .filter(|status| is_status_actionable_for_current_version(status, &current_version))
                 .max_by_key(|status| status.timestamp)
             {
                 return Ok(Some(status.clone()));
@@ -240,10 +253,10 @@ pub async fn update_get_resumable_status(
     }
 
     if let Some(task_id) = task_id {
-        return load_status_by_task_id(&app, &task_id).await;
+        return load_status_by_task_id(&app, &task_id, &current_version).await;
     }
 
-    load_latest_persisted_status(&app).await
+    load_latest_persisted_status(&app, &current_version).await
 }
 
 #[tauri::command]
@@ -919,6 +932,7 @@ async fn clear_version_cache(version_dir: &Path) -> Result<(), AppError> {
 async fn load_status_by_task_id(
     app: &AppHandle,
     task_id: &str,
+    current_version: &str,
 ) -> Result<Option<ResumableUpdateStatus>, AppError> {
     let root = updates_root(app)?;
     if !root.exists() {
@@ -940,7 +954,11 @@ async fn load_status_by_task_id(
         }
         if let Some(state) = load_state_file(&entry.path()).await? {
             if state.status.task_id == task_id {
-                return Ok(Some(state.status));
+                return Ok(is_status_actionable_for_current_version(
+                    &state.status,
+                    current_version,
+                )
+                .then_some(state.status));
             }
         }
     }
@@ -949,6 +967,7 @@ async fn load_status_by_task_id(
 
 async fn load_latest_persisted_status(
     app: &AppHandle,
+    current_version: &str,
 ) -> Result<Option<ResumableUpdateStatus>, AppError> {
     let root = updates_root(app)?;
     if !root.exists() {
@@ -970,6 +989,9 @@ async fn load_latest_persisted_status(
             continue;
         }
         if let Some(state) = load_state_file(&entry.path()).await? {
+            if !is_status_actionable_for_current_version(&state.status, current_version) {
+                continue;
+            }
             match latest.as_ref() {
                 Some(existing) if existing.timestamp >= state.status.timestamp => {}
                 _ => latest = Some(state.status),
@@ -977,6 +999,67 @@ async fn load_latest_persisted_status(
         }
     }
     Ok(latest)
+}
+
+async fn prune_stale_persisted_terminal_states(
+    app: &AppHandle,
+    current_version: &str,
+) -> Result<(), AppError> {
+    let root = updates_root(app)?;
+    if !root.exists() {
+        return Ok(());
+    }
+
+    let mut entries = tokio::fs::read_dir(&root)
+        .await
+        .map_err(|err| AppError::UpdateState(format!("read updates directory failed: {err}")))?;
+    while let Some(entry) = entries
+        .next_entry()
+        .await
+        .map_err(|err| AppError::UpdateState(format!("scan updates directory failed: {err}")))?
+    {
+        let path = entry.path();
+        let file_type = entry.file_type().await.map_err(|err| {
+            AppError::UpdateState(format!("read directory entry type failed: {err}"))
+        })?;
+        if !file_type.is_dir() {
+            continue;
+        }
+        let Some(state) = load_state_file(&path).await? else {
+            continue;
+        };
+        if !is_status_actionable_for_current_version(&state.status, current_version) {
+            tokio::fs::remove_dir_all(&path).await.map_err(|err| {
+                AppError::UpdateState(format!("remove stale cache dir failed: {err}"))
+            })?;
+        }
+    }
+
+    Ok(())
+}
+
+fn is_status_actionable_for_current_version(
+    status: &ResumableUpdateStatus,
+    current_version: &str,
+) -> bool {
+    if !status.stage.is_terminal() {
+        return true;
+    }
+    !is_current_version_caught_up(current_version, &status.version)
+}
+
+fn is_current_version_caught_up(current_version: &str, target_version: &str) -> bool {
+    match compare_versions(current_version, target_version) {
+        Some(Ordering::Greater | Ordering::Equal) => true,
+        Some(Ordering::Less) => false,
+        None => current_version.trim() == target_version.trim(),
+    }
+}
+
+fn compare_versions(left: &str, right: &str) -> Option<Ordering> {
+    let left = Version::parse(left.trim().trim_start_matches('v')).ok()?;
+    let right = Version::parse(right.trim().trim_start_matches('v')).ok()?;
+    Some(left.cmp(&right))
 }
 
 fn parse_content_range_total(content_range: &str) -> Option<u64> {
@@ -1187,5 +1270,23 @@ mod tests {
             message.contains("stage=installing"),
             "expected stage in error message, got: {message}"
         );
+    }
+
+    #[test]
+    fn compares_versions_for_caught_up_status() {
+        assert!(is_current_version_caught_up("1.0.10", "1.0.2"));
+        assert!(is_current_version_caught_up("1.0.10", "1.0.10"));
+        assert!(!is_current_version_caught_up("1.0.2", "1.0.10"));
+    }
+
+    #[test]
+    fn ignores_stale_terminal_status_once_app_version_is_newer() {
+        let mut status = sample_state().status;
+        status.stage = UpdateStage::Ready;
+        status.status = UpdateStage::Ready;
+        status.version = "1.0.2".to_string();
+
+        assert!(!is_status_actionable_for_current_version(&status, "1.0.10"));
+        assert!(is_status_actionable_for_current_version(&status, "1.0.1"));
     }
 }
