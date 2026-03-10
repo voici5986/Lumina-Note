@@ -140,6 +140,7 @@ export function DatabaseSplitView({ dbId }: DatabaseSplitViewProps) {
                   content={secondaryContent}
                   onChange={handleContentChange}
                   viewMode={editorMode as ViewMode}
+                  filePath={secondaryFile}
                 />
               </div>
             </div>

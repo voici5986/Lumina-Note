@@ -6,6 +6,7 @@ import { useUIStore } from "@/stores/useUIStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 import { parseLuminaLink } from "@/services/pdf/annotations";
 import { readBinaryFileBase64 } from "@/lib/tauri";
+import { getImageMimeType, resolveEditorImagePath } from "@/services/assets/editorImages";
 import mermaid from "mermaid";
 import { useShallow } from "zustand/react/shallow";
 import { pluginRenderRuntime } from "@/services/plugins/renderRuntime";
@@ -21,14 +22,16 @@ mermaid.initialize({
 interface ReadingViewProps {
   content: string;
   className?: string;
+  filePath?: string | null;
 }
 
-export function ReadingView({ content, className = "" }: ReadingViewProps) {
-  const { fileTree, openFile, vaultPath } = useFileStore(
+export function ReadingView({ content, className = "", filePath = null }: ReadingViewProps) {
+  const { fileTree, openFile, vaultPath, currentFile } = useFileStore(
     useShallow((state) => ({
       fileTree: state.fileTree,
       openFile: state.openFile,
       vaultPath: state.vaultPath,
+      currentFile: state.currentFile,
     }))
   );
   const { openSecondaryPdf } = useSplitStore();
@@ -80,27 +83,23 @@ export function ReadingView({ content, className = "" }: ReadingViewProps) {
   useEffect(() => {
     if (!containerRef.current || !vaultPath) return;
     
-    const images = containerRef.current.querySelectorAll('img.markdown-image');
+    const images = containerRef.current.querySelectorAll('img');
     images.forEach((imgEl) => {
       const img = imgEl as HTMLImageElement;
       const src = img.getAttribute('src');
       if (src && !src.startsWith('http') && !src.startsWith('data:')) {
-        // 本地图片：使用 base64 加载
-        const normalizedVaultPath = vaultPath.replace(/\\/g, '/');
-        const normalizedSrc = src.replace(/\\/g, '/').replace(/^\.\//,'');
-        const fullPath = normalizedSrc.startsWith('/') || /^[A-Za-z]:/.test(normalizedSrc)
-          ? normalizedSrc
-          : `${normalizedVaultPath}/${normalizedSrc}`;
+        const fullPath = resolveEditorImagePath({
+          src,
+          notePath: filePath ?? currentFile,
+          vaultPath,
+        });
+        if (!fullPath) return;
         
         img.style.opacity = '0.5';
-        const ext = fullPath.split('.').pop()?.toLowerCase() || 'png';
-        const mimeType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 
-                         ext === 'gif' ? 'image/gif' : 
-                         ext === 'webp' ? 'image/webp' : 'image/png';
         
         readBinaryFileBase64(fullPath)
           .then(base64 => {
-            img.src = `data:${mimeType};base64,${base64}`;
+            img.src = `data:${getImageMimeType(fullPath)};base64,${base64}`;
             img.style.opacity = '1';
           })
           .catch(err => {
@@ -110,7 +109,7 @@ export function ReadingView({ content, className = "" }: ReadingViewProps) {
           });
       }
     });
-  }, [html, vaultPath]);
+  }, [currentFile, filePath, html, vaultPath]);
 
   // Handle WikiLink, Tag, and Lumina link clicks
   const handleClick = useCallback((e: React.MouseEvent) => {

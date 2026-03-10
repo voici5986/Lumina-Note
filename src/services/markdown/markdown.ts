@@ -271,6 +271,13 @@ export function parseMarkdown(markdown: string): string {
       return `${codeBlockPrefix}${codeBlockPlaceholders.length - 1}${codeBlockSuffix}`;
     });
     
+    // Wiki image embeds
+    processed = processed.replace(/!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_match, assetPath, altText) => {
+      const safePath = String(assetPath).trim();
+      const safeAlt = String(altText || assetPath).trim();
+      return `<img src="${safePath}" alt="${safeAlt}" class="markdown-image" loading="lazy" />`;
+    });
+
     // WikiLinks
     processed = processed.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_match, link, display) => {
       const displayText = display || link;

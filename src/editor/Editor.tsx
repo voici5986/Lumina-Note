@@ -543,6 +543,7 @@ export function Editor() {
                   }}
                   viewMode={editorMode as ViewMode}
                   scrollContainerRef={scrollContainerRef}
+                  filePath={currentFile}
                 />
               </div>
             </div>

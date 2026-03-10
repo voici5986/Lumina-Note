@@ -86,6 +86,7 @@ function EditorPane({
             content={content} 
             onChange={onContentChange} 
             viewMode={editorMode as ViewMode}
+            filePath={file}
           />
         </div>
       </div>

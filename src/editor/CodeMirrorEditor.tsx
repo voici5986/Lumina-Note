@@ -6,7 +6,8 @@ import { useUIStore } from '@/stores/useUIStore';
 import { useLocaleStore } from '@/stores/useLocaleStore';
 import { useShallow } from 'zustand/react/shallow';
 import { parseLuminaLink } from '@/services/pdf/annotations';
-import { writeBinaryFile, readBinaryFileBase64 } from '@/lib/tauri';
+import { createDir, writeBinaryFile, readBinaryFileBase64 } from '@/lib/tauri';
+import { buildPastedImageTarget, getImageMimeType, resolveEditorImagePath } from '@/services/assets/editorImages';
 import {
   EditorState,
   StateField,
@@ -78,6 +79,7 @@ interface CodeMirrorEditorProps {
   viewMode?: ViewMode;
   livePreview?: boolean;
   scrollContainerRef?: RefObject<HTMLElement>;
+  filePath?: string | null;
 }
 
 export interface CodeMirrorEditorRef {
@@ -850,11 +852,17 @@ class ImageWidget extends WidgetType {
     readonly alt: string,
     readonly showInfo: boolean = false,
     readonly vaultPath: string = '',
+    readonly notePath: string | null = null,
   ) {
     super();
   }
   eq(other: ImageWidget) {
-    return other.src === this.src && other.alt === this.alt && other.showInfo === this.showInfo;
+    return (
+      other.src === this.src &&
+      other.alt === this.alt &&
+      other.showInfo === this.showInfo &&
+      other.notePath === this.notePath
+    );
   }
   toDOM() {
     const container = document.createElement('div');
@@ -884,32 +892,23 @@ class ImageWidget extends WidgetType {
       // 网络图片或 data URL
       img.src = this.src;
     } else if (this.vaultPath) {
-      // 本地图片：使用 base64 加载
-      const normalizedVaultPath = this.vaultPath.replace(/\\/g, '/');
-      const normalizedSrc = this.src.replace(/\\/g, '/').replace(/^\.\//, '');
-      const fullPath =
-        normalizedSrc.startsWith('/') || normalizedSrc.match(/^[A-Za-z]:/)
-          ? normalizedSrc
-          : `${normalizedVaultPath}/${normalizedSrc}`;
+      const fullPath = resolveEditorImagePath({
+        src: this.src,
+        notePath: this.notePath,
+        vaultPath: this.vaultPath,
+      });
+      if (!fullPath) {
+        container.appendChild(img);
+        return container;
+      }
 
       // 先显示加载中状态
       img.style.opacity = '0.5';
       img.alt = useLocaleStore.getState().t.common.loading;
 
-      // 异步加载 base64
-      const ext = fullPath.split('.').pop()?.toLowerCase() || 'png';
-      const mimeType =
-        ext === 'jpg' || ext === 'jpeg'
-          ? 'image/jpeg'
-          : ext === 'gif'
-            ? 'image/gif'
-            : ext === 'webp'
-              ? 'image/webp'
-              : 'image/png';
-
       readBinaryFileBase64(fullPath)
         .then((base64) => {
-          img.src = `data:${mimeType};base64,${base64}`;
+          img.src = `data:${getImageMimeType(fullPath)};base64,${base64}`;
           img.style.opacity = '1';
           img.alt = this.alt;
         })
@@ -2944,16 +2943,16 @@ const imageInfoField = StateField.define<Set<string>>({
 });
 
 // 创建图片装饰的工厂函数
-function createImageStateField(vaultPath: string) {
+function createImageStateField(vaultPath: string, notePath: string | null) {
   return StateField.define<DecorationSet>({
-    create: (state) => buildImageDecorations(state, vaultPath),
+    create: (state) => buildImageDecorations(state, vaultPath, notePath),
     update(deco, tr) {
       if (
         tr.docChanged ||
         tr.reconfigured ||
         tr.effects.some((e) => e.is(setMouseSelecting) || e.is(setImageShowInfo))
       ) {
-        return buildImageDecorations(tr.state, vaultPath);
+        return buildImageDecorations(tr.state, vaultPath, notePath);
       }
       if (tr.selection) {
         const oldSel = tr.startState.selection.main;
@@ -2964,7 +2963,7 @@ function createImageStateField(vaultPath: string) {
           oldTouches !== newTouches ||
           (newTouches && (oldSel.from !== newSel.from || oldSel.to !== newSel.to))
         ) {
-          return buildImageDecorations(tr.state, vaultPath);
+          return buildImageDecorations(tr.state, vaultPath, notePath);
         }
       }
       return deco.map(tr.changes);
@@ -2973,20 +2972,37 @@ function createImageStateField(vaultPath: string) {
   });
 }
 
-function buildImageDecorations(state: EditorState, vaultPath: string): DecorationSet {
+function buildImageDecorations(state: EditorState, vaultPath: string, notePath: string | null): DecorationSet {
   const decorations: any[] = [];
   const doc = docString(state);
   const showInfoSet = state.field(imageInfoField, false) || new Set<string>();
   imagePositionsCache = [];
 
-  // 匹配 Markdown 图片语法 ![alt](src)
-  const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  const imageMatches: Array<{ from: number; to: number; alt: string; src: string }> = [];
+  const markdownImageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  const wikiImageRegex = /!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+
   let match;
-  while ((match = imageRegex.exec(doc)) !== null) {
-    const from = match.index,
-      to = from + match[0].length;
-    const alt = match[1];
-    const src = match[2];
+  while ((match = markdownImageRegex.exec(doc)) !== null) {
+    imageMatches.push({
+      from: match.index,
+      to: match.index + match[0].length,
+      alt: match[1],
+      src: match[2],
+    });
+  }
+
+  while ((match = wikiImageRegex.exec(doc)) !== null) {
+    imageMatches.push({
+      from: match.index,
+      to: match.index + match[0].length,
+      alt: match[2] ?? match[1],
+      src: match[1],
+    });
+  }
+
+  for (const image of imageMatches.sort((left, right) => left.from - right.from)) {
+    const { from, to, alt, src } = image;
     imagePositionsCache.push({ from, to });
 
     if (shouldShowSource(state, from, to)) {
@@ -2994,7 +3010,7 @@ function buildImageDecorations(state: EditorState, vaultPath: string): Decoratio
       decorations.push(Decoration.mark({ class: 'cm-image-source' }).range(from, to));
       decorations.push(
         Decoration.widget({
-          widget: new ImageWidget(src, alt, true, vaultPath),
+          widget: new ImageWidget(src, alt, true, vaultPath, notePath),
           side: 1,
           block: true,
         }).range(to),
@@ -3004,7 +3020,7 @@ function buildImageDecorations(state: EditorState, vaultPath: string): Decoratio
       const showInfo = showInfoSet.has(src);
       decorations.push(
         Decoration.replace({
-          widget: new ImageWidget(src, alt, showInfo, vaultPath),
+          widget: new ImageWidget(src, alt, showInfo, vaultPath, notePath),
           block: true,
         }).range(from, to),
       );
@@ -3183,7 +3199,7 @@ const voicePreviewField = StateField.define<DecorationSet>({
 
 export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditorProps>(
   function CodeMirrorEditor(
-    { content, onChange, className = '', viewMode, livePreview, scrollContainerRef },
+    { content, onChange, className = '', viewMode, livePreview, scrollContainerRef, filePath = null },
     ref,
   ) {
     const { t } = useLocaleStore();
@@ -3200,13 +3216,14 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
     const pendingModeTransitionRestoreRef = useRef<PendingModeTransitionRestore | null>(null);
     const transitionSequenceRef = useRef(0);
 
-    const { openVideoNoteTab, openPDFTab, fileTree, openFile, vaultPath } = useFileStore(
+    const { openVideoNoteTab, openPDFTab, fileTree, openFile, vaultPath, currentFile } = useFileStore(
       useShallow((state) => ({
         openVideoNoteTab: state.openVideoNoteTab,
         openPDFTab: state.openPDFTab,
         fileTree: state.fileTree,
         openFile: state.openFile,
         vaultPath: state.vaultPath,
+        currentFile: state.currentFile,
       })),
     );
     const { openSecondaryPdf } = useSplitStore();
@@ -3215,10 +3232,16 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
     const markTransitionTrace = useCallback((type: string, payload: Record<string, unknown>) => {
       (window as any).__luminaEditorTrace?.mark?.(type, payload);
     }, []);
+    const resolvedFilePath = filePath ?? currentFile;
+    const filePathRef = useRef<string | null>(resolvedFilePath);
+
+    useEffect(() => {
+      filePathRef.current = resolvedFilePath;
+    }, [resolvedFilePath]);
 
     const getModeExtensions = useCallback(
       (mode: ViewMode) => {
-        const imageField = vaultPath ? createImageStateField(vaultPath) : null;
+        const imageField = vaultPath ? createImageStateField(vaultPath, resolvedFilePath) : null;
         const widgets = [
           mathStateField,
           mermaidStateField,
@@ -3249,7 +3272,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
             return [calloutStateField];
         }
       },
-      [vaultPath],
+      [resolvedFilePath, vaultPath],
     );
 
     const syncSelectionToViewport = useCallback(() => {
@@ -4039,21 +4062,21 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
 
             const file = item.getAsFile();
             if (!file) continue;
-
-            const ext = file.type.split('/')[1] || 'png';
-            const timestamp = Date.now();
-            const fileName = `image_${timestamp}.${ext}`;
-            // Windows 路径处理
-            const normalizedVaultPath = currentVaultPath.replace(/\\/g, '/');
-            const filePath = `${normalizedVaultPath}/${fileName}`;
+            const target = buildPastedImageTarget({
+              notePath: filePathRef.current ?? useFileStore.getState().currentFile,
+              vaultPath: currentVaultPath,
+              mimeType: file.type || 'image/png',
+            });
 
             try {
               const arrayBuffer = await file.arrayBuffer();
               const data = new Uint8Array(arrayBuffer);
-              await writeBinaryFile(filePath, data);
+              await createDir(target.directoryPath, { recursive: true });
+              await writeBinaryFile(target.filePath, data);
+              await useFileStore.getState().refreshFileTree();
 
               const pos = v.state.selection.main.head;
-              const imageMarkdown = `![](${fileName})`;
+              const imageMarkdown = `![](${target.referencePath})`;
               v.dispatch({
                 changes: { from: pos, insert: imageMarkdown },
                 selection: { anchor: pos + imageMarkdown.length },

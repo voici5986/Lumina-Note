@@ -91,6 +91,14 @@ describe('parseMarkdown', () => {
       expect(result).toContain('data-wikilink="actual note"');
       expect(result).toContain('display text');
     });
+
+    it('should parse wiki image embeds as images', () => {
+      const result = parseMarkdown('![[assets/hero.png|Hero image]]');
+      expect(result).toContain('<img');
+      expect(result).toContain('src="assets/hero.png"');
+      expect(result).toContain('alt="Hero image"');
+      expect(result).toContain('class="markdown-image"');
+    });
   });
 
   describe('callouts', () => {
