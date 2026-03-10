@@ -176,6 +176,15 @@ if (typeof window !== "undefined") {
   });
 }
 
+// jsdom lacks text range geometry used by CodeMirror selection layers.
+if (typeof Range !== "undefined" && !(Range.prototype as unknown as { getClientRects?: unknown }).getClientRects) {
+  Object.defineProperty(Range.prototype, "getClientRects", {
+    configurable: true,
+    writable: true,
+    value: () => [],
+  });
+}
+
 // jsdom doesn't implement scrollIntoView; some components call it in effects.
 if (typeof Element !== "undefined" && !(Element.prototype as unknown as { scrollIntoView?: unknown }).scrollIntoView) {
   (Element.prototype as unknown as { scrollIntoView: () => void }).scrollIntoView = vi.fn();

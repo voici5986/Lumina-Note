@@ -8,7 +8,7 @@ import { useRustAgentStore } from "@/stores/useRustAgentStore";
 import { MainAIChatShell } from "@/components/layout/MainAIChatShell";
 import { LocalGraph } from "@/components/effects/LocalGraph";
 import { debounce, getFileName } from "@/lib/utils";
-import { CodeMirrorEditor, CodeMirrorEditorRef, ViewMode } from "./CodeMirrorEditor";
+import { CodeMirrorEditor, ViewMode } from "./CodeMirrorEditor";
 import { SelectionToolbar } from "@/components/toolbar/SelectionToolbar";
 import { SelectionContextMenu } from "@/components/toolbar/SelectionContextMenu";
 import {
@@ -101,19 +101,11 @@ export function Editor() {
   const { sessions: chatSessions, currentSessionId: chatSessionId } = useAIStore();
   const { sessions: agentSessions, currentSessionId: agentSessionId } = useRustAgentStore();
 
-  // 滚动位置保持（基于行号）
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const codeMirrorRef = useRef<CodeMirrorEditorRef>(null);
-  const scrollLineRef = useRef<number>(1);
-  const prevModeRef = useRef<EditorMode>(editorMode);
-  const pendingScrollRef = useRef<number | null>(null);
-  const pendingViewportSelectionSyncRef = useRef(false);
   const lastOuterScrollTraceAtRef = useRef(0);
 
-  // 从滚动位置计算行号（用于阅读/源码模式）
   const getLineFromScrollPosition = useCallback((container: HTMLElement): number => {
     const scrollTop = container.scrollTop;
-    // 估算每行高度（约 28px）
     const lineHeight = 28;
     const estimatedLine = Math.floor(scrollTop / lineHeight) + 1;
     const lines = currentContent.split('\n').length;
@@ -121,7 +113,6 @@ export function Editor() {
   }, [currentContent]);
 
   const activeTab = activeTabIndex >= 0 ? tabs[activeTabIndex] : null;
-
 
   const markEditorTrace = useCallback((type: string, payload: Record<string, unknown> = {}) => {
     if (typeof window === 'undefined') return;
@@ -145,138 +136,6 @@ export function Editor() {
     const session = sessions.find(s => s.id === sessionId);
     return session?.title || t.common.newConversation;
   }, [activeTab?.type, chatMode, agentSessions, chatSessions, agentSessionId, chatSessionId]);
-
-  // 滚动到指定行号
-  const scrollToLine = useCallback((container: HTMLElement, line: number) => {
-    const lineHeight = 28;
-    container.scrollTop = (line - 1) * lineHeight;
-  }, []);
-
-  // 保存当前滚动位置（行号）- 在切换前同步调用
-  const saveScrollPosition = useCallback(() => {
-    // 优先从 CodeMirror 获取（更精确）
-    if (codeMirrorRef.current) {
-      const line = codeMirrorRef.current.getScrollLine();
-      if (line > 0) {
-        scrollLineRef.current = line;
-        markEditorTrace('editor-scroll-position-saved', {
-          source: 'codemirror',
-          line,
-          mode: editorMode,
-        });
-        return;
-      }
-    }
-    // 否则从外层容器获取
-    if (scrollContainerRef.current) {
-      const line = getLineFromScrollPosition(scrollContainerRef.current);
-      scrollLineRef.current = line;
-      markEditorTrace('editor-scroll-position-saved', {
-        source: 'outer-container',
-        line,
-        mode: editorMode,
-        scrollTop: scrollContainerRef.current.scrollTop,
-      });
-    }
-  }, [editorMode, getLineFromScrollPosition, markEditorTrace]);
-
-  // 尝试恢复滚动位置（带重试逻辑）
-  const tryRestoreScroll = useCallback((targetLine: number, retries: number = 0) => {
-    const maxRetries = 5;
-    const delay = 50;
-
-    if (editorMode === 'live') {
-      if (codeMirrorRef.current) {
-        markEditorTrace('editor-scroll-restore-attempt', {
-          mode: editorMode,
-          targetLine,
-          retries,
-          source: 'codemirror',
-        });
-        codeMirrorRef.current.scrollToLine(targetLine);
-        if (pendingViewportSelectionSyncRef.current) {
-          codeMirrorRef.current.syncSelectionToViewport();
-          pendingViewportSelectionSyncRef.current = false;
-          markEditorTrace('editor-selection-sync-after-restore', {
-            mode: editorMode,
-            targetLine,
-          });
-        }
-        pendingScrollRef.current = null;
-      } else if (retries < maxRetries) {
-        // CodeMirror 还没初始化，稍后重试
-        setTimeout(() => tryRestoreScroll(targetLine, retries + 1), delay);
-      }
-    } else {
-      if (scrollContainerRef.current) {
-        markEditorTrace('editor-scroll-restore-attempt', {
-          mode: editorMode,
-          targetLine,
-          retries,
-          source: 'outer-container',
-        });
-        scrollToLine(scrollContainerRef.current, targetLine);
-        pendingScrollRef.current = null;
-      } else if (retries < maxRetries) {
-        setTimeout(() => tryRestoreScroll(targetLine, retries + 1), delay);
-      }
-    }
-  }, [editorMode, markEditorTrace, scrollToLine]);
-
-  // 模式切换时恢复滚动位置
-  useEffect(() => {
-    const previousMode = prevModeRef.current;
-    const shouldSyncViewportSelection = previousMode === 'reading' && editorMode === 'live';
-    pendingViewportSelectionSyncRef.current = shouldSyncViewportSelection;
-
-    if (previousMode !== editorMode) {
-      markEditorTrace('editor-mode-changed', {
-        previousMode,
-        mode: editorMode,
-        savedLine: scrollLineRef.current,
-        pendingViewportSelectionSync: shouldSyncViewportSelection,
-      });
-    }
-
-    if (previousMode !== editorMode && scrollLineRef.current > 1) {
-      pendingScrollRef.current = scrollLineRef.current;
-      // 等待组件渲染后尝试恢复
-      requestAnimationFrame(() => {
-        tryRestoreScroll(scrollLineRef.current);
-      });
-    } else if (shouldSyncViewportSelection) {
-      requestAnimationFrame(() => {
-        if (!codeMirrorRef.current || !pendingViewportSelectionSyncRef.current) return;
-        codeMirrorRef.current.syncSelectionToViewport();
-        pendingViewportSelectionSyncRef.current = false;
-        markEditorTrace('editor-selection-sync-without-scroll-restore', {
-          mode: editorMode,
-          savedLine: scrollLineRef.current,
-        });
-      });
-    }
-    prevModeRef.current = editorMode;
-  }, [editorMode, markEditorTrace, tryRestoreScroll]);
-
-  // CodeMirror 初始化后检查是否有待处理的滚动
-  useEffect(() => {
-    if (editorMode === 'live' && pendingScrollRef.current && codeMirrorRef.current) {
-      codeMirrorRef.current.scrollToLine(pendingScrollRef.current);
-      markEditorTrace('editor-pending-scroll-restored', {
-        mode: editorMode,
-        targetLine: pendingScrollRef.current,
-      });
-      if (pendingViewportSelectionSyncRef.current) {
-        codeMirrorRef.current.syncSelectionToViewport();
-        pendingViewportSelectionSyncRef.current = false;
-        markEditorTrace('editor-selection-sync-after-pending-scroll', {
-          mode: editorMode,
-          targetLine: pendingScrollRef.current,
-        });
-      }
-      pendingScrollRef.current = null;
-    }
-  });
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -379,16 +238,16 @@ export function Editor() {
     };
   }, [editorMode, getLineFromScrollPosition, markEditorTrace]);
 
-  // 带保存滚动位置的模式切换
   const handleModeChange = useCallback((mode: EditorMode) => {
+    if (mode === editorMode) return;
     markEditorTrace('editor-mode-change-requested', {
       previousMode: editorMode,
       mode,
       activeTabType: activeTab?.type || 'unknown',
+      outerScrollTop: scrollContainerRef.current?.scrollTop ?? null,
     });
-    saveScrollPosition();
     setEditorMode(mode);
-  }, [activeTab?.type, editorMode, markEditorTrace, saveScrollPosition, setEditorMode]);
+  }, [activeTab?.type, editorMode, markEditorTrace, setEditorMode]);
 
   // 全局键盘快捷键
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -657,7 +516,6 @@ export function Editor() {
               {/* 统一使用 CodeMirrorEditor，通过 viewMode 切换模式 */}
               <div key="editor" className="editor-mode-content h-full">
                 <CodeMirrorEditor
-                  ref={codeMirrorRef}
                   content={currentContent}
                   onChange={(newContent) => {
                     updateContent(newContent);

@@ -1605,10 +1605,10 @@ function canElementScrollVertically(element: HTMLElement | null | undefined) {
 export function resolveDragScrollContainer(
   view: Pick<EditorView, 'dom' | 'scrollDOM'>,
   externalScrollContainerRef?: RefObject<HTMLElement> | null,
-) {
+): HTMLElement {
   const explicitContainer = externalScrollContainerRef?.current ?? null;
   if (canElementScrollVertically(explicitContainer)) {
-    return explicitContainer;
+    return explicitContainer as HTMLElement;
   }
 
   let current: HTMLElement | null = view.dom.parentElement;
@@ -1629,6 +1629,223 @@ export function resolveDragScrollContainer(
   }
 
   return view.scrollDOM;
+}
+
+type ModeCategory = 'view' | 'edit';
+type ModeTransitionKind = 'view-to-view' | 'view-to-edit' | 'edit-to-view' | 'edit-to-edit';
+
+type SharedDocumentAnchor = {
+  pos: number;
+  offsetTop: number;
+  source: 'viewport';
+};
+
+type TransitionSelectionSnapshot = {
+  anchor: number;
+  head: number;
+  from: number;
+  to: number;
+  withinViewport: boolean;
+};
+
+type ModeTransitionSnapshot = {
+  mode: ViewMode;
+  viewportAnchor: SharedDocumentAnchor;
+  selection: TransitionSelectionSnapshot;
+  viewport: { from: number; to: number };
+  scrollTop: number;
+};
+
+type ModeTransitionPlan = {
+  transitionId: number;
+  fromMode: ViewMode;
+  toMode: ViewMode;
+  kind: ModeTransitionKind;
+  viewportAnchor: SharedDocumentAnchor;
+  selectionToRestore: { anchor: number; head?: number } | null;
+  preserveSelection: boolean;
+  armFirstPointerIntentOverride: boolean;
+};
+
+function getModeCategory(mode: ViewMode): ModeCategory {
+  return mode === 'reading' ? 'view' : 'edit';
+}
+
+function classifyModeTransition(fromMode: ViewMode, toMode: ViewMode): ModeTransitionKind {
+  const fromCategory = getModeCategory(fromMode);
+  const toCategory = getModeCategory(toMode);
+  return `${fromCategory}-to-${toCategory}` as ModeTransitionKind;
+}
+
+function resolveViewportScrollContainer(
+  view: Pick<EditorView, 'dom' | 'scrollDOM'>,
+  externalScrollContainerRef?: RefObject<HTMLElement> | null,
+): HTMLElement {
+  return resolveDragScrollContainer(view, externalScrollContainerRef);
+}
+
+function getViewportAnchorOffset(scrollContainer: HTMLElement) {
+  const clientHeight = Number.isFinite(scrollContainer.clientHeight) ? scrollContainer.clientHeight : 0;
+  if (clientHeight <= 0) return 32;
+  return clampNumber(Math.round(clientHeight * 0.18), 24, 96);
+}
+
+function captureViewportAnchor(
+  view: Pick<EditorView, 'state' | 'viewport' | 'scrollDOM' | 'lineBlockAtHeight' | 'posAtCoords' | 'dom'>,
+  scrollContainer: HTMLElement,
+): SharedDocumentAnchor {
+  const docLength = view.state.doc.length;
+  const offsetTop = getViewportAnchorOffset(scrollContainer);
+  if (docLength <= 0) {
+    return { pos: 0, offsetTop, source: 'viewport' };
+  }
+
+  const rect = scrollContainer.getBoundingClientRect();
+  const editorRect = view.dom.getBoundingClientRect();
+  let pos: number | null = null;
+
+  if (Number.isFinite(rect.width) && rect.width > 0 && Number.isFinite(rect.height) && rect.height > 0) {
+    const probeX = clampNumber(
+      editorRect.left + Math.min(64, Math.max(24, editorRect.width * 0.18)),
+      editorRect.left + 8,
+      editorRect.right - 8,
+    );
+    const probeY = rect.top + offsetTop;
+    pos = view.posAtCoords({ x: probeX, y: probeY });
+  }
+
+  if (pos === null) {
+    pos =
+      scrollContainer === view.scrollDOM
+        ? getViewportSelectionAnchor(view)
+        : clampNumber(view.viewport.from, 0, docLength);
+  }
+
+  return {
+    pos: clampNumber(pos ?? view.viewport.from, 0, docLength),
+    offsetTop,
+    source: 'viewport',
+  };
+}
+
+function isSelectionNearViewportAnchor(
+  view: Pick<EditorView, 'state'>,
+  selection: { anchor: number; from: number; to: number },
+  viewportAnchorPos: number,
+) {
+  try {
+    const selectionLine = view.state.doc.lineAt(selection.anchor).number;
+    const viewportLine = view.state.doc.lineAt(viewportAnchorPos).number;
+    return Math.abs(selectionLine - viewportLine) <= 20;
+  } catch {
+    return selection.to >= viewportAnchorPos && selection.from <= viewportAnchorPos;
+  }
+}
+
+function captureModeTransitionSnapshot(
+  view: Pick<EditorView, 'state' | 'viewport' | 'scrollDOM' | 'lineBlockAtHeight' | 'posAtCoords' | 'dom'>,
+  mode: ViewMode,
+  scrollContainer: HTMLElement,
+): ModeTransitionSnapshot {
+  const selection = view.state.selection.main;
+  const viewportAnchor = captureViewportAnchor(view, scrollContainer);
+  return {
+    mode,
+    viewportAnchor,
+    selection: {
+      anchor: selection.anchor,
+      head: selection.head,
+      from: selection.from,
+      to: selection.to,
+      withinViewport: isSelectionNearViewportAnchor(view, selection, viewportAnchor.pos),
+    },
+    viewport: {
+      from: view.viewport.from,
+      to: view.viewport.to,
+    },
+    scrollTop: scrollContainer.scrollTop,
+  };
+}
+
+function buildModeTransitionPlan(options: {
+  transitionId: number;
+  snapshot: ModeTransitionSnapshot;
+  toMode: ViewMode;
+}): ModeTransitionPlan {
+  const { transitionId, snapshot, toMode } = options;
+  const kind = classifyModeTransition(snapshot.mode, toMode);
+  const targetCategory = getModeCategory(toMode);
+  const preserveSelection = kind === 'edit-to-edit' && snapshot.selection.withinViewport;
+
+  return {
+    transitionId,
+    fromMode: snapshot.mode,
+    toMode,
+    kind,
+    viewportAnchor: snapshot.viewportAnchor,
+    selectionToRestore:
+      targetCategory !== 'edit'
+        ? null
+        : preserveSelection
+          ? { anchor: snapshot.selection.anchor, head: snapshot.selection.head }
+          : { anchor: snapshot.viewportAnchor.pos },
+    preserveSelection,
+    armFirstPointerIntentOverride: targetCategory === 'edit',
+  };
+}
+
+function restoreViewportAnchor(
+  view: Pick<EditorView, 'coordsAtPos' | 'dispatch' | 'scrollDOM'>,
+  scrollContainer: HTMLElement,
+  anchor: SharedDocumentAnchor,
+) {
+  try {
+    const coords = view.coordsAtPos(anchor.pos);
+    if (coords) {
+      const scrollerRect = scrollContainer.getBoundingClientRect();
+      const desiredTop = scrollerRect.top + anchor.offsetTop;
+      const delta = coords.top - desiredTop;
+      if (Math.abs(delta) > 1) {
+        scrollContainer.scrollTop += delta;
+      }
+      return {
+        strategy: 'coords' as const,
+        delta,
+        targetPos: anchor.pos,
+        offsetTop: anchor.offsetTop,
+      };
+    }
+  } catch {
+  }
+
+  if (canMeasureTextGeometry()) {
+    view.dispatch({
+      effects: EditorView.scrollIntoView(anchor.pos, { y: 'start' }),
+    });
+    return {
+      strategy: 'scrollIntoView' as const,
+      delta: null,
+      targetPos: anchor.pos,
+      offsetTop: anchor.offsetTop,
+    };
+  }
+
+  return {
+    strategy: 'skipped' as const,
+    delta: null,
+    targetPos: anchor.pos,
+    offsetTop: anchor.offsetTop,
+  };
+}
+
+function isMeaningfulEditIntentKey(event: KeyboardEvent) {
+  if (event.metaKey || event.ctrlKey || event.altKey) return false;
+  if (event.key.length === 1) return true;
+  return ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown', 'Enter', 'Backspace', 'Delete', 'Tab'].includes(event.key);
+}
+
+function canMeasureTextGeometry() {
+  return typeof Range !== 'undefined' && typeof (Range.prototype as { getClientRects?: unknown }).getClientRects === 'function';
 }
 
 function getViewportSelectionAnchor(
@@ -3061,7 +3278,11 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
     const isExternalChange = useRef(false);
     const lastInternalContent = useRef<string>(content);
     const previousModeRef = useRef<ViewMode>(effectiveMode);
+    const effectiveModeRef = useRef<ViewMode>(effectiveMode);
     const suppressNextLivePointerRestoreRef = useRef(false);
+    const transitionSequenceRef = useRef(0);
+    const lastExplicitEditIntentAtRef = useRef(0);
+    const lastProgrammaticSelectionAtRef = useRef(0);
 
     const { openVideoNoteTab, openPDFTab, fileTree, openFile, vaultPath } = useFileStore(
       useShallow((state) => ({
@@ -3074,6 +3295,10 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
     );
     const { openSecondaryPdf } = useSplitStore();
     const { setSplitView, editorFontSize, editorInteractionTraceEnabled } = useUIStore();
+
+    const markTransitionTrace = useCallback((type: string, payload: Record<string, unknown>) => {
+      (window as any).__luminaEditorTrace?.mark?.(type, payload);
+    }, []);
 
     const getModeExtensions = useCallback(
       (mode: ViewMode) => {
@@ -3100,7 +3325,6 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
               collapseOnSelectionFacet.of(true),
               livePreviewPlugin,
               tableEditorPlugin(),
-              // 保持 fenced code 在 live 模式下为稳定的可编辑单态，避免依赖的 selection/render 脱节。
               editableCodeBlockField,
               ...widgets,
             ];
@@ -3115,34 +3339,89 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
     const syncSelectionToViewport = useCallback(() => {
       const view = viewRef.current;
       if (!view) return;
+      const scrollContainer = resolveViewportScrollContainer(view, scrollContainerRef);
       const selection = view.state.selection.main;
-      const nextAnchor = getViewportSelectionAnchor(view);
+      const nextAnchor = captureViewportAnchor(view, scrollContainer).pos;
       if (selection.from === nextAnchor && selection.to === nextAnchor) {
         return;
       }
-      (window as any).__luminaEditorTrace?.mark?.('selection-synced-to-viewport', {
+      lastProgrammaticSelectionAtRef.current = Date.now();
+      markTransitionTrace('selection-synced-to-viewport', {
         previousAnchor: selection.anchor,
         previousHead: selection.head,
         previousFrom: selection.from,
         previousTo: selection.to,
         nextAnchor,
-        scrollTop: view.scrollDOM.scrollTop,
+        scrollTop: scrollContainer.scrollTop,
         viewportFrom: view.viewport.from,
         viewportTo: view.viewport.to,
+        mode: effectiveModeRef.current,
       });
       view.dispatch({
         selection: { anchor: nextAnchor },
         scrollIntoView: false,
       });
-    }, []);
+    }, [markTransitionTrace, scrollContainerRef]);
+
+    const applyModeTransitionPlan = useCallback(
+      (view: EditorView, plan: ModeTransitionPlan) => {
+        const applyRestore = (phase: 'raf-1' | 'raf-2') => {
+          if (viewRef.current !== view) return;
+          const scrollContainer = resolveViewportScrollContainer(view, scrollContainerRef);
+          if (plan.selectionToRestore) {
+            const currentSelection = view.state.selection.main;
+            const nextHead = plan.selectionToRestore.head ?? plan.selectionToRestore.anchor;
+            if (
+              currentSelection.anchor !== plan.selectionToRestore.anchor ||
+              currentSelection.head !== nextHead
+            ) {
+              lastProgrammaticSelectionAtRef.current = Date.now();
+              view.dispatch({
+                selection: plan.selectionToRestore,
+                scrollIntoView: false,
+              });
+            }
+          }
+          const restoreResult = restoreViewportAnchor(view, scrollContainer, plan.viewportAnchor);
+          markTransitionTrace('mode-transition-restore-applied', {
+            transitionId: plan.transitionId,
+            phase,
+            fromMode: plan.fromMode,
+            toMode: plan.toMode,
+            kind: plan.kind,
+            preserveSelection: plan.preserveSelection,
+            selectionAnchor: view.state.selection.main.anchor,
+            selectionHead: view.state.selection.main.head,
+            scrollTop: scrollContainer.scrollTop,
+            viewportFrom: view.viewport.from,
+            viewportTo: view.viewport.to,
+            restoreStrategy: restoreResult.strategy,
+            restoreDelta: restoreResult.delta,
+            targetPos: restoreResult.targetPos,
+            offsetTop: restoreResult.offsetTop,
+            scrollContainerSource: scrollContainer === view.scrollDOM ? 'codemirror' : 'external',
+          });
+        };
+
+        suppressNextLivePointerRestoreRef.current = plan.armFirstPointerIntentOverride;
+        requestAnimationFrame(() => {
+          applyRestore('raf-1');
+          requestAnimationFrame(() => {
+            applyRestore('raf-2');
+          });
+        });
+      },
+      [markTransitionTrace, scrollContainerRef],
+    );
 
     useImperativeHandle(
       ref,
       () => ({
         getScrollLine: () => {
           if (!viewRef.current) return 1;
-          const pos = viewRef.current.lineBlockAtHeight(viewRef.current.scrollDOM.scrollTop).from;
-          return viewRef.current.state.doc.lineAt(pos).number;
+          const scrollContainer = resolveViewportScrollContainer(viewRef.current, scrollContainerRef);
+          const anchor = captureViewportAnchor(viewRef.current, scrollContainer);
+          return viewRef.current.state.doc.lineAt(anchor.pos).number;
         },
         scrollToLine: (line: number) => {
           if (!viewRef.current) return;
@@ -3155,8 +3434,12 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
         },
         syncSelectionToViewport,
       }),
-      [syncSelectionToViewport],
+      [scrollContainerRef, syncSelectionToViewport],
     );
+
+    useEffect(() => {
+      effectiveModeRef.current = effectiveMode;
+    }, [effectiveMode]);
 
     useEffect(() => {
       if (!containerRef.current) return;
@@ -3588,6 +3871,15 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
       };
       const handleContentPointerDown = (event: PointerEvent) => {
         traceInputEvent('content-pointerdown', event);
+        if (event.button !== 0) return;
+        if (getModeCategory(effectiveModeRef.current) !== 'edit') return;
+        lastExplicitEditIntentAtRef.current = Date.now();
+        selectionTrace.event('explicit-edit-intent', {
+          source: 'pointerdown',
+          mode: effectiveModeRef.current,
+          x: event.clientX,
+          y: event.clientY,
+        });
       };
       const handleContentPointerMove = (event: PointerEvent) => {
         const now = Date.now();
@@ -3619,6 +3911,18 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
       const handleContentClick = (event: MouseEvent) => {
         traceInputEvent('content-click', event);
       };
+      const handleEditorKeyDown = (event: KeyboardEvent) => {
+        if (!isViewActive(view, event.target)) return;
+        if (getModeCategory(effectiveModeRef.current) !== 'edit') return;
+        if (!isMeaningfulEditIntentKey(event)) return;
+        lastExplicitEditIntentAtRef.current = Date.now();
+        selectionTrace.event('explicit-edit-intent', {
+          source: 'keydown',
+          mode: effectiveModeRef.current,
+          key: event.key,
+          code: event.code,
+        });
+      };
       view.contentDOM.addEventListener('pointerdown', handleFirstLivePointerRestoreGuard, true);
       view.contentDOM.addEventListener('mousedown', handleMouseDown);
       view.scrollDOM.addEventListener('scroll', handleEditorScroll, { passive: true });
@@ -3632,6 +3936,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
       view.contentDOM.addEventListener('click', handleContentClick);
       ownerDoc.addEventListener('mousemove', handleMouseMove);
       ownerDoc.addEventListener('mouseup', handleMouseUp);
+      ownerDoc.addEventListener('keydown', handleEditorKeyDown, true);
       ownerDoc.addEventListener('visibilitychange', handleOwnerDocVisibilityChange);
       ownerDoc.defaultView?.addEventListener('blur', handleWindowBlur);
 
@@ -3922,6 +4227,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
         view.scrollDOM.removeEventListener('wheel', handleEditorWheel);
         ownerDoc.removeEventListener('mousemove', handleMouseMove);
         ownerDoc.removeEventListener('mouseup', handleMouseUp);
+        ownerDoc.removeEventListener('keydown', handleEditorKeyDown, true);
         ownerDoc.removeEventListener('visibilitychange', handleOwnerDocVisibilityChange);
         ownerDoc.defaultView?.removeEventListener('blur', handleWindowBlur);
         ownerDoc.removeEventListener('beforeinput', handleSelectAllBeforeInput, true);
@@ -3939,35 +4245,74 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
     useEffect(() => {
       const view = viewRef.current;
       if (!view) return;
-      (window as any).__luminaEditorTrace?.mark?.('view-mode-reconfigure', {
+
+      const previousMode = previousModeRef.current;
+      const modeChanged = previousMode !== effectiveMode;
+      const scrollContainer = resolveViewportScrollContainer(view, scrollContainerRef);
+      const transitionId = modeChanged ? transitionSequenceRef.current + 1 : transitionSequenceRef.current;
+      let transitionPlan: ModeTransitionPlan | null = null;
+
+      if (modeChanged) {
+        transitionSequenceRef.current = transitionId;
+        const snapshot = captureModeTransitionSnapshot(view, previousMode, scrollContainer);
+        transitionPlan = buildModeTransitionPlan({
+          transitionId,
+          snapshot,
+          toMode: effectiveMode,
+        });
+        markTransitionTrace('mode-transition-captured', {
+          transitionId,
+          fromMode: previousMode,
+          toMode: effectiveMode,
+          kind: transitionPlan.kind,
+          scrollTop: snapshot.scrollTop,
+          viewportAnchorPos: snapshot.viewportAnchor.pos,
+          viewportAnchorOffsetTop: snapshot.viewportAnchor.offsetTop,
+          selectionAnchor: snapshot.selection.anchor,
+          selectionHead: snapshot.selection.head,
+          selectionFrom: snapshot.selection.from,
+          selectionTo: snapshot.selection.to,
+          selectionWithinViewport: snapshot.selection.withinViewport,
+          viewportFrom: snapshot.viewport.from,
+          viewportTo: snapshot.viewport.to,
+          preserveSelection: transitionPlan.preserveSelection,
+        });
+      }
+
+      markTransitionTrace('view-mode-reconfigure', {
+        transitionId,
+        previousMode,
         mode: effectiveMode,
+        modeChanged,
         readOnly: isReadOnly,
         selectionAnchor: view.state.selection.main.anchor,
         selectionHead: view.state.selection.main.head,
         viewportFrom: view.viewport.from,
         viewportTo: view.viewport.to,
-        scrollTop: view.scrollDOM.scrollTop,
+        scrollTop: scrollContainer.scrollTop,
+        scrollContainerSource: scrollContainer === view.scrollDOM ? 'codemirror' : 'external',
       });
+
       view.dispatch({
         effects: [
           viewModeCompartment.reconfigure(getModeExtensions(effectiveMode)),
           readOnlyCompartment.reconfigure(EditorState.readOnly.of(isReadOnly)),
         ],
       });
-    }, [effectiveMode, isReadOnly, getModeExtensions]);
 
-    useEffect(() => {
-      const previousMode = previousModeRef.current;
+      if (transitionPlan) {
+        applyModeTransitionPlan(view, transitionPlan);
+      }
+
       previousModeRef.current = effectiveMode;
-      const shouldSuppressNextPointerRestore = previousMode === 'reading' && effectiveMode === 'live';
-      suppressNextLivePointerRestoreRef.current = shouldSuppressNextPointerRestore;
-      if (!shouldSuppressNextPointerRestore) return;
-      (window as any).__luminaEditorTrace?.mark?.('reading-to-live-transition', {
-        previousMode,
-        mode: effectiveMode,
-      });
-      syncSelectionToViewport();
-    }, [effectiveMode, syncSelectionToViewport]);
+    }, [
+      applyModeTransitionPlan,
+      effectiveMode,
+      getModeExtensions,
+      isReadOnly,
+      markTransitionTrace,
+      scrollContainerRef,
+    ]);
 
     useEffect(() => {
       const traceApi = (window as any).__luminaEditorTrace;
