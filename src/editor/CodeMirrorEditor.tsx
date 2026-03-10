@@ -83,6 +83,7 @@ interface CodeMirrorEditorProps {
 export interface CodeMirrorEditorRef {
   getScrollLine: () => number;
   scrollToLine: (line: number) => void;
+  syncSelectionToViewport: () => void;
 }
 
 // ============ 3. 样式定义 (动画与布局核心) ============
@@ -1630,6 +1631,20 @@ export function resolveDragScrollContainer(
   return view.scrollDOM;
 }
 
+function getViewportSelectionAnchor(
+  view: Pick<EditorView, 'scrollDOM' | 'lineBlockAtHeight' | 'state' | 'viewport'>,
+) {
+  const docLength = view.state.doc.length;
+  if (docLength <= 0) return 0;
+  const scrollTop = Number.isFinite(view.scrollDOM.scrollTop) ? view.scrollDOM.scrollTop : 0;
+  try {
+    const block = view.lineBlockAtHeight(scrollTop);
+    return clampNumber(block.from, 0, docLength);
+  } catch {
+    return clampNumber(view.viewport.from, 0, docLength);
+  }
+}
+
 type ManualDragSelectableView = {
   inputState?: {
     mouseSelection?: {
@@ -2932,6 +2947,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
     const viewRef = useRef<EditorView | null>(null);
     const isExternalChange = useRef(false);
     const lastInternalContent = useRef<string>(content);
+    const previousModeRef = useRef<ViewMode>(effectiveMode);
 
     const { openVideoNoteTab, openPDFTab, fileTree, openFile, vaultPath } = useFileStore(
       useShallow((state) => ({
@@ -2982,6 +2998,20 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
       [vaultPath],
     );
 
+    const syncSelectionToViewport = useCallback(() => {
+      const view = viewRef.current;
+      if (!view) return;
+      const nextAnchor = getViewportSelectionAnchor(view);
+      const selection = view.state.selection.main;
+      if (selection.from === nextAnchor && selection.to === nextAnchor) {
+        return;
+      }
+      view.dispatch({
+        selection: { anchor: nextAnchor },
+        scrollIntoView: false,
+      });
+    }, []);
+
     useImperativeHandle(
       ref,
       () => ({
@@ -2999,8 +3029,9 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
             }),
           });
         },
+        syncSelectionToViewport,
       }),
-      [],
+      [syncSelectionToViewport],
     );
 
     useEffect(() => {
@@ -3676,6 +3707,13 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
         ],
       });
     }, [effectiveMode, isReadOnly, getModeExtensions]);
+
+    useEffect(() => {
+      const previousMode = previousModeRef.current;
+      previousModeRef.current = effectiveMode;
+      if (previousMode !== 'reading' || effectiveMode !== 'live') return;
+      syncSelectionToViewport();
+    }, [effectiveMode, syncSelectionToViewport]);
 
     useEffect(() => {
       const view = viewRef.current;

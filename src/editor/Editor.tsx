@@ -107,6 +107,7 @@ export function Editor() {
   const scrollLineRef = useRef<number>(1);
   const prevModeRef = useRef<EditorMode>(editorMode);
   const pendingScrollRef = useRef<number | null>(null);
+  const pendingViewportSelectionSyncRef = useRef(false);
 
   // 从滚动位置计算行号（用于阅读/源码模式）
   const getLineFromScrollPosition = useCallback((container: HTMLElement): number => {
@@ -168,6 +169,10 @@ export function Editor() {
     if (editorMode === 'live') {
       if (codeMirrorRef.current) {
         codeMirrorRef.current.scrollToLine(targetLine);
+        if (pendingViewportSelectionSyncRef.current) {
+          codeMirrorRef.current.syncSelectionToViewport();
+          pendingViewportSelectionSyncRef.current = false;
+        }
         pendingScrollRef.current = null;
       } else if (retries < maxRetries) {
         // CodeMirror 还没初始化，稍后重试
@@ -185,11 +190,21 @@ export function Editor() {
 
   // 模式切换时恢复滚动位置
   useEffect(() => {
-    if (prevModeRef.current !== editorMode && scrollLineRef.current > 1) {
+    const previousMode = prevModeRef.current;
+    const shouldSyncViewportSelection = previousMode === 'reading' && editorMode === 'live';
+    pendingViewportSelectionSyncRef.current = shouldSyncViewportSelection;
+
+    if (previousMode !== editorMode && scrollLineRef.current > 1) {
       pendingScrollRef.current = scrollLineRef.current;
       // 等待组件渲染后尝试恢复
       requestAnimationFrame(() => {
         tryRestoreScroll(scrollLineRef.current);
+      });
+    } else if (shouldSyncViewportSelection) {
+      requestAnimationFrame(() => {
+        if (!codeMirrorRef.current || !pendingViewportSelectionSyncRef.current) return;
+        codeMirrorRef.current.syncSelectionToViewport();
+        pendingViewportSelectionSyncRef.current = false;
       });
     }
     prevModeRef.current = editorMode;
@@ -199,6 +214,10 @@ export function Editor() {
   useEffect(() => {
     if (editorMode === 'live' && pendingScrollRef.current && codeMirrorRef.current) {
       codeMirrorRef.current.scrollToLine(pendingScrollRef.current);
+      if (pendingViewportSelectionSyncRef.current) {
+        codeMirrorRef.current.syncSelectionToViewport();
+        pendingViewportSelectionSyncRef.current = false;
+      }
       pendingScrollRef.current = null;
     }
   });
