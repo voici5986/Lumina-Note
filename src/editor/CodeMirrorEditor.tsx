@@ -1785,7 +1785,7 @@ function buildModeTransitionPlan(options: {
     viewportAnchor: snapshot.viewportAnchor,
     selectionToRestore:
       targetCategory !== 'edit'
-        ? null
+        ? { anchor: snapshot.viewportAnchor.pos }
         : preserveSelection
           ? { anchor: snapshot.selection.anchor, head: snapshot.selection.head }
           : { anchor: snapshot.viewportAnchor.pos },

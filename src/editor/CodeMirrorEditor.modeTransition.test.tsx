@@ -134,6 +134,32 @@ describe('CodeMirror editor mode transition selection sync', () => {
     expect(view.state.selection.main.head).toBe(visibleLineStart + 6);
   });
 
+  it('collapses stale edit selection to viewport anchor when entering reading mode, preventing range selection on next click', async () => {
+    const content = Array.from({ length: 80 }, (_, i) => `Line ${i + 1}`).join('\n');
+    const { view, rerender } = setupEditor(content, 'live');
+    const topCaret = content.indexOf('Line 2');
+    const bottomViewport = content.indexOf('Line 60');
+
+    // Simulate: user clicked at top in live mode
+    act(() => {
+      view.dispatch({ selection: { anchor: topCaret } });
+    });
+
+    // Simulate: user scrolled to bottom (viewport is now at Line 60)
+    const lineBlockSpy = mockVisibleLineAtScroll(view, bottomViewport, 1680);
+
+    // Switch to reading mode — selection must collapse to viewport anchor (bottom)
+    act(() => {
+      rerender(<CodeMirrorEditor content={content} onChange={vi.fn()} viewMode="reading" />);
+    });
+    await flushTransitionFrames();
+
+    // The CM selection must NOT be stale at topCaret — it should be at the viewport anchor
+    expect(view.state.selection.main.anchor).toBe(bottomViewport);
+    expect(view.state.selection.main.from).toBe(view.state.selection.main.to);
+    lineBlockSpy.mockRestore();
+  });
+
   it('falls back to the current viewport when switching between edit modes with an off-screen stale caret', async () => {
     const content = Array.from({ length: 80 }, (_, i) => `Line ${i + 1}`).join('\n');
     const { view, rerender } = setupEditor(content, 'source');
