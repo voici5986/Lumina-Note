@@ -316,9 +316,11 @@ body.resizing iframe[data-codex-iframe="true"] {
     animation-duration: 1ms !important;
   }
   .ui-icon-btn:active,
+  .ui-card-hover:active,
   .db-icon-btn:active,
   .db-action-btn:active:not(:disabled),
-  .db-toggle-btn:active {
+  .db-toggle-btn:active,
+  .mode-switcher-btn:active {
     transform: none;
   }
 }
