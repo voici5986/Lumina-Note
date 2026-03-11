@@ -418,7 +418,7 @@ export function ImageManagerView() {
 
   const handleOpenNote = useCallback(
     (path: string) => {
-      openFile(path);
+      openFile(path, { preview: true });
     },
     [openFile],
   );
