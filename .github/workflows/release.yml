@@ -28,7 +28,6 @@ jobs:
       contents: write
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
         include:
           - platform: 'macos-latest'
@@ -49,6 +48,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: lts/*
+          cache: 'npm'
 
       - name: Install Rust stable (with target)
         if: matrix.rust_target != ''
@@ -62,6 +62,11 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
 
       - name: Install frontend dependencies
         run: npm ci

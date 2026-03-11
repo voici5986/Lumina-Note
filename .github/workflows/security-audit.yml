@@ -18,6 +18,9 @@ jobs:
         with:
           toolchain: stable
 
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
 
@@ -38,6 +41,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: lts/*
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci --ignore-scripts

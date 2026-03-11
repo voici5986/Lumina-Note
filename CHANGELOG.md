@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.11] - 2026-03-11
+
+### 改进
+- CI/Release 构建效率优化：Release 3 个平台并行构建，添加 Rust 和 npm 依赖缓存
+
 ## [1.0.10] - 2026-03-11
 
 ### 修复

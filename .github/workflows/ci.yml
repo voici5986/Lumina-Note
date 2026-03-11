@@ -17,6 +17,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: lts/*
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
@@ -37,6 +38,11 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
 
       - name: Format (server)
         working-directory: server
@@ -70,6 +76,11 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
 
       - name: Format (src-tauri)
         working-directory: src-tauri
