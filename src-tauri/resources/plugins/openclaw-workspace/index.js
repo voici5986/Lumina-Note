@@ -144,7 +144,7 @@ module.exports = function setup(api) {
     }
     const attachment = api.workspace.getOpenClawAttachment();
     if (!attachment) {
-      api.ui.notify("Attach the current workspace as OpenClaw first.");
+      api.ui.notify("Attach an OpenClaw workspace first.");
       return false;
     }
     const body = [
@@ -232,14 +232,14 @@ module.exports = function setup(api) {
     if (!snapshot.workspacePath) {
       return [
         "<p>No workspace is currently open.</p>",
-        "<p>Open the real OpenClaw workspace folder in Lumina to use this integration.</p>",
+        "<p>Open any Lumina workspace, then attach an OpenClaw workspace path to use this integration.</p>",
       ].join("");
     }
 
     const status = snapshot.attached ? "Attached" : "Not attached";
     const guidance = snapshot.attached
       ? "<p>These remain the real files OpenClaw reads. Edit them from the normal file tree, not from a copy.</p>"
-      : "<p>Open the real OpenClaw workspace folder in Lumina, then use <code>Attach current workspace</code> to opt into the shared workspace binding.</p>";
+      : "<p>Choose an OpenClaw workspace path in settings, then use <code>Attach OpenClaw workspace</code> to mount it into the current Lumina workspace.</p>";
 
     return [
       `<p><strong>Status:</strong> ${status}</p>`,
@@ -300,8 +300,8 @@ module.exports = function setup(api) {
     cachedSnapshot = null;
     api.ui.notify(
       snapshot.detectedFiles.length > 0
-        ? "Attached current workspace as an OpenClaw workspace."
-        : "Attached current workspace, but no OpenClaw markers were validated yet.",
+        ? "Attached an OpenClaw workspace to the current Lumina workspace."
+        : "Attached an OpenClaw workspace, but no OpenClaw markers were validated yet.",
     );
     await rebuildUi();
   };
@@ -357,19 +357,19 @@ module.exports = function setup(api) {
         title: "OpenClaw Workspace",
         commands: [
           {
-            id: "attach-current-workspace",
-            title: "Attach current workspace",
+            id: "attach-openclaw-workspace",
+            title: "Attach OpenClaw workspace",
             description: snapshot.attached
-              ? "Refresh the current OpenClaw workspace attachment."
-              : "Attach the current Lumina workspace as an OpenClaw workspace.",
+              ? "Refresh the mounted OpenClaw workspace attachment."
+              : "Attach an external OpenClaw workspace to the current Lumina workspace.",
             run: () => {
               void attachWorkspace();
             },
           },
           {
-            id: "detach-current-workspace",
-            title: "Clear cached workspace state",
-            description: "Clear the current workspace's cached OpenClaw detection state.",
+            id: "detach-openclaw-workspace",
+            title: "Detach OpenClaw workspace",
+            description: "Clear the mounted OpenClaw workspace state for this Lumina workspace.",
             run: () => {
               void detachWorkspace();
             },
@@ -377,7 +377,7 @@ module.exports = function setup(api) {
           {
             id: "open-overview",
             title: "Open overview",
-            description: "Inspect the current workspace for OpenClaw memory files and artifacts.",
+            description: "Inspect the mounted OpenClaw workspace for memory files and artifacts.",
             run: () => {
               void openOverview();
             },
@@ -385,7 +385,7 @@ module.exports = function setup(api) {
           {
             id: "refresh-workspace-state",
             title: "Refresh workspace state",
-            description: "Refresh OpenClaw attachment metadata from the current workspace files.",
+            description: "Refresh OpenClaw attachment metadata from the mounted workspace files.",
             run: () => {
               void refreshAttachment();
             },

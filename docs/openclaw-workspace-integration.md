@@ -8,8 +8,8 @@ Current status: Phase 1 in-product integration is available.
 
 Implemented in Lumina:
 
-- Detect whether the current Lumina workspace matches an OpenClaw workspace contract.
-- Allow the user to explicitly attach or detach the current workspace as an OpenClaw workspace.
+- Detect whether an external folder matches an OpenClaw workspace contract.
+- Allow the user to explicitly attach or detach an external OpenClaw workspace onto the current Lumina workspace.
 - Surface key memory files, recent daily memory files, conventional plan files, artifacts, and Lumina bridge notes inside Lumina.
 - Treat OpenClaw memory and artifact files as normal Lumina materials instead of copying them into a separate store.
 - Ship a bundled official `OpenClaw Workspace` plugin with overview, manual refresh, bridge-note staging, and status affordances.
@@ -53,17 +53,18 @@ Local verification used during implementation:
 
 Lumina currently supports one explicit integration model:
 
-- Open the real OpenClaw workspace folder as the current Lumina workspace.
-- Optionally attach that current workspace as an OpenClaw workspace.
+- Open any normal Lumina workspace as the host workspace.
+- Optionally attach one external OpenClaw workspace path onto that host workspace.
 
 Behavioral rules:
 
-- Detection is automatic when Lumina loads or refreshes the file tree.
+- Detection is driven by the configured OpenClaw path when Lumina loads or refreshes that mounted file tree.
 - Attachment is explicit and user-controlled.
 - Editing in Lumina changes the same files OpenClaw reads and writes.
 - Lumina does not create a second storage format for OpenClaw materials.
-- Search, graph, markdown editing, retrieval, and project organization operate on the same workspace files.
+- Search, markdown editing, retrieval, and project organization can operate across the host workspace and the mounted OpenClaw workspace.
 - Conventional `plans/` folders and staged `.lumina/openclaw-bridge-*.md` notes get special affordances, but they remain ordinary workspace files.
+- The mounted OpenClaw root is rendered as an additional source inside Sidebar and filtered search scopes; it is not imported into the host vault.
 
 ## Security And Support Boundaries
 
@@ -85,17 +86,17 @@ Important user-facing boundary:
 
 Expected failure modes:
 
-- The current workspace is not an OpenClaw workspace.
-- The workspace path becomes unavailable or is moved.
+- The configured OpenClaw path is not an OpenClaw workspace.
+- The mounted workspace path becomes unavailable or is moved.
 - Required root markers disappear after attachment.
 - OpenClaw writes new files that Lumina has not refreshed yet.
 
 Current handling:
 
-- Lumina keeps detection state per workspace path.
+- Lumina keeps detection state per host workspace path.
 - Attachment can be cleared manually.
 - Missing markers degrade the integration affordances instead of blocking normal file browsing.
-- Workspace refresh updates grouped memory / plan / artifact affordances when the file tree is reloaded.
+- Workspace refresh updates grouped memory / plan / artifact affordances when the mounted file tree is reloaded.
 - Settings and the built-in plugin surface warning-only conflict visibility when attached OpenClaw files overlap with dirty Lumina files.
 - A release flag can disable the feature at build time: `VITE_ENABLE_OPENCLAW_WORKSPACE=0`.
 
@@ -112,11 +113,12 @@ Completed validation for the current implementation:
 
 Recommended manual checks before broader rollout:
 
-- Open a real `~/.openclaw/workspace` in Lumina
+- Open any normal Lumina workspace
+- In settings, pick a real `~/.openclaw/workspace` as the mounted OpenClaw path
 - Confirm the settings panel shows detected markers and attachment status
-- Attach the workspace and verify the bundled plugin overview opens
+- Attach the mounted workspace and verify the bundled plugin overview opens
 - Open `AGENTS.md` and a recent `memory/YYYY-MM-DD.md` from Sidebar and Overview
 - Stage the current note or selection and confirm a `.lumina/openclaw-bridge-*.md` file is created
 - Use filtered views for memories, plans, and artifacts from Sidebar or Overview
 - Refresh after creating a new file under `output/` or `canvas/`
-- Rename or remove the workspace path and confirm Lumina degrades safely
+- Rename or remove the mounted workspace path and confirm Lumina degrades safely
