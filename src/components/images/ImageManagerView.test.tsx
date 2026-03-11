@@ -108,6 +108,7 @@ describe("ImageManagerView", () => {
       sortOrder: "desc",
       selectedPaths: [],
       focusedPath: null,
+      detailPanelOpen: true,
     });
     vi.stubGlobal("Image", MockImage);
   });
@@ -116,9 +117,8 @@ describe("ImageManagerView", () => {
     render(<ImageManagerView />);
 
     expect((await screen.findAllByText("hero.png")).length).toBeGreaterThan(0);
-    expect(screen.getByText(en.imageManager.imageDetails)).toBeInTheDocument();
-    expect(screen.getByText(en.imageManager.referencedByNotes)).toBeInTheDocument();
-    expect(screen.getByText("alpha")).toBeInTheDocument();
+    // No image selected by default, detail panel shows empty state
+    expect(screen.getByText(en.imageManager.selectImageTitle)).toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText(en.imageManager.searchPlaceholder), {
       target: { value: "missing" },
