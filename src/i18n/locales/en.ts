@@ -1137,6 +1137,7 @@ export default {
     openClawDesc: 'Detect whether the current Lumina workspace matches the OpenClaw workspace contract and make the shared-file boundary explicit.',
     openClawEnabled: 'Enable integration',
     openClawDisabledDesc: 'OpenClaw integration is currently disabled. Lumina will treat the workspace as a normal folder until you re-enable it.',
+    openClawReleaseFlagDesc: 'OpenClaw integration is disabled by the current release flag. Set VITE_ENABLE_OPENCLAW_WORKSPACE=1 to turn the feature on for this build.',
     openClawNoWorkspace: 'Open a local workspace first to inspect whether it is an OpenClaw workspace.',
     openClawDetected: 'Detected',
     openClawNotDetected: 'Not detected',

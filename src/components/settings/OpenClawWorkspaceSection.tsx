@@ -2,7 +2,10 @@ import { AlertTriangle, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 import { useFileStore } from "@/stores/useFileStore";
-import { useOpenClawWorkspaceStore } from "@/stores/useOpenClawWorkspaceStore";
+import {
+  OPENCLAW_WORKSPACE_RELEASE_ENABLED,
+  useOpenClawWorkspaceStore,
+} from "@/stores/useOpenClawWorkspaceStore";
 import {
   ensureOpenClawTodayMemoryNote,
   type OpenClawWorkspaceSnapshot,
@@ -109,6 +112,7 @@ export function OpenClawWorkspaceSection() {
             <input
               type="checkbox"
               checked={integrationEnabled}
+              disabled={!OPENCLAW_WORKSPACE_RELEASE_ENABLED}
               onChange={(event) => setIntegrationEnabled(event.target.checked)}
             />
             {t.settingsModal.openClawEnabled}
@@ -127,7 +131,9 @@ export function OpenClawWorkspaceSection() {
 
       {!integrationEnabled && (
         <div className="rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground">
-          {t.settingsModal.openClawDisabledDesc}
+          {OPENCLAW_WORKSPACE_RELEASE_ENABLED
+            ? t.settingsModal.openClawDisabledDesc
+            : t.settingsModal.openClawReleaseFlagDesc}
         </div>
       )}
 

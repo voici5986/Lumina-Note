@@ -19,7 +19,7 @@ import { pluginStyleRuntime, type PluginStyleLayer } from "@/services/plugins/st
 import { pluginRenderRuntime } from "@/services/plugins/renderRuntime";
 import { pluginEditorRuntime } from "@/services/plugins/editorRuntime";
 import type { PluginInfo, PluginPermission, PluginRuntimeStatus } from "@/types/plugins";
-import type { OpenClawWorkspaceAttachment } from "@/types/openclaw";
+import type { OpenClawConflictState, OpenClawWorkspaceAttachment } from "@/types/openclaw";
 
 type PluginHostEvent = "app:ready" | "workspace:changed" | "active-file:changed";
 
@@ -186,6 +186,11 @@ interface LuminaPluginApi {
     attachOpenClawWorkspace: (input?: {
       gateway?: Partial<OpenClawWorkspaceAttachment["gateway"]>;
     }) => OpenClawWorkspaceAttachment;
+    refreshOpenClawWorkspace: () => Promise<OpenClawWorkspaceAttachment | null>;
+    updateOpenClawGateway: (
+      gateway: Partial<OpenClawWorkspaceAttachment["gateway"]>,
+    ) => OpenClawWorkspaceAttachment | null;
+    getOpenClawConflictState: () => OpenClawConflictState | null;
     detachOpenClawWorkspace: () => void;
     registerPanel: (input: { id: string; title: string; html: string }) => () => void;
     registerTabType: (input: {
@@ -1232,6 +1237,30 @@ return exported(api, plugin);
             throw new Error("Failed to attach current workspace as OpenClaw workspace");
           }
           return attachment;
+        },
+        refreshOpenClawWorkspace: async () => {
+          requirePermission("workspace:integrations");
+          if (!workspacePath) {
+            throw new Error("No workspace is currently open");
+          }
+          const store = useOpenClawWorkspaceStore.getState();
+          await store.refreshWorkspace(workspacePath);
+          const fileTree = useFileStore.getState().fileTree;
+          if (fileTree.length > 0) {
+            store.refreshAttachmentScan(workspacePath, fileTree);
+          }
+          return store.getAttachment(workspacePath);
+        },
+        updateOpenClawGateway: (gateway: Partial<OpenClawWorkspaceAttachment["gateway"]>) => {
+          requirePermission("workspace:integrations");
+          if (!workspacePath) {
+            throw new Error("No workspace is currently open");
+          }
+          return useOpenClawWorkspaceStore.getState().updateGateway(workspacePath, gateway);
+        },
+        getOpenClawConflictState: () => {
+          requirePermission("workspace:integrations");
+          return useOpenClawWorkspaceStore.getState().getConflictState(workspacePath);
         },
         detachOpenClawWorkspace: () => {
           requirePermission("workspace:integrations");

@@ -91,7 +91,7 @@ Get the latest build from [Releases](https://github.com/blueberrycongee/Lumina-N
 - WebDAV sync
 - Flashcard review
 - 15 themes
-- OpenClaw workspace attachment with memory/artifact affordances
+- OpenClaw workspace attachment with memory/plan/artifact affordances, filtered views, and bridge notes
 
 <h3 align="center">Plugin ecosystem (Developer Preview)</h3>
 - Load plugins from workspace / user / built-in directories

@@ -10,14 +10,16 @@ Implemented in Lumina:
 
 - Detect whether the current Lumina workspace matches an OpenClaw workspace contract.
 - Allow the user to explicitly attach or detach the current workspace as an OpenClaw workspace.
-- Surface key memory files and recent daily memory files inside Lumina.
+- Surface key memory files, recent daily memory files, conventional plan files, artifacts, and Lumina bridge notes inside Lumina.
 - Treat OpenClaw memory and artifact files as normal Lumina materials instead of copying them into a separate store.
-- Ship a bundled official `OpenClaw Workspace` plugin with overview and quick actions.
+- Ship a bundled official `OpenClaw Workspace` plugin with overview, manual refresh, bridge-note staging, and status affordances.
+- Add filtered workspace views for OpenClaw memories, plans, and artifacts through Lumina global search scopes.
+- Persist optional Gateway endpoint metadata and expose concurrent-change warnings when Lumina and OpenClaw touch the same dirty file.
 
 Not implemented yet:
 
-- Gateway-backed live controls beyond local file-centric attachment.
-- Aggressive conflict resolution beyond normal local file refresh behavior.
+- Gateway-backed live transport or auth flows beyond local file-centric attachment.
+- Aggressive conflict resolution beyond warning-level visibility and normal local file refresh behavior.
 - A separate import/sync layer or remote admin workflow.
 
 ## Verified Workspace Contract
@@ -41,9 +43,11 @@ Workspace markers Lumina currently treats as first-class:
 
 Local verification used during implementation:
 
-- A live local OpenClaw workspace existed at `~/.openclaw/workspace`
+- A live local OpenClaw workspace existed at `~/.openclaw/workspace` on March 12, 2026
 - Observed root files included `AGENTS.md`, `SOUL.md`, `USER.md`, `IDENTITY.md`, `TOOLS.md`, `HEARTBEAT.md`, `MEMORY.md`
-- Observed folders included `memory/`, `skills/`, and `output/`
+- Observed folders included `memory/`, `skills/`, `output/`, and `tmp/`
+- Observed artifact output included `output/playwright/`
+- No conventional `plans/` directory was present in that local workspace at validation time
 
 ## Product Contract
 
@@ -59,6 +63,7 @@ Behavioral rules:
 - Editing in Lumina changes the same files OpenClaw reads and writes.
 - Lumina does not create a second storage format for OpenClaw materials.
 - Search, graph, markdown editing, retrieval, and project organization operate on the same workspace files.
+- Conventional `plans/` folders and staged `.lumina/openclaw-bridge-*.md` notes get special affordances, but they remain ordinary workspace files.
 
 ## Security And Support Boundaries
 
@@ -90,17 +95,20 @@ Current handling:
 - Lumina keeps detection state per workspace path.
 - Attachment can be cleared manually.
 - Missing markers degrade the integration affordances instead of blocking normal file browsing.
-- Workspace refresh updates recent memory and artifact affordances when the file tree is reloaded.
+- Workspace refresh updates grouped memory / plan / artifact affordances when the file tree is reloaded.
+- Settings and the built-in plugin surface warning-only conflict visibility when attached OpenClaw files overlap with dirty Lumina files.
+- A release flag can disable the feature at build time: `VITE_ENABLE_OPENCLAW_WORKSPACE=0`.
 
 ## Validation Checklist
 
 Completed validation for the current implementation:
 
-- Unit tests for workspace detection and derived memory/artifact metadata
+- Unit tests for workspace detection and derived memory / plan / artifact metadata
 - Unit tests for persisted OpenClaw workspace store behavior
 - Unit tests for built-in plugin enablement defaults
 - TypeScript compile check with `npx tsc --noEmit`
 - Production web build with `npm run build`
+- Local filesystem verification against a real `~/.openclaw/workspace` on March 12, 2026
 
 Recommended manual checks before broader rollout:
 
@@ -108,14 +116,7 @@ Recommended manual checks before broader rollout:
 - Confirm the settings panel shows detected markers and attachment status
 - Attach the workspace and verify the bundled plugin overview opens
 - Open `AGENTS.md` and a recent `memory/YYYY-MM-DD.md` from Sidebar and Overview
+- Stage the current note or selection and confirm a `.lumina/openclaw-bridge-*.md` file is created
+- Use filtered views for memories, plans, and artifacts from Sidebar or Overview
 - Refresh after creating a new file under `output/` or `canvas/`
 - Rename or remove the workspace path and confirm Lumina degrades safely
-
-## Next Steps
-
-Planned follow-up work:
-
-- Stronger grouping for memories, plans, and artifacts
-- Saved searches or filtered workspace views for OpenClaw outputs
-- Better conflict visibility when files change during an open Lumina session
-- Optional Gateway-aware enhancements after the file-centric path is stable

@@ -8,6 +8,9 @@ import {
 import type { FileEntry } from "@/lib/tauri";
 import type { OpenClawConflictState, OpenClawWorkspaceAttachment } from "@/types/openclaw";
 
+export const OPENCLAW_WORKSPACE_RELEASE_ENABLED =
+  (import.meta.env.VITE_ENABLE_OPENCLAW_WORKSPACE ?? "1") !== "0";
+
 type AttachWorkspaceInput = {
   workspacePath: string;
   gateway?: Partial<OpenClawWorkspaceAttachment["gateway"]>;
@@ -62,7 +65,7 @@ function applySnapshotToAttachment(
 export const useOpenClawWorkspaceStore = create<OpenClawWorkspaceState>()(
   persist(
     (set, get) => ({
-      integrationEnabled: true,
+      integrationEnabled: OPENCLAW_WORKSPACE_RELEASE_ENABLED,
       snapshotsByPath: {},
       attachmentsByPath: {},
       conflictsByPath: {},
@@ -70,13 +73,17 @@ export const useOpenClawWorkspaceStore = create<OpenClawWorkspaceState>()(
       isRefreshing: false,
       lastError: null,
       setIntegrationEnabled: (enabled) => {
+        if (!OPENCLAW_WORKSPACE_RELEASE_ENABLED) {
+          set({ integrationEnabled: false, activeWorkspacePath: null });
+          return;
+        }
         set((state) => ({
           integrationEnabled: enabled,
           activeWorkspacePath: enabled ? state.activeWorkspacePath : null,
         }));
       },
       refreshWorkspace: async (path) => {
-        if (!get().integrationEnabled) {
+        if (!OPENCLAW_WORKSPACE_RELEASE_ENABLED || !get().integrationEnabled) {
           return null;
         }
         if (!path) {
@@ -104,7 +111,7 @@ export const useOpenClawWorkspaceStore = create<OpenClawWorkspaceState>()(
         return snapshot;
       },
       getSnapshot: (path) => {
-        if (!get().integrationEnabled) return null;
+        if (!OPENCLAW_WORKSPACE_RELEASE_ENABLED || !get().integrationEnabled) return null;
         const targetPath = path ?? get().activeWorkspacePath;
         if (!targetPath) return null;
         return get().snapshotsByPath[targetPath] ?? null;
@@ -119,13 +126,13 @@ export const useOpenClawWorkspaceStore = create<OpenClawWorkspaceState>()(
           };
         }),
       getAttachment: (path) => {
-        if (!get().integrationEnabled) return null;
+        if (!OPENCLAW_WORKSPACE_RELEASE_ENABLED || !get().integrationEnabled) return null;
         const targetPath = path ?? get().activeWorkspacePath;
         if (!targetPath) return null;
         return get().attachmentsByPath[targetPath] ?? null;
       },
       attachWorkspace: ({ workspacePath, gateway }) => {
-        if (!get().integrationEnabled) {
+        if (!OPENCLAW_WORKSPACE_RELEASE_ENABLED || !get().integrationEnabled) {
           throw new Error("OpenClaw integration is disabled.");
         }
         const nowIso = new Date().toISOString();
@@ -170,7 +177,7 @@ export const useOpenClawWorkspaceStore = create<OpenClawWorkspaceState>()(
           return { attachmentsByPath: next, conflictsByPath: nextConflicts };
         }),
       updateGateway: (workspacePath, gateway) => {
-        if (!get().integrationEnabled) return null;
+        if (!OPENCLAW_WORKSPACE_RELEASE_ENABLED || !get().integrationEnabled) return null;
         const current = get().attachmentsByPath[workspacePath];
         if (!current) return null;
         const next = {
@@ -189,7 +196,7 @@ export const useOpenClawWorkspaceStore = create<OpenClawWorkspaceState>()(
         return next;
       },
       refreshAttachmentScan: (workspacePath, fileTree) => {
-        if (!get().integrationEnabled) {
+        if (!OPENCLAW_WORKSPACE_RELEASE_ENABLED || !get().integrationEnabled) {
           return null;
         }
         const snapshot = fileTree
@@ -241,7 +248,7 @@ export const useOpenClawWorkspaceStore = create<OpenClawWorkspaceState>()(
         }));
       },
       getConflictState: (path) => {
-        if (!get().integrationEnabled) return null;
+        if (!OPENCLAW_WORKSPACE_RELEASE_ENABLED || !get().integrationEnabled) return null;
         const targetPath = path ?? get().activeWorkspacePath;
         if (!targetPath) return null;
         return get().conflictsByPath[targetPath] ?? null;

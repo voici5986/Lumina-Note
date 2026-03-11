@@ -1032,6 +1032,7 @@ export default {
     openClawDesc: '現在の Lumina ワークスペースが OpenClaw のワークスペース契約に一致するかを確認し、共有される実ファイル境界を明示します。',
     openClawEnabled: '統合を有効化',
     openClawDisabledDesc: 'OpenClaw integration は現在無効です。再度有効化するまで Lumina は通常のフォルダとして扱います。',
+    openClawReleaseFlagDesc: '現在の release flag では OpenClaw integration が無効です。この build で有効化するには VITE_ENABLE_OPENCLAW_WORKSPACE=1 を設定してください。',
     openClawNoWorkspace: 'まずローカルワークスペースを開いてから、OpenClaw ワークスペースかどうかを確認してください。',
     openClawDetected: 'Detected',
     openClawNotDetected: 'Not detected',

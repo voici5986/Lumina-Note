@@ -2,6 +2,7 @@ module.exports = function setup(api) {
   const OVERVIEW_TAB_TYPE = "openclaw-workspace-overview";
   const KEY_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "HEARTBEAT.md", "MEMORY.md"];
   const ARTIFACT_PREFIXES = ["output/", "artifacts/", "tmp/docs/"];
+  const PLAN_PREFIXES = ["plans/", "docs/plans/", ".openclaw/plans/", "output/plans/"];
 
   let cachedSnapshot = null;
   let disposeUi = () => {};
@@ -41,7 +42,10 @@ module.exports = function setup(api) {
         attachment: null,
         keyFiles: KEY_FILES.map((path) => ({ path, exists: false })),
         memoryFiles: [],
+        planFiles: [],
         artifactFiles: [],
+        bridgeNotes: [],
+        conflictState: null,
       };
       return cachedSnapshot;
     }
@@ -62,20 +66,31 @@ module.exports = function setup(api) {
     const memoryFiles = normalized
       .filter((path) => path.startsWith("memory/") && path.toLowerCase().endsWith(".md"))
       .sort((left, right) => right.localeCompare(left));
-    const artifactFiles = normalized.filter((path) =>
-      ARTIFACT_PREFIXES.some((prefix) => path.startsWith(prefix)),
+    const planFiles = normalized.filter((path) =>
+      PLAN_PREFIXES.some((prefix) => path.startsWith(prefix)),
     );
+    const artifactFiles = normalized.filter((path) =>
+      ARTIFACT_PREFIXES.some((prefix) => path.startsWith(prefix)) &&
+      !PLAN_PREFIXES.some((prefix) => path.startsWith(prefix)),
+    );
+    const bridgeNotes = normalized.filter((path) =>
+      path.startsWith(".lumina/openclaw-bridge-") && path.toLowerCase().endsWith(".md"),
+    );
+    const conflictState = api.workspace.getOpenClawConflictState();
 
     cachedSnapshot = {
       workspacePath,
       attached: Boolean(detectedAttachment),
       attachment: detectedAttachment,
+      conflictState,
       keyFiles: KEY_FILES.map((path) => ({
         path,
         exists: fileSet.has(path),
       })),
       memoryFiles,
+      planFiles,
       artifactFiles,
+      bridgeNotes,
     };
 
     return cachedSnapshot;
@@ -169,6 +184,22 @@ module.exports = function setup(api) {
     });
   };
 
+  const refreshAttachment = async () => {
+    if (!api.workspace.getPath()) {
+      api.ui.notify("Open a workspace first.");
+      return false;
+    }
+    const attachment = await api.workspace.refreshOpenClawWorkspace();
+    cachedSnapshot = null;
+    api.ui.notify(
+      attachment
+        ? "Refreshed OpenClaw workspace metadata."
+        : "Refreshed workspace detection, but no attachment exists yet.",
+    );
+    await rebuildUi();
+    return Boolean(attachment);
+  };
+
   const renderOverview = (snapshot) => {
     const keyFileItems = snapshot.keyFiles
       .map(
@@ -182,6 +213,14 @@ module.exports = function setup(api) {
       .join("");
     const artifactItems = snapshot.artifactFiles
       .slice(0, 8)
+      .map((path) => `<li><code>${escapeHtml(path)}</code></li>`)
+      .join("");
+    const planItems = snapshot.planFiles
+      .slice(0, 8)
+      .map((path) => `<li><code>${escapeHtml(path)}</code></li>`)
+      .join("");
+    const bridgeItems = snapshot.bridgeNotes
+      .slice(0, 4)
       .map((path) => `<li><code>${escapeHtml(path)}</code></li>`)
       .join("");
 
@@ -208,13 +247,20 @@ module.exports = function setup(api) {
       snapshot.attachment && snapshot.attachment.gateway && snapshot.attachment.gateway.enabled
         ? `<p><strong>Gateway:</strong> <code>${escapeHtml(snapshot.attachment.gateway.endpoint || "")}</code></p>`
         : "<p><strong>Gateway:</strong> not configured</p>",
+      snapshot.conflictState && snapshot.conflictState.status === "warning"
+        ? `<p><strong>Conflict:</strong> ${escapeHtml(snapshot.conflictState.message || "warning")}</p>`
+        : "<p><strong>Conflict:</strong> none</p>",
       guidance,
       "<h3>Key memory files</h3>",
       `<ul>${keyFileItems || "<li>No key files found.</li>"}</ul>`,
       `<p><strong>Daily memory files:</strong> ${snapshot.memoryFiles.length}</p>`,
       memoryItems ? `<ul>${memoryItems}</ul>` : "<p>No daily memory files found.</p>",
+      `<p><strong>Plan files:</strong> ${snapshot.planFiles.length}</p>`,
+      planItems ? `<ul>${planItems}</ul>` : "<p>No plan files found under known plan folders.</p>",
       `<p><strong>Artifacts under known folders:</strong> ${snapshot.artifactFiles.length}</p>`,
       artifactItems ? `<ul>${artifactItems}</ul>` : "<p>No files found under output/, artifacts/, or tmp/docs/.</p>",
+      `<p><strong>Bridge notes:</strong> ${snapshot.bridgeNotes.length}</p>`,
+      bridgeItems ? `<ul>${bridgeItems}</ul>` : "<p>No Lumina bridge notes have been staged yet.</p>",
       "<p>Quick actions are available from the command palette group <code>OpenClaw Workspace</code>.</p>",
     ].join("");
   };
@@ -272,6 +318,20 @@ module.exports = function setup(api) {
 
     if (snapshot.attached) {
       disposers.push(
+        api.ui.registerStatusBarItem({
+          id: "openclaw-workspace-status",
+          text:
+            snapshot.attachment && snapshot.attachment.gateway && snapshot.attachment.gateway.enabled
+              ? "OpenClaw: attached + gateway"
+              : "OpenClaw: attached",
+          align: "left",
+          order: 260,
+          run: () => {
+            void openOverview();
+          },
+        }),
+      );
+      disposers.push(
         api.ui.registerRibbonItem({
           id: "open-openclaw-workspace",
           title: "OpenClaw",
@@ -314,6 +374,14 @@ module.exports = function setup(api) {
             description: "Inspect the current workspace for OpenClaw memory files and artifacts.",
             run: () => {
               void openOverview();
+            },
+          },
+          {
+            id: "refresh-workspace-state",
+            title: "Refresh workspace state",
+            description: "Refresh OpenClaw attachment metadata from the current workspace files.",
+            run: () => {
+              void refreshAttachment();
             },
           },
           {

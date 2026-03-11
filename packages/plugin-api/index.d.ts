@@ -219,6 +219,11 @@ export interface LuminaPluginApi {
     attachOpenClawWorkspace: (input?: {
       gateway?: Partial<OpenClawWorkspaceAttachment["gateway"]>;
     }) => OpenClawWorkspaceAttachment;
+    refreshOpenClawWorkspace: () => Promise<OpenClawWorkspaceAttachment | null>;
+    updateOpenClawGateway: (
+      gateway: Partial<OpenClawWorkspaceAttachment["gateway"]>,
+    ) => OpenClawWorkspaceAttachment | null;
+    getOpenClawConflictState: () => OpenClawConflictState | null;
     detachOpenClawWorkspace: () => void;
     registerPanel: (input: { id: string; title: string; html: string }) => () => void;
     registerTabType: (input: {

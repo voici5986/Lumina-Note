@@ -1138,6 +1138,7 @@ export default {
     openClawDesc: '检测当前 Lumina 工作区是否符合 OpenClaw 工作区契约，并明确这是一套共享真实文件而不是导入副本。',
     openClawEnabled: '启用集成',
     openClawDisabledDesc: 'OpenClaw 集成当前已关闭。重新启用前，Lumina 会把该工作区当作普通文件夹处理。',
+    openClawReleaseFlagDesc: '当前发布开关已关闭 OpenClaw 集成。为这个构建设置 VITE_ENABLE_OPENCLAW_WORKSPACE=1 后才能启用。',
     openClawNoWorkspace: '请先打开一个本地工作区，再检查它是否为 OpenClaw 工作区。',
     openClawDetected: '已识别',
     openClawNotDetected: '未识别',

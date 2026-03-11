@@ -1032,6 +1032,7 @@ export default {
     openClawDesc: '檢測目前 Lumina 工作區是否符合 OpenClaw 工作區契約，並明確標示這是一套共享真實檔案而不是匯入副本。',
     openClawEnabled: '啟用整合',
     openClawDisabledDesc: 'OpenClaw 整合目前已關閉。重新啟用前，Lumina 會把此工作區當作一般資料夾處理。',
+    openClawReleaseFlagDesc: '目前的 release flag 已關閉 OpenClaw 整合。要在這個 build 啟用它，請設定 VITE_ENABLE_OPENCLAW_WORKSPACE=1。',
     openClawNoWorkspace: '請先開啟一個本地工作區，再檢查它是否為 OpenClaw 工作區。',
     openClawDetected: '已識別',
     openClawNotDetected: '未識別',
