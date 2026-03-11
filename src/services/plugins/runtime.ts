@@ -11,6 +11,7 @@ import {
 import { useCommandStore } from "@/stores/useCommandStore";
 import { useFileStore } from "@/stores/useFileStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
+import { useOpenClawWorkspaceStore } from "@/stores/useOpenClawWorkspaceStore";
 import { usePluginUiStore } from "@/stores/usePluginUiStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { pluginThemeRuntime, type ThemeMode } from "@/services/plugins/themeRuntime";
@@ -18,6 +19,7 @@ import { pluginStyleRuntime, type PluginStyleLayer } from "@/services/plugins/st
 import { pluginRenderRuntime } from "@/services/plugins/renderRuntime";
 import { pluginEditorRuntime } from "@/services/plugins/editorRuntime";
 import type { PluginInfo, PluginPermission, PluginRuntimeStatus } from "@/types/plugins";
+import type { OpenClawWorkspaceAttachment } from "@/types/openclaw";
 
 type PluginHostEvent = "app:ready" | "workspace:changed" | "active-file:changed";
 
@@ -180,6 +182,11 @@ interface LuminaPluginApi {
     openFile: (path: string) => Promise<void>;
     readFile: (path: string) => Promise<string>;
     writeFile: (path: string, content: string) => Promise<void>;
+    getOpenClawAttachment: () => OpenClawWorkspaceAttachment | null;
+    attachOpenClawWorkspace: (input?: {
+      gateway?: Partial<OpenClawWorkspaceAttachment["gateway"]>;
+    }) => OpenClawWorkspaceAttachment;
+    detachOpenClawWorkspace: () => void;
     registerPanel: (input: { id: string; title: string; html: string }) => () => void;
     registerTabType: (input: {
       type: string;
@@ -1199,6 +1206,39 @@ return exported(api, plugin);
         writeFile: async (path: string, content: string) => {
           requirePermission("vault:write");
           return saveFile(resolvePluginPath(path), content);
+        },
+        getOpenClawAttachment: () => {
+          requirePermission("workspace:integrations");
+          return useOpenClawWorkspaceStore.getState().getAttachment(workspacePath);
+        },
+        attachOpenClawWorkspace: (input?: {
+          gateway?: Partial<OpenClawWorkspaceAttachment["gateway"]>;
+        }) => {
+          requirePermission("workspace:integrations");
+          if (!workspacePath) {
+            throw new Error("No workspace is currently open");
+          }
+          const store = useOpenClawWorkspaceStore.getState();
+          store.attachWorkspace({
+            workspacePath,
+            gateway: input?.gateway,
+          });
+          const fileTree = useFileStore.getState().fileTree;
+          if (fileTree.length > 0) {
+            store.refreshAttachmentScan(workspacePath, fileTree);
+          }
+          const attachment = store.getAttachment(workspacePath);
+          if (!attachment) {
+            throw new Error("Failed to attach current workspace as OpenClaw workspace");
+          }
+          return attachment;
+        },
+        detachOpenClawWorkspace: () => {
+          requirePermission("workspace:integrations");
+          if (!workspacePath) {
+            throw new Error("No workspace is currently open");
+          }
+          useOpenClawWorkspaceStore.getState().detachWorkspace(workspacePath);
         },
         registerPanel,
         registerTabType,

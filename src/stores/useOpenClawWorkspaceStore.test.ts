@@ -1,54 +1,77 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { useOpenClawWorkspaceStore, getDetectedOpenClawEntries } from "@/stores/useOpenClawWorkspaceStore";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const inspectMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/services/openclaw/workspace", () => ({
+  inspectOpenClawWorkspace: inspectMock,
+}));
+
+import { useOpenClawWorkspaceStore } from "./useOpenClawWorkspaceStore";
 
 describe("useOpenClawWorkspaceStore", () => {
-  const workspacePath = "/tmp/openclaw-workspace";
-
   beforeEach(() => {
     localStorage.clear();
-    useOpenClawWorkspaceStore.setState({ attachmentsByPath: {} });
-  });
-
-  it("detects OpenClaw root memory files and folders from the current tree", () => {
-    const detected = getDetectedOpenClawEntries([
-      { name: "AGENTS.md", path: `${workspacePath}/AGENTS.md`, is_dir: false, children: null },
-      { name: "SOUL.md", path: `${workspacePath}/SOUL.md`, is_dir: false, children: null },
-      { name: "memory", path: `${workspacePath}/memory`, is_dir: true, children: [] },
-      { name: "notes", path: `${workspacePath}/notes`, is_dir: true, children: [] },
-    ]);
-
-    expect(detected).toEqual({
-      detectedFiles: ["AGENTS.md", "SOUL.md"],
-      detectedFolders: ["memory"],
+    inspectMock.mockReset();
+    useOpenClawWorkspaceStore.setState({
+      snapshotsByPath: {},
+      activeWorkspacePath: null,
+      isRefreshing: false,
+      lastError: null,
     });
   });
 
-  it("attaches, refreshes, and marks an OpenClaw workspace unavailable", () => {
-    const attached = useOpenClawWorkspaceStore.getState().attachWorkspace({
-      workspacePath,
-      detectedFiles: ["AGENTS.md"],
+  it("stores the refreshed snapshot for the active workspace", async () => {
+    inspectMock.mockResolvedValue({
+      workspacePath: "/tmp/openclaw",
+      status: "detected",
+      checkedAt: 1,
+      matchedRequiredFiles: ["AGENTS.md", "SOUL.md", "USER.md"],
+      matchedOptionalFiles: [],
+      matchedDirectories: ["memory"],
+      missingRequiredFiles: [],
+      memoryDirectoryPath: "/tmp/openclaw/memory",
+      todayMemoryPath: "/tmp/openclaw/memory/2026-03-11.md",
+      artifactDirectoryPaths: [],
+      editablePriorityFiles: ["AGENTS.md", "SOUL.md", "USER.md"],
+      indexingScope: "shared-workspace",
+      gatewayEnabled: false,
+      error: null,
     });
 
-    expect(attached.workspacePath).toBe(workspacePath);
-    expect(attached.status).toBe("attached");
-    expect(useOpenClawWorkspaceStore.getState().isAttached(workspacePath)).toBe(true);
+    const snapshot = await useOpenClawWorkspaceStore.getState().refreshWorkspace("/tmp/openclaw");
 
-    useOpenClawWorkspaceStore.getState().refreshAttachmentScan(workspacePath, [
-      { name: "AGENTS.md", path: `${workspacePath}/AGENTS.md`, is_dir: false, children: null },
-      { name: "USER.md", path: `${workspacePath}/USER.md`, is_dir: false, children: null },
-      { name: "output", path: `${workspacePath}/output`, is_dir: true, children: [] },
-    ]);
+    expect(snapshot?.status).toBe("detected");
+    expect(useOpenClawWorkspaceStore.getState().activeWorkspacePath).toBe("/tmp/openclaw");
+    expect(useOpenClawWorkspaceStore.getState().getSnapshot("/tmp/openclaw")?.memoryDirectoryPath).toBe(
+      "/tmp/openclaw/memory",
+    );
+  });
 
-    expect(useOpenClawWorkspaceStore.getState().getAttachment(workspacePath)).toMatchObject({
-      detectedFiles: ["AGENTS.md", "USER.md"],
-      detectedFolders: ["output"],
-      status: "attached",
+  it("clears the active workspace when refresh is called without a path", async () => {
+    useOpenClawWorkspaceStore.setState({
+      activeWorkspacePath: "/tmp/openclaw",
+      snapshotsByPath: {
+        "/tmp/openclaw": {
+          workspacePath: "/tmp/openclaw",
+          status: "detected",
+          checkedAt: 1,
+          matchedRequiredFiles: ["AGENTS.md", "SOUL.md", "USER.md"],
+          matchedOptionalFiles: [],
+          matchedDirectories: ["memory"],
+          missingRequiredFiles: [],
+          memoryDirectoryPath: "/tmp/openclaw/memory",
+          todayMemoryPath: "/tmp/openclaw/memory/2026-03-11.md",
+          artifactDirectoryPaths: [],
+          editablePriorityFiles: ["AGENTS.md", "SOUL.md", "USER.md"],
+          indexingScope: "shared-workspace",
+          gatewayEnabled: false,
+          error: null,
+        },
+      },
     });
 
-    useOpenClawWorkspaceStore.getState().markUnavailable(workspacePath);
-    expect(useOpenClawWorkspaceStore.getState().getAttachment(workspacePath)?.status).toBe("unavailable");
+    await useOpenClawWorkspaceStore.getState().refreshWorkspace(null);
 
-    useOpenClawWorkspaceStore.getState().detachWorkspace(workspacePath);
-    expect(useOpenClawWorkspaceStore.getState().getAttachment(workspacePath)).toBeNull();
+    expect(useOpenClawWorkspaceStore.getState().activeWorkspacePath).toBeNull();
   });
 });

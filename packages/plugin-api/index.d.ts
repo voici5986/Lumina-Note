@@ -14,6 +14,7 @@ export type LuminaPluginPermission =
   | "workspace:*"
   | "workspace:read"
   | "workspace:open"
+  | "workspace:integrations"
   | "workspace:panel"
   | "workspace:tab"
   | "editor:*"
@@ -61,6 +62,23 @@ export interface LuminaPluginManifestV1 {
     light?: Record<string, string>;
     dark?: Record<string, string>;
   };
+}
+
+export interface OpenClawWorkspaceSnapshot {
+  workspacePath: string;
+  status: "detected" | "not-detected" | "error";
+  checkedAt: number;
+  matchedRequiredFiles: string[];
+  matchedOptionalFiles: string[];
+  matchedDirectories: string[];
+  missingRequiredFiles: string[];
+  memoryDirectoryPath: string | null;
+  todayMemoryPath: string;
+  artifactDirectoryPaths: string[];
+  editablePriorityFiles: string[];
+  indexingScope: "shared-workspace";
+  gatewayEnabled: boolean;
+  error: string | null;
 }
 
 export interface LuminaPluginApi {
@@ -166,6 +184,9 @@ export interface LuminaPluginApi {
     openFile: (path: string) => Promise<void>;
     readFile: (path: string) => Promise<string>;
     writeFile: (path: string, content: string) => Promise<void>;
+    getOpenClawAttachment: () => OpenClawWorkspaceSnapshot | null;
+    attachOpenClawWorkspace: () => Promise<OpenClawWorkspaceSnapshot>;
+    detachOpenClawWorkspace: () => void;
     registerPanel: (input: { id: string; title: string; html: string }) => () => void;
     registerTabType: (input: {
       type: string;

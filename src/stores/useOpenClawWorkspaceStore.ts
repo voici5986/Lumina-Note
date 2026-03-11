@@ -1,137 +1,192 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { FileEntry } from "@/lib/tauri";
 import {
-  OPENCLAW_ROOT_MEMORY_FILES,
-  OPENCLAW_ROOT_MEMORY_FOLDERS,
-  type OpenClawWorkspaceAttachment,
-} from "@/types/openclaw";
+  inspectOpenClawWorkspace,
+  inspectOpenClawWorkspaceTree,
+  type OpenClawWorkspaceSnapshot,
+} from "@/services/openclaw/workspace";
+import type { FileEntry } from "@/lib/tauri";
+import type { OpenClawWorkspaceAttachment } from "@/types/openclaw";
 
-type AttachOpenClawWorkspaceInput = {
+type AttachWorkspaceInput = {
   workspacePath: string;
   gateway?: Partial<OpenClawWorkspaceAttachment["gateway"]>;
-  detectedFiles?: string[];
-  detectedFolders?: string[];
 };
 
 interface OpenClawWorkspaceState {
+  snapshotsByPath: Record<string, OpenClawWorkspaceSnapshot>;
   attachmentsByPath: Record<string, OpenClawWorkspaceAttachment>;
-  attachWorkspace: (input: AttachOpenClawWorkspaceInput) => OpenClawWorkspaceAttachment;
-  detachWorkspace: (workspacePath: string) => void;
-  markUnavailable: (workspacePath: string) => void;
-  refreshAttachmentScan: (workspacePath: string, fileTree: FileEntry[]) => void;
-  getAttachment: (workspacePath?: string | null) => OpenClawWorkspaceAttachment | null;
-  isAttached: (workspacePath?: string | null) => boolean;
+  activeWorkspacePath: string | null;
+  isRefreshing: boolean;
+  lastError: string | null;
+  refreshWorkspace: (path?: string | null) => Promise<OpenClawWorkspaceSnapshot | null>;
+  getSnapshot: (path?: string | null) => OpenClawWorkspaceSnapshot | null;
+  clearSnapshot: (path: string) => void;
+  getAttachment: (path?: string | null) => OpenClawWorkspaceAttachment | null;
+  attachWorkspace: (input: AttachWorkspaceInput) => OpenClawWorkspaceAttachment;
+  detachWorkspace: (path: string) => void;
+  refreshAttachmentScan: (
+    workspacePath: string,
+    fileTree?: FileEntry[],
+  ) => OpenClawWorkspaceAttachment | null;
+  markUnavailable: (path: string) => void;
 }
 
-const detectOpenClawEntries = (fileTree: FileEntry[]) => {
-  const rootFiles = new Set<string>();
-  const rootFolders = new Set<string>();
+function toIsoString(timestamp: number): string {
+  return new Date(timestamp).toISOString();
+}
 
-  for (const entry of fileTree) {
-    if (entry.is_dir) {
-      if (OPENCLAW_ROOT_MEMORY_FOLDERS.includes(entry.name as (typeof OPENCLAW_ROOT_MEMORY_FOLDERS)[number])) {
-        rootFolders.add(entry.name);
-      }
-      continue;
-    }
-
-    if (OPENCLAW_ROOT_MEMORY_FILES.includes(entry.name as (typeof OPENCLAW_ROOT_MEMORY_FILES)[number])) {
-      rootFiles.add(entry.name);
-    }
-  }
-
+function applySnapshotToAttachment(
+  attachment: OpenClawWorkspaceAttachment,
+  snapshot: OpenClawWorkspaceSnapshot,
+): OpenClawWorkspaceAttachment {
   return {
-    detectedFiles: Array.from(rootFiles).sort(),
-    detectedFolders: Array.from(rootFolders).sort(),
+    ...attachment,
+    status: snapshot.status === "error" ? "unavailable" : "attached",
+    lastValidatedAt: toIsoString(snapshot.checkedAt),
+    detectedFiles: snapshot.editablePriorityFiles,
+    detectedFolders: snapshot.matchedDirectories,
   };
-};
-
-const buildAttachment = (
-  workspacePath: string,
-  current: OpenClawWorkspaceAttachment | null,
-  input: AttachOpenClawWorkspaceInput,
-): OpenClawWorkspaceAttachment => ({
-  kind: "openclaw",
-  workspacePath,
-  status: "attached",
-  attachedAt: current?.attachedAt ?? new Date().toISOString(),
-  lastValidatedAt: new Date().toISOString(),
-  detectedFiles: [...(input.detectedFiles ?? current?.detectedFiles ?? [])].sort(),
-  detectedFolders: [...(input.detectedFolders ?? current?.detectedFolders ?? [])].sort(),
-  gateway: {
-    enabled: input.gateway?.enabled ?? current?.gateway.enabled ?? false,
-    endpoint: input.gateway?.endpoint ?? current?.gateway.endpoint ?? null,
-  },
-});
+}
 
 export const useOpenClawWorkspaceStore = create<OpenClawWorkspaceState>()(
   persist(
     (set, get) => ({
+      snapshotsByPath: {},
       attachmentsByPath: {},
-      attachWorkspace: (input) => {
-        const workspacePath = input.workspacePath.trim();
-        const current = get().attachmentsByPath[workspacePath] ?? null;
-        const next = buildAttachment(workspacePath, current, input);
+      activeWorkspacePath: null,
+      isRefreshing: false,
+      lastError: null,
+      refreshWorkspace: async (path) => {
+        if (!path) {
+          set({ activeWorkspacePath: null, isRefreshing: false, lastError: null });
+          return null;
+        }
+
+        set({ activeWorkspacePath: path, isRefreshing: true, lastError: null });
+        const snapshot = await inspectOpenClawWorkspace(path);
+        set((state) => ({
+          snapshotsByPath: {
+            ...state.snapshotsByPath,
+            [path]: snapshot,
+          },
+          attachmentsByPath: state.attachmentsByPath[path]
+            ? {
+                ...state.attachmentsByPath,
+                [path]: applySnapshotToAttachment(state.attachmentsByPath[path], snapshot),
+              }
+            : state.attachmentsByPath,
+          activeWorkspacePath: path,
+          isRefreshing: false,
+          lastError: snapshot.status === "error" ? snapshot.error : null,
+        }));
+        return snapshot;
+      },
+      getSnapshot: (path) => {
+        const targetPath = path ?? get().activeWorkspacePath;
+        if (!targetPath) return null;
+        return get().snapshotsByPath[targetPath] ?? null;
+      },
+      clearSnapshot: (path) =>
+        set((state) => {
+          const next = { ...state.snapshotsByPath };
+          delete next[path];
+          return {
+            snapshotsByPath: next,
+            activeWorkspacePath: state.activeWorkspacePath === path ? null : state.activeWorkspacePath,
+          };
+        }),
+      getAttachment: (path) => {
+        const targetPath = path ?? get().activeWorkspacePath;
+        if (!targetPath) return null;
+        return get().attachmentsByPath[targetPath] ?? null;
+      },
+      attachWorkspace: ({ workspacePath, gateway }) => {
+        const nowIso = new Date().toISOString();
+        const existing = get().attachmentsByPath[workspacePath];
+        const attachment: OpenClawWorkspaceAttachment = existing
+          ? {
+              ...existing,
+              gateway: {
+                ...existing.gateway,
+                ...gateway,
+              },
+            }
+          : {
+              kind: "openclaw",
+              workspacePath,
+              status: "attached",
+              attachedAt: nowIso,
+              lastValidatedAt: null,
+              detectedFiles: [],
+              detectedFolders: [],
+              gateway: {
+                enabled: gateway?.enabled ?? false,
+                endpoint: gateway?.endpoint ?? null,
+              },
+            };
         set((state) => ({
           attachmentsByPath: {
             ...state.attachmentsByPath,
-            [workspacePath]: next,
+            [workspacePath]: attachment,
           },
+          activeWorkspacePath: workspacePath,
         }));
-        return next;
+        return attachment;
       },
-      detachWorkspace: (workspacePath) =>
+      detachWorkspace: (path) =>
         set((state) => {
           const next = { ...state.attachmentsByPath };
-          delete next[workspacePath];
+          delete next[path];
           return { attachmentsByPath: next };
         }),
-      markUnavailable: (workspacePath) =>
-        set((state) => {
-          const current = state.attachmentsByPath[workspacePath];
-          if (!current) {
-            return state;
-          }
-          return {
-            attachmentsByPath: {
-              ...state.attachmentsByPath,
-              [workspacePath]: {
-                ...current,
-                status: "unavailable",
-              },
-            },
-          };
-        }),
       refreshAttachmentScan: (workspacePath, fileTree) => {
-        const current = get().attachmentsByPath[workspacePath];
-        if (!current) {
-          return;
+        const snapshot = fileTree
+          ? inspectOpenClawWorkspaceTree(workspacePath, fileTree)
+          : get().getSnapshot(workspacePath);
+        if (!snapshot) {
+          return get().getAttachment(workspacePath);
         }
-        const detected = detectOpenClawEntries(fileTree);
-        get().attachWorkspace({
-          workspacePath,
-          detectedFiles: detected.detectedFiles,
-          detectedFolders: detected.detectedFolders,
-          gateway: current.gateway,
-        });
+        const existingAttachment = get().attachmentsByPath[workspacePath];
+        set((state) => ({
+          snapshotsByPath: {
+            ...state.snapshotsByPath,
+            [workspacePath]: snapshot,
+          },
+          attachmentsByPath: existingAttachment
+            ? {
+                ...state.attachmentsByPath,
+                [workspacePath]: applySnapshotToAttachment(existingAttachment, snapshot),
+              }
+            : state.attachmentsByPath,
+          activeWorkspacePath: workspacePath,
+          lastError: snapshot.status === "error" ? snapshot.error : null,
+        }));
+        return existingAttachment
+          ? applySnapshotToAttachment(existingAttachment, snapshot)
+          : null;
       },
-      getAttachment: (workspacePath) => {
-        if (!workspacePath) return null;
-        return get().attachmentsByPath[workspacePath] ?? null;
-      },
-      isAttached: (workspacePath) => {
-        if (!workspacePath) return false;
-        return Boolean(get().attachmentsByPath[workspacePath]);
-      },
+      markUnavailable: (path) =>
+        set((state) => ({
+          attachmentsByPath: state.attachmentsByPath[path]
+            ? {
+                ...state.attachmentsByPath,
+                [path]: {
+                  ...state.attachmentsByPath[path],
+                  status: "unavailable",
+                  lastValidatedAt: new Date().toISOString(),
+                },
+              }
+            : state.attachmentsByPath,
+        })),
     }),
     {
       name: "lumina-openclaw-workspaces",
       partialize: (state) => ({
+        snapshotsByPath: state.snapshotsByPath,
         attachmentsByPath: state.attachmentsByPath,
+        activeWorkspacePath: state.activeWorkspacePath,
       }),
     },
   ),
 );
-
-export const getDetectedOpenClawEntries = detectOpenClawEntries;
