@@ -133,7 +133,10 @@ export const executeImageAssetChanges = async ({
 
   try {
     for (const change of changes) {
-      await createDirFn(dirname(change.to));
+      const targetDir = dirname(change.to);
+      if (targetDir !== dirname(change.from)) {
+        await createDirFn(targetDir);
+      }
       await renameFileFn(change.from, change.to);
       completedChanges.push(change);
     }
