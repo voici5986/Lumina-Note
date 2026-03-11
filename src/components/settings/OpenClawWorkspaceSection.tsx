@@ -1,5 +1,6 @@
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
 import { useLocaleStore } from "@/stores/useLocaleStore";
 import { useFileStore } from "@/stores/useFileStore";
 import {
@@ -34,38 +35,44 @@ export function OpenClawWorkspaceSection() {
     integrationEnabled,
     getSnapshot,
     getAttachment,
+    getMountedWorkspacePath,
     getConflictState,
     setIntegrationEnabled,
     refreshWorkspace,
     attachWorkspace,
     detachWorkspace,
     updateGateway,
-    refreshAttachmentScan,
     clearConflictState,
     isRefreshing,
   } = useOpenClawWorkspaceStore((state) => ({
     integrationEnabled: state.integrationEnabled,
     getSnapshot: state.getSnapshot,
     getAttachment: state.getAttachment,
+    getMountedWorkspacePath: state.getMountedWorkspacePath,
     getConflictState: state.getConflictState,
     setIntegrationEnabled: state.setIntegrationEnabled,
     refreshWorkspace: state.refreshWorkspace,
     attachWorkspace: state.attachWorkspace,
     detachWorkspace: state.detachWorkspace,
     updateGateway: state.updateGateway,
-    refreshAttachmentScan: state.refreshAttachmentScan,
     clearConflictState: state.clearConflictState,
     isRefreshing: state.isRefreshing,
   }));
 
   const snapshot = getSnapshot(vaultPath);
   const attachment = getAttachment(vaultPath);
+  const mountedWorkspacePath = getMountedWorkspacePath(vaultPath);
   const conflictState = getConflictState(vaultPath);
   const [gatewayEndpointDraft, setGatewayEndpointDraft] = useState("");
+  const [mountedPathDraft, setMountedPathDraft] = useState("");
 
   useEffect(() => {
     setGatewayEndpointDraft(attachment?.gateway.endpoint ?? "");
   }, [attachment?.gateway.endpoint]);
+
+  useEffect(() => {
+    setMountedPathDraft(mountedWorkspacePath ?? "");
+  }, [mountedWorkspacePath]);
 
   const handleOpenAgents = async () => {
     if (!snapshot) return;
@@ -73,16 +80,20 @@ export function OpenClawWorkspaceSection() {
   };
 
   const handleOpenTodayMemory = async () => {
-    if (!vaultPath) return;
-    const path = await ensureOpenClawTodayMemoryNote(vaultPath);
+    if (!snapshot) return;
+    const path = await ensureOpenClawTodayMemoryNote(snapshot.workspacePath);
     await openFile(path);
-    void refreshWorkspace(vaultPath);
+    void refreshWorkspace(vaultPath, { workspacePath: snapshot.workspacePath });
   };
 
-  const handleAttach = () => {
+  const handleAttach = async () => {
     if (!vaultPath) return;
-    attachWorkspace({ workspacePath: vaultPath });
-    refreshAttachmentScan(vaultPath);
+    const targetWorkspacePath = mountedPathDraft.trim() || vaultPath;
+    await attachWorkspace({
+      hostWorkspacePath: vaultPath,
+      workspacePath: targetWorkspacePath,
+    });
+    void refreshWorkspace(vaultPath, { workspacePath: targetWorkspacePath });
   };
 
   const handleDetach = () => {
@@ -96,6 +107,20 @@ export function OpenClawWorkspaceSection() {
       enabled: gatewayEndpointDraft.trim().length > 0,
       endpoint: gatewayEndpointDraft.trim() || null,
     });
+  };
+
+  const handlePickWorkspace = async () => {
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      title: t.settingsModal.openClawPickWorkspace,
+    });
+    if (typeof selected === "string") {
+      setMountedPathDraft(selected);
+      if (vaultPath) {
+        void refreshWorkspace(vaultPath, { workspacePath: selected });
+      }
+    }
   };
 
   return (
@@ -119,7 +144,11 @@ export function OpenClawWorkspaceSection() {
           </label>
           <button
             type="button"
-            onClick={() => void refreshWorkspace(vaultPath)}
+            onClick={() =>
+              void refreshWorkspace(vaultPath, {
+                workspacePath: mountedPathDraft.trim() || mountedWorkspacePath || vaultPath || undefined,
+              })
+            }
             disabled={!vaultPath || isRefreshing || !integrationEnabled}
             className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-background/60 px-3 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
           >
@@ -143,8 +172,32 @@ export function OpenClawWorkspaceSection() {
         </div>
       )}
 
-      {integrationEnabled && vaultPath && snapshot && (
+      {integrationEnabled && vaultPath && (
         <div className="space-y-3 rounded-lg border border-border bg-background/70 p-3">
+          <div className="space-y-2">
+            <span className="font-medium">{t.settingsModal.openClawMountedWorkspace}</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={mountedPathDraft}
+                onChange={(event) => setMountedPathDraft(event.target.value)}
+                placeholder={t.settingsModal.openClawMountedWorkspacePlaceholder}
+                className="flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground"
+              />
+              <button
+                type="button"
+                onClick={() => void handlePickWorkspace()}
+                className="rounded-lg border border-border bg-background/60 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
+              >
+                {t.settingsModal.openClawPickWorkspace}
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {t.settingsModal.openClawMountedWorkspaceHint}
+            </p>
+          </div>
+
+          {snapshot && (
           <div className="flex flex-wrap items-center gap-2">
             <span
               className={`rounded-full px-2 py-1 text-[11px] font-medium ${
@@ -170,7 +223,9 @@ export function OpenClawWorkspaceSection() {
               {t.settingsModal.openClawCheckedAt.replace("{time}", formatCheckedAt(snapshot.checkedAt))}
             </span>
           </div>
+          )}
 
+          {snapshot && (
           <div className="space-y-1 text-sm">
             <div>
               <span className="font-medium">{t.settingsModal.openClawWorkspacePath}</span>
@@ -237,6 +292,7 @@ export function OpenClawWorkspaceSection() {
               </div>
             )}
           </div>
+          )}
 
           {conflictState && conflictState.status === "warning" && (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700">
@@ -261,10 +317,10 @@ export function OpenClawWorkspaceSection() {
           )}
 
           <div className="flex flex-wrap gap-2">
-            {!attachment && snapshot.status === "detected" && (
+            {!attachment && (
               <button
                 type="button"
-                onClick={handleAttach}
+                onClick={() => void handleAttach()}
                 className="rounded-lg border border-border bg-background/60 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
               >
                 {t.settingsModal.openClawAttach}
@@ -282,7 +338,7 @@ export function OpenClawWorkspaceSection() {
             <button
               type="button"
               onClick={() => void handleOpenAgents()}
-              disabled={snapshot.status !== "detected"}
+              disabled={!snapshot || snapshot.status !== "detected"}
               className="rounded-lg border border-border bg-background/60 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
             >
               {t.settingsModal.openClawOpenAgents}
@@ -290,14 +346,14 @@ export function OpenClawWorkspaceSection() {
             <button
               type="button"
               onClick={() => void handleOpenTodayMemory()}
-              disabled={snapshot.status === "error"}
+              disabled={!snapshot || snapshot.status === "error"}
               className="rounded-lg border border-border bg-background/60 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
             >
               {t.settingsModal.openClawOpenTodayMemory}
             </button>
           </div>
 
-          {snapshot.error && <p className="text-xs text-red-600">{snapshot.error}</p>}
+          {snapshot?.error && <p className="text-xs text-red-600">{snapshot.error}</p>}
         </div>
       )}
     </section>

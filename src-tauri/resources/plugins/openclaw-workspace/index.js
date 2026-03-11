@@ -31,12 +31,14 @@ module.exports = function setup(api) {
   };
 
   const inspectWorkspace = async ({ force = false } = {}) => {
-    const workspacePath = api.workspace.getPath();
+    const hostWorkspacePath = api.workspace.getPath();
     const openClawAttachment = api.workspace.getOpenClawAttachment();
+    const workspacePath = api.workspace.getOpenClawWorkspacePath() || hostWorkspacePath;
     const detectedAttachment =
       openClawAttachment && openClawAttachment.status === "attached" ? openClawAttachment : null;
     if (!workspacePath) {
       cachedSnapshot = {
+        hostWorkspacePath: null,
         workspacePath: null,
         attached: false,
         attachment: null,
@@ -54,7 +56,9 @@ module.exports = function setup(api) {
       return cachedSnapshot;
     }
 
-    const files = await api.vault.listFiles();
+    const files = detectedAttachment
+      ? await api.workspace.listOpenClawWorkspaceFiles()
+      : await api.vault.listFiles();
     const normalized = Array.from(
       new Set(
         files
@@ -79,6 +83,7 @@ module.exports = function setup(api) {
     const conflictState = api.workspace.getOpenClawConflictState();
 
     cachedSnapshot = {
+      hostWorkspacePath,
       workspacePath,
       attached: Boolean(detectedAttachment),
       attachment: detectedAttachment,
@@ -110,7 +115,7 @@ module.exports = function setup(api) {
       api.ui.notify(`${label} not found: ${path}`);
       return false;
     }
-    await api.workspace.openFile(path);
+    await api.workspace.openOpenClawWorkspaceFile(path);
     return true;
   };
 
@@ -124,7 +129,7 @@ module.exports = function setup(api) {
       api.ui.notify("No OpenClaw daily memory files found.");
       return false;
     }
-    await api.workspace.openFile(latest);
+    await api.workspace.openOpenClawWorkspaceFile(latest);
     return true;
   };
 
@@ -132,9 +137,9 @@ module.exports = function setup(api) {
     `.lumina/openclaw-bridge-${kind}-${new Date().toISOString().replace(/[:.]/g, "-")}.md`;
 
   const stageBridgeNote = async (kind, content, metadata) => {
-    const workspacePath = api.workspace.getPath();
+    const workspacePath = api.workspace.getOpenClawWorkspacePath();
     if (!workspacePath) {
-      api.ui.notify("Open a workspace first.");
+      api.ui.notify("Attach an OpenClaw workspace first.");
       return false;
     }
     const attachment = api.workspace.getOpenClawAttachment();
@@ -154,8 +159,8 @@ module.exports = function setup(api) {
       "",
     ].join("\n");
     const path = buildBridgePath(kind);
-    await api.vault.writeFile(path, body);
-    await api.workspace.openFile(path);
+    await api.workspace.writeOpenClawWorkspaceFile(path, body);
+    await api.workspace.openOpenClawWorkspaceFile(path);
     api.ui.notify(`Staged ${kind} into ${path}`);
     return true;
   };
@@ -238,7 +243,8 @@ module.exports = function setup(api) {
 
     return [
       `<p><strong>Status:</strong> ${status}</p>`,
-      `<p><strong>Workspace:</strong> <code>${escapeHtml(snapshot.workspacePath)}</code></p>`,
+      `<p><strong>Host workspace:</strong> <code>${escapeHtml(snapshot.hostWorkspacePath || "")}</code></p>`,
+      `<p><strong>OpenClaw workspace:</strong> <code>${escapeHtml(snapshot.workspacePath)}</code></p>`,
       snapshot.attachment
         ? `<p><strong>Last validated:</strong> <code>${escapeHtml(
             snapshot.attachment.lastValidatedAt || "",

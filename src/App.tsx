@@ -257,6 +257,9 @@ function App() {
   const loadPlugins = usePluginStore((state) => state.loadPlugins);
   const setAppearanceSafeMode = usePluginStore((state) => state.setAppearanceSafeMode);
   const setCurrentUpdateVersion = useUpdateStore((state) => state.setCurrentVersion);
+  const mountedOpenClawWorkspacePath = useOpenClawWorkspaceStore((state) =>
+    state.getMountedWorkspacePath(vaultPath),
+  );
 
   // Get active tab
   const activeTab = activeTabIndex >= 0 ? tabs[activeTabIndex] : null;
@@ -381,6 +384,9 @@ function App() {
 
         // 启动后端文件监听
         await startFileWatcher(vaultPath);
+        if (mountedOpenClawWorkspacePath && mountedOpenClawWorkspacePath !== vaultPath) {
+          await startFileWatcher(mountedOpenClawWorkspacePath);
+        }
         console.log("[FileWatcher] Started watching:", vaultPath);
 
         // 监听文件变化事件（带防抖）
@@ -401,11 +407,45 @@ function App() {
               if (fileStore.currentFile && fileStore.isDirty) {
                 dirtyPaths.push(fileStore.currentFile);
               }
+              const normalize = (path: string) => path.replace(/\\/g, "/");
+              const vaultPrefix = `${normalize(vaultPath).replace(/\/+$/, "")}/`;
+              const mountedPrefix = mountedOpenClawWorkspacePath
+                ? `${normalize(mountedOpenClawWorkspacePath).replace(/\/+$/, "")}/`
+                : null;
+              const normalizedChangedPath = normalize(changedPath);
               useOpenClawWorkspaceStore.getState().recordExternalChange(
                 vaultPath,
                 [changedPath],
                 dirtyPaths,
               );
+              if (
+                mountedPrefix &&
+                normalizedChangedPath.startsWith(mountedPrefix) &&
+                mountedOpenClawWorkspacePath !== vaultPath
+              ) {
+                void useOpenClawWorkspaceStore
+                  .getState()
+                  .refreshMountedFileTree(
+                    vaultPath,
+                    mountedOpenClawWorkspacePath ?? undefined,
+                  )
+                  .then((tree) =>
+                    useOpenClawWorkspaceStore
+                      .getState()
+                      .refreshAttachmentScan(
+                        vaultPath,
+                        tree,
+                        mountedOpenClawWorkspacePath ?? undefined,
+                      ),
+                  );
+              }
+              if (!normalizedChangedPath.startsWith(vaultPrefix)) {
+                handleFsChangeEvent(event.payload, (path) => {
+                  reloadFileIfOpen(path, { skipIfDirty: true });
+                  reloadSecondaryIfOpen(path, { skipIfDirty: true });
+                });
+                return;
+              }
             }
             refreshFileTree();
             handleFsChangeEvent(event.payload, (path) => {
@@ -431,7 +471,7 @@ function App() {
       if (unlisten) unlisten();
       if (debounceTimer) clearTimeout(debounceTimer);
     };
-  }, [vaultPath, refreshFileTree]);
+  }, [vaultPath, mountedOpenClawWorkspacePath, refreshFileTree]);
 
   // 监听后端触发的浏览器新标签事件（window.open）
   useEffect(() => {

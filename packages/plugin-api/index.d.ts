@@ -102,6 +102,7 @@ export interface OpenClawConflictState {
 
 export interface OpenClawWorkspaceAttachment {
   kind: "openclaw";
+  hostWorkspacePath: string;
   workspacePath: string;
   status: "attached" | "unavailable";
   attachedAt: string;
@@ -211,19 +212,25 @@ export interface LuminaPluginApi {
   };
   workspace: {
     getPath: () => string | null;
+    getOpenClawWorkspacePath: () => string | null;
     getActiveFile: () => string | null;
     openFile: (path: string) => Promise<void>;
     readFile: (path: string) => Promise<string>;
     writeFile: (path: string, content: string) => Promise<void>;
     getOpenClawAttachment: () => OpenClawWorkspaceAttachment | null;
     attachOpenClawWorkspace: (input?: {
+      workspacePath?: string;
       gateway?: Partial<OpenClawWorkspaceAttachment["gateway"]>;
-    }) => OpenClawWorkspaceAttachment;
+    }) => Promise<OpenClawWorkspaceAttachment>;
     refreshOpenClawWorkspace: () => Promise<OpenClawWorkspaceAttachment | null>;
     updateOpenClawGateway: (
       gateway: Partial<OpenClawWorkspaceAttachment["gateway"]>,
     ) => OpenClawWorkspaceAttachment | null;
     getOpenClawConflictState: () => OpenClawConflictState | null;
+    listOpenClawWorkspaceFiles: () => Promise<string[]>;
+    openOpenClawWorkspaceFile: (path: string) => Promise<void>;
+    readOpenClawWorkspaceFile: (path: string) => Promise<string>;
+    writeOpenClawWorkspaceFile: (path: string, content: string) => Promise<void>;
     detachOpenClawWorkspace: () => void;
     registerPanel: (input: { id: string; title: string; html: string }) => () => void;
     registerTabType: (input: {

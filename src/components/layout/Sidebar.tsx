@@ -142,6 +142,7 @@ export function Sidebar() {
       openClawAttachment: state.getAttachment(vaultPath),
     })),
   );
+  const openClawMountedTree = useOpenClawWorkspaceStore((state) => state.getMountedFileTree(vaultPath));
   const { 
     isRecording, 
     status: voiceStatus, 
@@ -207,6 +208,7 @@ export function Sidebar() {
   const [renameValue, setRenameValue] = useState("");
   // 展开的文件夹路径集合
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+  const [expandedMountedPaths, setExpandedMountedPaths] = useState<Set<string>>(new Set());
   // 根目录拖拽悬停状态
   const [isRootDragOver, setIsRootDragOver] = useState(false);
   const [isFileTreeScrollActive, setIsFileTreeScrollActive] = useState(false);
@@ -830,6 +832,18 @@ export function Sidebar() {
     });
   }, []);
 
+  const toggleMountedExpanded = useCallback((path: string) => {
+    setExpandedMountedPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  }, []);
+
   // 处理选中（单击：preview 模式打开）
   const handleSelect = useCallback((entry: FileEntry) => {
     setSelectedPath(entry.path);
@@ -1205,6 +1219,27 @@ export function Sidebar() {
               </button>
             )}
           </div>
+
+          {openClawMountedTree.length > 0 && (
+            <div className="mt-3 rounded-md border border-border/70 bg-background/40">
+              <div className="border-b border-border/70 px-2 py-1.5 text-[11px] font-medium text-muted-foreground">
+                {openClawAttachment?.workspacePath.split(/[/\\]/).pop() || t.sidebar.openClawTitle}
+              </div>
+              <div className="max-h-56 overflow-y-auto py-1">
+                {openClawMountedTree.map((entry) => (
+                  <MountedWorkspaceTreeItem
+                    key={entry.path}
+                    entry={entry}
+                    level={0}
+                    currentFile={currentFile}
+                    expandedPaths={expandedMountedPaths}
+                    toggleExpanded={toggleMountedExpanded}
+                    onOpen={(path) => void openFile(path)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1602,6 +1637,74 @@ interface FileTreeItemProps {
   onCreateSubmit: () => void;
   onCreateCancel: () => void;
   vaultPath: string | null;
+}
+
+interface MountedWorkspaceTreeItemProps {
+  entry: FileEntry;
+  level: number;
+  currentFile: string | null;
+  expandedPaths: Set<string>;
+  toggleExpanded: (path: string) => void;
+  onOpen: (path: string) => void;
+}
+
+function MountedWorkspaceTreeItem({
+  entry,
+  level,
+  currentFile,
+  expandedPaths,
+  toggleExpanded,
+  onOpen,
+}: MountedWorkspaceTreeItemProps) {
+  const paddingLeft = 12 + level * 14;
+  const isExpanded = expandedPaths.has(entry.path);
+
+  if (entry.is_dir) {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => toggleExpanded(entry.path)}
+          className="flex w-full items-center gap-1.5 py-1 pr-2 text-left text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
+          style={{ paddingLeft }}
+        >
+          {isExpanded ? <ChevronDown className="h-3 w-3 shrink-0" /> : <ChevronRight className="h-3 w-3 shrink-0" />}
+          <Folder className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{entry.name}</span>
+        </button>
+        {isExpanded && Array.isArray(entry.children) && (
+          <div>
+            {entry.children.map((child) => (
+              <MountedWorkspaceTreeItem
+                key={child.path}
+                entry={child}
+                level={level + 1}
+                currentFile={currentFile}
+                expandedPaths={expandedPaths}
+                toggleExpanded={toggleExpanded}
+                onOpen={onOpen}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(entry.path)}
+      className={cn(
+        "flex w-full items-center gap-1.5 py-1 pr-2 text-left text-[11px] hover:bg-accent",
+        currentFile === entry.path ? "bg-accent text-foreground" : "text-muted-foreground",
+      )}
+      style={{ paddingLeft }}
+    >
+      <File className="h-3.5 w-3.5 shrink-0" />
+      <span className="truncate">{entry.name}</span>
+    </button>
+  );
 }
 
 function FileTreeItem({ 

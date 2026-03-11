@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useFileStore } from "@/stores/useFileStore";
 import { useBrowserStore } from "@/stores/useBrowserStore";
 import { useLocaleStore } from "@/stores/useLocaleStore";
+import { useOpenClawWorkspaceStore } from "@/stores/useOpenClawWorkspaceStore";
 import { FileEntry, readFile } from "@/lib/tauri";
 import type { FsChangePayload } from "@/lib/fsChange";
 import { cn, getFileName } from "@/lib/utils";
@@ -50,7 +51,8 @@ export function GlobalSearch({ isOpen, onClose, request }: GlobalSearchProps) {
 
   const getCacheKey = useCallback((path: string) => path.replace(/\\/g, "/"), []);
   
-  const { fileTree, openFile } = useFileStore();
+  const { fileTree, openFile, vaultPath } = useFileStore();
+  const openClawMountedTree = useOpenClawWorkspaceStore((state) => state.getMountedFileTree(vaultPath));
   const { hideAllWebViews, showAllWebViews } = useBrowserStore();
 
   // 弹窗打开时隐藏 WebView，关闭时恢复
@@ -78,19 +80,20 @@ export function GlobalSearch({ isOpen, onClose, request }: GlobalSearchProps) {
 
   // Flatten file tree to get all file paths
   const allFiles = useMemo(() => {
-    const files: { path: string; name: string }[] = [];
+    const files = new Map<string, { path: string; name: string }>();
     const flatten = (entries: FileEntry[]) => {
       for (const entry of entries) {
         if (entry.is_dir && entry.children) {
           flatten(entry.children);
         } else if (!entry.is_dir) {
-          files.push({ path: entry.path, name: getFileName(entry.name) });
+          files.set(entry.path, { path: entry.path, name: getFileName(entry.name) });
         }
       }
     };
     flatten(fileTree);
-    return files;
-  }, [fileTree]);
+    flatten(openClawMountedTree);
+    return Array.from(files.values());
+  }, [fileTree, openClawMountedTree]);
 
   // Keep cache in sync with active file set when tree changes.
   useEffect(() => {

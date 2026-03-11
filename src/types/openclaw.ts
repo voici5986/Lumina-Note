@@ -29,6 +29,7 @@ export interface OpenClawConflictState {
 
 export interface OpenClawWorkspaceAttachment {
   kind: "openclaw";
+  hostWorkspacePath: string;
   workspacePath: string;
   status: OpenClawAttachmentStatus;
   attachedAt: string;
