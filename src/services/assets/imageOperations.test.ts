@@ -78,10 +78,10 @@ describe("imageOperations", () => {
       ],
       "/vault/assets/hero.png",
       "cover",
-      vi.fn(async () => {
+      vi.fn(async (_path: string) => {
         throw new Error("disk read should be skipped for the active note");
       }),
-      vi.fn(async () => false),
+      vi.fn(async (_path: string) => false),
     );
 
     expect(preview.noteUpdates).toHaveLength(1);
@@ -89,7 +89,7 @@ describe("imageOperations", () => {
   });
 
   it("rolls back note updates and file moves when saving markdown refs fails", async () => {
-    const renameFileFn = vi.fn(async () => {});
+    const renameFileFn = vi.fn(async (_from: string, _to: string) => {});
     const saveFileFn = vi
       .fn()
       .mockResolvedValueOnce(undefined)
@@ -127,9 +127,9 @@ describe("imageOperations", () => {
         ],
         renameFileFn,
         saveFileFn,
-        createDirFn: vi.fn(async () => {}),
+        createDirFn: vi.fn(async (_path: string) => {}),
         refreshFileTree: vi.fn(async () => {}),
-        reloadFileIfOpen: vi.fn(async () => {}),
+        reloadFileIfOpen: vi.fn(async (_path: string) => {}),
       }),
     ).rejects.toThrow("save failed");
 
@@ -158,8 +158,8 @@ describe("imageOperations", () => {
       previewImageAssetChanges(
         [makeDir("/vault/assets", [makeFile("/vault/assets/hero.png"), makeFile("/vault/assets/cover.png")])],
         [{ from: "/vault/assets/hero.png", to: "/vault/assets/cover.png" }],
-        vi.fn(async () => ""),
-        vi.fn(async () => true),
+        vi.fn(async (_path: string) => ""),
+        vi.fn(async (_path: string) => true),
       ),
     ).rejects.toThrow("Target already exists: cover.png");
   });
@@ -168,16 +168,16 @@ describe("imageOperations", () => {
     const preview = await previewImageAssetChanges(
       [makeDir("/vault/assets", [makeFile("/vault/assets/hero.png")])],
       [{ from: "/vault/assets/hero.png", to: "/vault/assets/cover.png" }],
-      vi.fn(async () => ""),
-      vi.fn(async () => false),
+      vi.fn(async (_path: string) => ""),
+      vi.fn(async (_path: string) => false),
     );
     expect(preview.changes).toEqual([{ from: "/vault/assets/hero.png", to: "/vault/assets/cover.png" }]);
   });
 
   it('stops before renaming files when creating the target directory fails', async () => {
-    const renameFileFn = vi.fn(async () => {});
-    const saveFileFn = vi.fn(async () => {});
-    const createDirFn = vi.fn(async () => {
+    const renameFileFn = vi.fn(async (_from: string, _to: string) => {});
+    const saveFileFn = vi.fn(async (_path: string, _content: string) => {});
+    const createDirFn = vi.fn(async (_path: string) => {
       throw new Error('mkdir failed');
     });
 
@@ -189,7 +189,7 @@ describe("imageOperations", () => {
         saveFileFn,
         createDirFn,
         refreshFileTree: vi.fn(async () => {}),
-        reloadFileIfOpen: vi.fn(async () => {}),
+        reloadFileIfOpen: vi.fn(async (_path: string) => {}),
       }),
     ).rejects.toThrow('mkdir failed');
 

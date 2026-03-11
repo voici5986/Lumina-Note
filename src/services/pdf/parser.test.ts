@@ -28,7 +28,7 @@ describe('parsePDF cache', () => {
   });
 
   it('should reuse cache when modified time is unchanged', async () => {
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => ({
       ok: true,
       json: async () => ({ structure: mockStructure }),
     }));
@@ -52,7 +52,7 @@ describe('parsePDF cache', () => {
   });
 
   it('should invalidate cache when modified time changes', async () => {
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => ({
       ok: true,
       json: async () => ({ structure: mockStructure }),
     }));
@@ -75,7 +75,7 @@ describe('parsePDF cache', () => {
   });
 
   it('should not reuse cache across different backend configs', async () => {
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => ({
       ok: true,
       json: async () => ({ structure: mockStructure }),
     }));
@@ -126,7 +126,7 @@ describe('parsePDF cache', () => {
   });
 
   it('returns an error result when the parser responds with a non-ok status', async () => {
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => ({
       ok: false,
       statusText: 'Bad Request',
     }));

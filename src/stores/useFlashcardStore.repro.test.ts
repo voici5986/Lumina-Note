@@ -49,7 +49,7 @@ describe("useFlashcardStore regression", () => {
   });
 
   it("loads nested markdown cards from Flashcards subfolders", async () => {
-    readDirMock.mockImplementation(async (targetPath: string | URL) => {
+    readDirMock.mockImplementation(async (targetPath: string | URL, _options?: unknown) => {
       const pathString = String(targetPath);
       if (pathString.endsWith("/Flashcards")) {
         return [{ name: "Topic", isDirectory: true } as never];
@@ -72,7 +72,7 @@ describe("useFlashcardStore regression", () => {
       { name: "ok.md", isDirectory: false } as never,
     ]);
 
-    readTextFileMock.mockImplementation(async (filePath: string | URL) => {
+    readTextFileMock.mockImplementation(async (filePath: string | URL, _options?: unknown) => {
       if (String(filePath).endsWith("broken.md")) {
         throw new Error("mock read failed");
       }

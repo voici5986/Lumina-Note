@@ -36,7 +36,7 @@ vi.mock("@/services/ai/ai", () => ({
 }));
 
 vi.mock("@/lib/tauri", () => ({
-  readFile: vi.fn(async () => ""),
+  readFile: vi.fn(async (path: string) => path ? "" : ""),
 }));
 
 vi.mock("@/stores/useLocaleStore", () => ({

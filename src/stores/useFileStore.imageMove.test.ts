@@ -5,10 +5,10 @@ const executeImageMove = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/tauri", () => ({
   listDirectory: vi.fn(() => Promise.resolve([])),
-  readFile: vi.fn(),
-  saveFile: vi.fn(),
-  createFile: vi.fn(),
-  createDir: vi.fn(() => Promise.resolve()),
+  readFile: vi.fn((path: string) => Promise.resolve(path)),
+  saveFile: vi.fn((path: string, content: string) => Promise.resolve({ path, content })),
+  createFile: vi.fn((path: string) => Promise.resolve(path)),
+  createDir: vi.fn((path: string, options?: { recursive?: boolean }) => Promise.resolve({ path, options })),
   moveFile,
 }));
 
