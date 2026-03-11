@@ -1,7 +1,7 @@
 /**
  * Reranker 测试
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Reranker } from './reranker';
 import type { RAGConfig, SearchResult } from './types';
 
@@ -24,10 +24,15 @@ const mockResults: SearchResult[] = [
 
 describe('Reranker', () => {
   let reranker: Reranker;
+  const originalFetch = global.fetch;
 
   beforeEach(() => {
     reranker = new Reranker(baseConfig);
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
   });
 
   describe('isEnabled', () => {

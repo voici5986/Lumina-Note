@@ -18,8 +18,8 @@ const updateStoreState = {
 vi.mock("@/stores/useUIStore", () => ({
   useUIStore: () => ({
     isDarkMode: false,
-    toggleTheme: vi.fn(),
-    setRightPanelTab: vi.fn(),
+    toggleTheme: () => undefined,
+    setRightPanelTab: () => undefined,
   }),
 }));
 
@@ -27,16 +27,16 @@ vi.mock("@/stores/useFileStore", () => ({
   useFileStore: () => ({
     tabs: [],
     activeTabIndex: -1,
-    openGraphTab: vi.fn(),
-    switchTab: vi.fn(),
+    openGraphTab: () => undefined,
+    switchTab: () => undefined,
     recentFiles: [],
-    openFile: vi.fn(),
+    openFile: () => undefined,
     fileTree: [],
-    openAIMainTab: vi.fn(),
+    openAIMainTab: () => undefined,
     currentFile: null,
-    openFlashcardTab: vi.fn(),
-    openCardFlowTab: vi.fn(),
-    openImageManagerTab: vi.fn(),
+    openFlashcardTab: () => undefined,
+    openCardFlowTab: () => undefined,
+    openImageManagerTab: () => undefined,
   }),
 }));
 
@@ -97,11 +97,11 @@ vi.mock("@/stores/useUpdateStore", () => ({
 }));
 
 vi.mock("@tauri-apps/plugin-shell", () => ({
-  open: vi.fn(),
+  open: async () => undefined,
 }));
 
 vi.mock("@/lib/tauri", () => ({
-  exists: vi.fn(),
+  exists: async () => false,
   isTauriAvailable: () => true,
 }));
 

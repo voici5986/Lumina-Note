@@ -21,19 +21,19 @@ vi.mock("@/config/themes", () => ({
 }));
 
 vi.mock("@/config/themePlugin", () => ({
-  loadUserThemes: vi.fn(async () => []),
-  getUserThemes: vi.fn(() => []),
-  deleteUserTheme: vi.fn(async () => undefined),
+  loadUserThemes: async () => [],
+  getUserThemes: () => [],
+  deleteUserTheme: async () => undefined,
 }));
 
 vi.mock("@/stores/useUIStore", () => ({
   useUIStore: () => ({
     themeId: "default",
-    setThemeId: vi.fn(),
+    setThemeId: () => undefined,
     editorMode: "live",
-    setEditorMode: vi.fn(),
+    setEditorMode: () => undefined,
     editorFontSize: 16,
-    setEditorFontSize: vi.fn(),
+    setEditorFontSize: () => undefined,
   }),
 }));
 

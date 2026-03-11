@@ -4,6 +4,16 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { getTranslations, detectSystemLocale, SUPPORTED_LOCALES, Locale } from './index';
 
+function flattenKeys(value: Record<string, unknown>, prefix = ''): string[] {
+  return Object.entries(value).flatMap(([key, nestedValue]) => {
+    const nextKey = prefix ? `${prefix}.${key}` : key;
+    if (nestedValue && typeof nestedValue === 'object' && !Array.isArray(nestedValue)) {
+      return flattenKeys(nestedValue as Record<string, unknown>, nextKey);
+    }
+    return [nextKey];
+  });
+}
+
 describe('i18n', () => {
   describe('SUPPORTED_LOCALES', () => {
     it('should have 4 supported locales', () => {
@@ -27,26 +37,20 @@ describe('i18n', () => {
   });
 
   describe('getTranslations', () => {
-    it('should return translations for zh-CN', () => {
-      const t = getTranslations('zh-CN');
-      expect(t).toBeDefined();
-      expect(t.common).toBeDefined();
+    it('returns translations for each supported locale', () => {
+      for (const locale of SUPPORTED_LOCALES) {
+        const t = getTranslations(locale.code as Locale);
+        expect(t).toBeDefined();
+        expect(t.common).toBeDefined();
+      }
     });
 
-    it('should return translations for en', () => {
-      const t = getTranslations('en');
-      expect(t).toBeDefined();
-      expect(t.common).toBeDefined();
-    });
+    it('keeps the same translation key tree across all locales', () => {
+      const zhCNKeys = flattenKeys(getTranslations('zh-CN') as Record<string, unknown>).sort();
 
-    it('should return translations for zh-TW', () => {
-      const t = getTranslations('zh-TW');
-      expect(t).toBeDefined();
-    });
-
-    it('should return translations for ja', () => {
-      const t = getTranslations('ja');
-      expect(t).toBeDefined();
+      for (const locale of ['en', 'zh-TW', 'ja'] as const) {
+        expect(flattenKeys(getTranslations(locale) as Record<string, unknown>).sort()).toEqual(zhCNKeys);
+      }
     });
 
     it('should fallback to zh-CN for unknown locale', () => {

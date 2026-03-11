@@ -10,9 +10,9 @@ vi.mock("@/stores/useLocaleStore", () => ({
   getCurrentTranslations: () => en,
 }));
 
-const openFile = vi.hoisted(() => vi.fn());
-const refreshFileTree = vi.hoisted(() => vi.fn(async () => {}));
-const reloadFileIfOpen = vi.hoisted(() => vi.fn(async () => {}));
+const openFile = vi.hoisted(() => (() => undefined));
+const refreshFileTree = vi.hoisted(() => (async () => undefined));
+const reloadFileIfOpen = vi.hoisted(() => (async () => undefined));
 const fileStoreState = vi.hoisted(() => ({
   vaultPath: "/vault",
   fileTree: [
@@ -69,11 +69,11 @@ vi.mock("@/stores/useFileStore", () => ({
 vi.mock("@/lib/tauri", () => ({
   readFile: vi.fn(async () => "![Hero](../assets/hero.png)"),
   readBinaryFileBase64: vi.fn(async () => "AAAA"),
-  showInExplorer: vi.fn(async () => {}),
+  showInExplorer: async () => undefined,
 }));
 
 vi.mock("@/lib/reportError", () => ({
-  reportOperationError: vi.fn(),
+  reportOperationError: () => undefined,
 }));
 
 class MockImage {
@@ -91,9 +91,6 @@ class MockImage {
 
 describe("ImageManagerView", () => {
   beforeEach(() => {
-    openFile.mockReset();
-    refreshFileTree.mockClear();
-    reloadFileIfOpen.mockClear();
     fileStoreState.currentFile = null;
     fileStoreState.currentContent = "";
     fileStoreState.tabs = [];

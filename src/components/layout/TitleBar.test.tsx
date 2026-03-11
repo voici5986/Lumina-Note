@@ -6,10 +6,10 @@ const tauriMocks = vi.hoisted(() => {
   const appWindow = {
     isMaximized: vi.fn(async () => false),
     onResized: vi.fn(async () => () => {}),
-    startDragging: vi.fn(async () => {}),
-    minimize: vi.fn(async () => {}),
-    toggleMaximize: vi.fn(async () => {}),
-    close: vi.fn(async () => {}),
+    startDragging: async () => undefined,
+    minimize: async () => undefined,
+    toggleMaximize: async () => undefined,
+    close: async () => undefined,
   };
   return {
     appWindow,
@@ -47,10 +47,6 @@ describe("TitleBar", () => {
 
     tauriMocks.appWindow.isMaximized.mockClear();
     tauriMocks.appWindow.onResized.mockClear();
-    tauriMocks.appWindow.startDragging.mockClear();
-    tauriMocks.appWindow.minimize.mockClear();
-    tauriMocks.appWindow.toggleMaximize.mockClear();
-    tauriMocks.appWindow.close.mockClear();
   });
 
   it("does not touch tauri window APIs when tauri runtime is unavailable", async () => {

@@ -5,12 +5,12 @@ import { TabBar } from "./TabBar";
 
 const macTopChromeEnabled = vi.hoisted(() => ({ value: false }));
 const leftSidebarOpenState = vi.hoisted(() => ({ value: true }));
-const switchTab = vi.fn();
-const closeTab = vi.fn(async () => {});
-const closeOtherTabs = vi.fn();
-const closeAllTabs = vi.fn();
-const reorderTabs = vi.fn();
-const togglePinTab = vi.fn();
+const switchTab = () => undefined;
+const closeTab = async () => undefined;
+const closeOtherTabs = () => undefined;
+const closeAllTabs = () => undefined;
+const reorderTabs = () => undefined;
+const togglePinTab = () => undefined;
 const fileStoreState = vi.hoisted(() => ({
   tabs: [{ id: "tab-1", name: "Daily Note.md", type: "file", isPinned: false, isDirty: false }],
 }));
@@ -57,7 +57,7 @@ vi.mock("@/stores/useUIStore", () => ({
 }));
 
 vi.mock("@/lib/reportError", () => ({
-  reportOperationError: vi.fn(),
+  reportOperationError: () => undefined,
 }));
 
 vi.mock("./MacTopChrome", () => ({

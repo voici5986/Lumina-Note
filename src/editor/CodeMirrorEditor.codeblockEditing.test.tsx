@@ -24,7 +24,13 @@ function getStableCodeBlockShell(container: HTMLElement) {
 }
 
 describe("CodeMirror live code block editing", () => {
+  const originalClipboard = navigator.clipboard;
+
   afterEach(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: originalClipboard,
+    });
     cleanup();
   });
 

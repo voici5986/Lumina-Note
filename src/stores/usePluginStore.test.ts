@@ -6,22 +6,22 @@ const syncMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/tauri", () => ({
   listPlugins: listPluginsMock,
-  scaffoldWorkspaceExamplePlugin: vi.fn(),
-  scaffoldWorkspaceThemePlugin: vi.fn(),
-  scaffoldWorkspaceUiOverhaulPlugin: vi.fn(),
-  getWorkspacePluginDir: vi.fn(),
+  scaffoldWorkspaceExamplePlugin: async () => undefined,
+  scaffoldWorkspaceThemePlugin: async () => undefined,
+  scaffoldWorkspaceUiOverhaulPlugin: async () => undefined,
+  getWorkspacePluginDir: async () => '/tmp/workspace/.lumina/plugins',
 }));
 
 vi.mock("@/services/plugins/runtime", () => ({
   pluginRuntime: {
     sync: syncMock,
-    unloadAll: vi.fn(),
+    unloadAll: () => undefined,
   },
 }));
 
 vi.mock("@/services/plugins/styleRuntime", () => ({
   pluginStyleRuntime: {
-    clearAll: vi.fn(),
+    clearAll: () => undefined,
   },
 }));
 
