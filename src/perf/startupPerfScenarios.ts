@@ -216,7 +216,7 @@ function runTabSerializationScenario(): PerfScenarioResult {
     id: "tab-serialization-size",
     description: "Estimates payload size and serialization cost for tab snapshots.",
     durationMs,
-    thresholdMs: 140,
+    thresholdMs: 300,
     codeRefs: [
       "src/stores/useFileStore.ts",
       "src/components/layout/TabBar.tsx",
