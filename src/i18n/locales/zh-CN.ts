@@ -7,6 +7,12 @@ export default {
     openFolder: '打开笔记文件夹',
     selectFolder: '选择一个包含 Markdown 笔记的文件夹',
     language: '语言',
+    featureMarkdown: 'Markdown 原生',
+    featureMarkdownDesc: '纯 Markdown 编写，实时预览',
+    featureAI: 'AI 驱动',
+    featureAIDesc: '对话、搜索、深度研究',
+    featureLocal: '本地优先',
+    featureLocalDesc: '笔记始终保存在你的设备上',
   },
   
   // 通用

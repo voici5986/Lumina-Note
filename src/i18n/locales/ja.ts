@@ -7,6 +7,12 @@ export default {
     openFolder: 'ノートフォルダを開く',
     selectFolder: 'Markdown ノートを含むフォルダを選択',
     language: '言語',
+    featureMarkdown: 'Markdown ネイティブ',
+    featureMarkdownDesc: 'Markdown でリアルタイムプレビュー',
+    featureAI: 'AI 搭載',
+    featureAIDesc: 'チャット、検索、リサーチ',
+    featureLocal: 'ローカルファースト',
+    featureLocalDesc: 'ノートは常にあなたのデバイスに',
   },
   
   // 共通

@@ -34,6 +34,12 @@ vi.mock("@/stores/useLocaleStore", () => ({
         subtitle: "Pick a folder",
         openFolder: "Open Folder",
         selectFolder: "Choose a folder to continue",
+        featureMarkdown: "Markdown Native",
+        featureMarkdownDesc: "Write in pure Markdown with live preview",
+        featureAI: "AI Powered",
+        featureAIDesc: "Chat, search, and research with AI",
+        featureLocal: "Local First",
+        featureLocalDesc: "Your notes stay on your device",
       },
     },
   }),
@@ -60,5 +66,17 @@ describe("WelcomeScreen", () => {
     expect(screen.getByTestId("language-switcher")).toHaveAttribute("data-show-label", "false");
     expect(screen.getByTestId("welcome-top-row")).toBeInTheDocument();
     expect(container.querySelector('.h-10[data-tauri-drag-region]')).toBeNull();
+  });
+
+  it("renders all three feature highlights", () => {
+    render(<WelcomeScreen onOpenVault={vi.fn()} />);
+
+    expect(screen.getByText("Markdown Native")).toBeInTheDocument();
+    expect(screen.getByText("AI Powered")).toBeInTheDocument();
+    expect(screen.getByText("Local First")).toBeInTheDocument();
+
+    expect(screen.getByText("Write in pure Markdown with live preview")).toBeInTheDocument();
+    expect(screen.getByText("Chat, search, and research with AI")).toBeInTheDocument();
+    expect(screen.getByText("Your notes stay on your device")).toBeInTheDocument();
   });
 });

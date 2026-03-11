@@ -7,6 +7,12 @@ export default {
     openFolder: '開啟筆記資料夾',
     selectFolder: '選擇一個包含 Markdown 筆記的資料夾',
     language: '語言',
+    featureMarkdown: 'Markdown 原生',
+    featureMarkdownDesc: '純 Markdown 編寫，即時預覽',
+    featureAI: 'AI 驅動',
+    featureAIDesc: '對話、搜尋、深度研究',
+    featureLocal: '本地優先',
+    featureLocalDesc: '筆記始終保存在你的裝置上',
   },
   
   // 通用

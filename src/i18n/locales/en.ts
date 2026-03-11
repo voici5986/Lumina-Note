@@ -7,6 +7,12 @@ export default {
     openFolder: 'Open Notes Folder',
     selectFolder: 'Select a folder containing Markdown notes',
     language: 'Language',
+    featureMarkdown: 'Markdown Native',
+    featureMarkdownDesc: 'Write in pure Markdown with live preview',
+    featureAI: 'AI Powered',
+    featureAIDesc: 'Chat, search, and research with AI',
+    featureLocal: 'Local First',
+    featureLocalDesc: 'Your notes stay on your device',
   },
   
   // Common
