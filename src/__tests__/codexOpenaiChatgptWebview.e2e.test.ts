@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { chromium, type Browser, type Page } from "playwright-core";
 
 function findEdgeExecutablePath(): string | null {
@@ -70,9 +70,43 @@ async function openWebview(page: Page, origin: string) {
     if (!iframe) throw new Error("missing iframe");
     iframe.src = u;
   }, url);
-  await page.waitForTimeout(8000);
+  await page.waitForFunction(
+    (expectedUrl) => {
+      const iframe = document.getElementById("w");
+      return (
+        iframe instanceof HTMLIFrameElement
+        && iframe.src === expectedUrl
+        && iframe.contentDocument?.readyState === "complete"
+        && iframe.contentDocument.body !== null
+      );
+    },
+    url,
+    { timeout: 10_000 },
+  );
   return url;
 }
+
+
+it("waits for the iframe document to become ready instead of sleeping", async () => {
+  const page = {
+    setContent: vi.fn(async () => undefined),
+    evaluate: vi.fn(async () => undefined),
+    waitForFunction: vi.fn(async () => undefined),
+    waitForTimeout: vi.fn(async () => undefined),
+  } as unknown as Page;
+
+  const url = await openWebview(page, "http://127.0.0.1:4010");
+
+  expect(url).toBe("http://127.0.0.1:4010/view/chatgpt.sidebarView?token=t");
+  expect(page.setContent).toHaveBeenCalled();
+  expect(page.evaluate).toHaveBeenCalledWith(expect.any(Function), url);
+  expect(page.waitForFunction).toHaveBeenCalledWith(
+    expect.any(Function),
+    url,
+    { timeout: 10_000 },
+  );
+  expect(page.waitForTimeout).not.toHaveBeenCalled();
+});
 
 describe("openai.chatgpt webview smoke (e2e)", () => {
   let browser: Browser | null = null;
