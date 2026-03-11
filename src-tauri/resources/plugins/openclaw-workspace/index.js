@@ -31,9 +31,9 @@ module.exports = function setup(api) {
 
   const inspectWorkspace = async ({ force = false } = {}) => {
     const workspacePath = api.workspace.getPath();
-    const openClawSnapshot = api.workspace.getOpenClawAttachment();
+    const openClawAttachment = api.workspace.getOpenClawAttachment();
     const detectedAttachment =
-      openClawSnapshot && openClawSnapshot.status === "detected" ? openClawSnapshot : null;
+      openClawAttachment && openClawAttachment.status === "attached" ? openClawAttachment : null;
     if (!workspacePath) {
       cachedSnapshot = {
         workspacePath: null,
@@ -136,17 +136,17 @@ module.exports = function setup(api) {
       ].join("");
     }
 
-    const status = snapshot.attached ? "Detected" : "Not detected";
+    const status = snapshot.attached ? "Attached" : "Not attached";
     const guidance = snapshot.attached
       ? "<p>These remain the real files OpenClaw reads. Edit them from the normal file tree, not from a copy.</p>"
-      : "<p>Open the real OpenClaw workspace folder in Lumina, then use <code>Rescan current workspace</code> to refresh detection.</p>";
+      : "<p>Open the real OpenClaw workspace folder in Lumina, then use <code>Attach current workspace</code> to opt into the shared workspace binding.</p>";
 
     return [
       `<p><strong>Status:</strong> ${status}</p>`,
       `<p><strong>Workspace:</strong> <code>${escapeHtml(snapshot.workspacePath)}</code></p>`,
       snapshot.attachment
         ? `<p><strong>Last validated:</strong> <code>${escapeHtml(
-            new Date(snapshot.attachment.checkedAt).toISOString(),
+            snapshot.attachment.lastValidatedAt || "",
           )}</code></p>`
         : "",
       guidance,
@@ -182,9 +182,9 @@ module.exports = function setup(api) {
     const snapshot = await api.workspace.attachOpenClawWorkspace();
     cachedSnapshot = null;
     api.ui.notify(
-      snapshot.status === "detected"
-        ? "Detected OpenClaw workspace markers in the current workspace."
-        : "Current workspace does not match the OpenClaw workspace markers.",
+      snapshot.detectedFiles.length > 0
+        ? "Attached current workspace as an OpenClaw workspace."
+        : "Attached current workspace, but no OpenClaw markers were validated yet.",
     );
     await rebuildUi();
   };
@@ -227,10 +227,10 @@ module.exports = function setup(api) {
         commands: [
           {
             id: "attach-current-workspace",
-            title: "Rescan current workspace",
+            title: "Attach current workspace",
             description: snapshot.attached
-              ? "Refresh OpenClaw markers for the current workspace."
-              : "Check whether the current Lumina workspace matches the OpenClaw markers.",
+              ? "Refresh the current OpenClaw workspace attachment."
+              : "Attach the current Lumina workspace as an OpenClaw workspace.",
             run: () => {
               void attachWorkspace();
             },
