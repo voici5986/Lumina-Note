@@ -260,6 +260,8 @@ function App() {
   const [createDbOpen, setCreateDbOpen] = useState(false);
   const [evalPanelOpen, setEvalPanelOpen] = useState(false);
   const [codexPanelOpen, setCodexPanelOpen] = useState(false);
+  const [welcomePreview, setWelcomePreview] = useState(false);
+  const welcomeTapRef = useRef<{ count: number; timer: ReturnType<typeof setTimeout> | null }>({ count: 0, timer: null });
 
   // 首次启动时默认打开 AI Chat
   useEffect(() => {
@@ -1120,6 +1122,27 @@ function App() {
           <CodexVscodeHostPanel onClose={() => setCodexPanelOpen(false)} />
         </div>
       )}
+
+      {/* Hidden welcome preview: tap top-right corner 5 times to activate */}
+      {welcomePreview && (
+        <div className="fixed inset-0 z-[200]">
+          <WelcomeScreen onOpenVault={() => setWelcomePreview(false)} />
+        </div>
+      )}
+      <div
+        className="fixed top-0 right-0 w-4 h-4 z-[99]"
+        onClick={() => {
+          const ref = welcomeTapRef.current;
+          ref.count++;
+          if (ref.timer) clearTimeout(ref.timer);
+          if (ref.count >= 5) {
+            ref.count = 0;
+            setWelcomePreview(true);
+          } else {
+            ref.timer = setTimeout(() => { ref.count = 0; }, 2000);
+          }
+        }}
+      />
 
       <PluginStatusBar />
       <PluginShellSlotHost slotId="app-bottom" />
