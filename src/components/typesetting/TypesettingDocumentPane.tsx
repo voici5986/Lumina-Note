@@ -45,17 +45,12 @@ import {
   DEFAULT_DPI,
   DEFAULT_FONT_SIZE_PX,
   DEFAULT_LINE_HEIGHT_PX,
-  MIN_ZOOM,
-  MAX_ZOOM,
-  ZOOM_STEP,
   type LayoutRender,
   type RenderedLine,
   mmToPx,
   pxToMm,
   pxToPt,
   boxToPx,
-  clampZoom,
-  roundZoom,
   scaleBoxPx,
   defaultLineHeightForFont,
   ensurePositivePx,
@@ -68,6 +63,7 @@ import {
   firstRunFontFamilyFromBlocks,
   buildSegmentsFromBlocks,
 } from "./typesettingUtils";
+import { TypesettingToolbar } from "./TypesettingToolbar";
 
 declare global {
   interface Window {
@@ -1184,205 +1180,37 @@ export function TypesettingDocumentPane({ path, onExportReady, autoOpen = true }
 
   return (
     <div className="flex-1 overflow-auto bg-background">
-      <div className="sticky top-0 z-10 flex items-center justify-center bg-background/80 px-6 py-3 backdrop-blur">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1 text-sm text-foreground shadow-sm">
-            <button
-              type="button"
-              className="rounded border border-border px-2 py-0.5 text-sm disabled:opacity-50"
-              aria-label="Zoom out"
-              onClick={() =>
-                setZoom((current) => clampZoom(roundZoom(current - ZOOM_STEP)))
-              }
-              disabled={zoom <= MIN_ZOOM}
-            >
-              -
-            </button>
-            <span className="min-w-[3rem] text-center">
-              {Math.round(zoom * 100)}%
-            </span>
-            <button
-              type="button"
-              className="rounded border border-border px-2 py-0.5 text-sm disabled:opacity-50"
-              aria-label="Zoom in"
-              onClick={() =>
-                setZoom((current) => clampZoom(roundZoom(current + ZOOM_STEP)))
-              }
-              disabled={zoom >= MAX_ZOOM}
-            >
-              +
-            </button>
-          </div>
-          <div className="flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1 text-sm text-foreground shadow-sm">
-            <button
-              type="button"
-              className="rounded border border-border px-2 py-0.5 text-xs disabled:opacity-50"
-              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-              disabled={currentPage <= 1}
-              aria-label="Previous page"
-            >
-              Prev
-            </button>
-            <span className="min-w-[5rem] text-center">
-              Page {currentPage} / {displayTotalPages}
-            </span>
-            <button
-              type="button"
-              className="rounded border border-border px-2 py-0.5 text-xs disabled:opacity-50"
-              onClick={() =>
-                setCurrentPage((prev) => Math.min(displayTotalPages, prev + 1))
-              }
-              disabled={currentPage >= displayTotalPages}
-              aria-label="Next page"
-            >
-              Next
-            </button>
-          </div>
-          <button
-            type="button"
-            className="rounded-md border border-border bg-card px-3 py-1 text-sm text-foreground shadow-sm disabled:opacity-50"
-            onClick={() => saveActiveFile()}
-            disabled={!doc?.isDirty}
-          >
-            Save
-          </button>
-          <button
-            type="button"
-            className="rounded-md border border-border bg-card px-3 py-1 text-sm text-foreground shadow-sm disabled:opacity-50"
-            onClick={handleToggleOpenOfficePreview}
-            disabled={openOfficeLoading || !tauriAvailable}
-          >
-            {openOfficePreview ? "Close OpenOffice" : "OpenOffice Preview"}
-          </button>
-          {openOfficePreview ? (
-            <button
-              type="button"
-              className="rounded-md border border-border bg-card px-3 py-1 text-sm text-foreground shadow-sm disabled:opacity-50"
-              onClick={handleRefreshOpenOfficePreview}
-              disabled={openOfficeLoading || !tauriAvailable}
-            >
-              {openOfficeLoading ? "Rendering..." : "Refresh OpenOffice"}
-            </button>
-          ) : null}
-          {openOfficePreview ? (
-            <button
-              type="button"
-              className="rounded-md border border-border bg-card px-3 py-1 text-sm text-foreground shadow-sm disabled:opacity-50"
-              onClick={() => setOpenOfficeAutoRefresh((current) => !current)}
-              disabled={!tauriAvailable}
-            >
-              Auto Refresh: {openOfficeAutoRefresh ? "On" : "Off"}
-            </button>
-          ) : null}
-          <div className="flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-sm text-foreground shadow-sm">
-            <button
-              type="button"
-              className="rounded border border-border px-2 py-0.5 text-xs"
-              onClick={() => {
-                editableRef.current?.focus();
-                document.execCommand("bold");
-              }}
-              aria-label="Bold"
-            >
-              B
-            </button>
-            <button
-              type="button"
-              className="rounded border border-border px-2 py-0.5 text-xs"
-              onClick={() => {
-                editableRef.current?.focus();
-                document.execCommand("italic");
-              }}
-              aria-label="Italic"
-            >
-              I
-            </button>
-            <button
-              type="button"
-              className="rounded border border-border px-2 py-0.5 text-xs"
-              onClick={() => {
-                editableRef.current?.focus();
-                document.execCommand("underline");
-              }}
-              aria-label="Underline"
-            >
-              U
-            </button>
-            <button
-              type="button"
-              className="rounded border border-border px-2 py-0.5 text-xs"
-              onClick={() => {
-                editableRef.current?.focus();
-                document.execCommand("insertUnorderedList");
-              }}
-              aria-label="Bulleted list"
-            >
-              •
-            </button>
-            <button
-              type="button"
-              className="rounded border border-border px-2 py-0.5 text-xs"
-              onClick={() => {
-                editableRef.current?.focus();
-                document.execCommand("insertOrderedList");
-              }}
-              aria-label="Numbered list"
-            >
-              1.
-            </button>
-          </div>
-          <button
-            type="button"
-            className="rounded-md border border-border bg-card px-3 py-1 text-sm text-foreground shadow-sm disabled:opacity-50"
-            onClick={handleExport}
-            disabled={exporting}
-          >
-            {exporting ? "Exporting..." : "Export PDF"}
-          </button>
-          <button
-            type="button"
-            className="rounded-md border border-border bg-card px-3 py-1 text-sm text-foreground shadow-sm disabled:opacity-50"
-            onClick={handlePrint}
-            disabled={printing}
-          >
-            {printing ? "Printing..." : "Print"}
-          </button>
-          <button
-            type="button"
-            className="rounded-md border border-border bg-card px-3 py-1 text-sm text-foreground shadow-sm disabled:opacity-50"
-            onClick={handleExportDocx}
-            disabled={exportingDocx}
-          >
-            {exportingDocx ? "Exporting DOCX..." : "Export DOCX"}
-          </button>
-          {exportError ? (
-            <span className="text-xs text-destructive">{exportError}</span>
-          ) : null}
-          {printError ? (
-            <span className="text-xs text-destructive">{printError}</span>
-          ) : null}
-          {exportDocxError ? (
-            <span className="text-xs text-destructive">{exportDocxError}</span>
-          ) : null}
-          {openOfficeError ? (
-            <span className="text-xs text-destructive">OpenOffice: {openOfficeError}</span>
-          ) : null}
-          {openOfficeError && openOfficeError.toLowerCase().includes("soffice") ? (
-            <button
-              type="button"
-              className="rounded-md border border-border bg-card px-3 py-1 text-xs text-foreground shadow-sm disabled:opacity-50"
-              onClick={handleInstallDocTools}
-              disabled={docToolsInstalling || !tauriAvailable}
-            >
-              {docToolsInstalling ? "Installing tools..." : "Install Doc Tools"}
-            </button>
-          ) : null}
-          {openOfficePreview && openOfficeStale ? (
-            <span className="text-xs text-warning">OpenOffice preview stale</span>
-          ) : null}
-          <span className="text-xs text-muted-foreground">{layoutSummary}</span>
-        </div>
-      </div>
+      <TypesettingToolbar
+        zoom={zoom}
+        setZoom={setZoom}
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+        displayTotalPages={displayTotalPages}
+        isDirty={doc?.isDirty ?? false}
+        onSave={() => saveActiveFile()}
+        exporting={exporting}
+        exportError={exportError}
+        onExport={handleExport}
+        exportingDocx={exportingDocx}
+        exportDocxError={exportDocxError}
+        onExportDocx={handleExportDocx}
+        printing={printing}
+        printError={printError}
+        onPrint={handlePrint}
+        openOfficePreview={openOfficePreview}
+        openOfficeLoading={openOfficeLoading}
+        openOfficeError={openOfficeError}
+        openOfficeStale={openOfficeStale}
+        openOfficeAutoRefresh={openOfficeAutoRefresh}
+        onToggleOpenOfficePreview={handleToggleOpenOfficePreview}
+        onRefreshOpenOfficePreview={handleRefreshOpenOfficePreview}
+        onToggleAutoRefresh={() => setOpenOfficeAutoRefresh((current) => !current)}
+        docToolsInstalling={docToolsInstalling}
+        onInstallDocTools={handleInstallDocTools}
+        tauriAvailable={tauriAvailable}
+        editableRef={editableRef}
+        layoutSummary={layoutSummary}
+      />
       <div className="flex min-h-full items-center justify-center px-6 py-10">
         {openOfficePreview ? (
           <div className="w-full max-w-5xl">
