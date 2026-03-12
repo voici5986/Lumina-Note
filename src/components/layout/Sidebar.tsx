@@ -656,20 +656,49 @@ export function Sidebar() {
     let cancelled = false;
     readOpenClawCronJobs(ocPath).then(
       (jobs) => { if (!cancelled) setOpenClawCronJobs(jobs); },
-      () => { if (!cancelled) setOpenClawCronJobs([]); },
+      (error) => {
+        if (!cancelled) {
+          setOpenClawCronJobs([]);
+          reportOperationError({
+            source: "Sidebar.loadCronJobs",
+            action: "Load OpenClaw cron jobs",
+            error,
+          });
+        }
+      },
     );
     return () => { cancelled = true; };
   }, [openClawAttachment]);
 
   const openCronEditor = useCallback((jobId?: string) => {
-    if (jobId) {
-      const actions = pluginRuntime.getTabActions("openclaw-workspace:openclaw-workspace-overview");
-      if (actions["edit-cron-job"]) {
-        void actions["edit-cron-job"]({ jobId });
-        return;
+    try {
+      if (jobId) {
+        const actions = pluginRuntime.getTabActions("openclaw-workspace:openclaw-workspace-overview");
+        if (actions["edit-cron-job"]) {
+          Promise.resolve(actions["edit-cron-job"]({ jobId })).catch((error) => {
+            reportOperationError({
+              source: "Sidebar.openCronEditor",
+              action: "Open cron job editor",
+              error,
+            });
+          });
+          return;
+        }
       }
+      if (!pluginRuntime.executeCommand("plugin-command:openclaw-workspace:create-cron-job")) {
+        reportOperationError({
+          source: "Sidebar.openCronEditor",
+          action: "Open cron job editor",
+          error: new Error("OpenClaw plugin command not available. Is the plugin enabled?"),
+        });
+      }
+    } catch (error) {
+      reportOperationError({
+        source: "Sidebar.openCronEditor",
+        action: "Open cron job editor",
+        error,
+      });
     }
-    pluginRuntime.executeCommand("plugin-command:openclaw-workspace:create-cron-job");
   }, []);
 
   useEffect(() => {
