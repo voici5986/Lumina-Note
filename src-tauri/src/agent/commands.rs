@@ -98,6 +98,13 @@ fn emit_agent_event_safe(sink: &TauriEventSink, event: Event) {
     }
 }
 
+async fn build_llm_http_client(app: &AppHandle) -> Result<reqwest::Client, String> {
+    app.state::<crate::proxy::ProxyState>()
+        .client_with_timeout(std::time::Duration::from_secs(300))
+        .await
+        .map_err(|e| format!("Failed to build LLM HTTP client: {e}"))
+}
+
 fn now_unix_millis() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
@@ -256,11 +263,7 @@ async fn execute_task_inner(
         },
     );
 
-    let http_client = app
-        .state::<crate::proxy::ProxyState>()
-        .client_with_timeout(std::time::Duration::from_secs(300))
-        .await
-        .map_err(|e| format!("Failed to build LLM HTTP client: {e}"))?;
+    let http_client = build_llm_http_client(&app).await?;
     let result = run_forge_loop(
         app.clone(),
         config,
@@ -507,7 +510,7 @@ pub async fn agent_approve_tool(
         },
     );
 
-    let http_client = app.state::<crate::proxy::ProxyState>().client().await;
+    let http_client = build_llm_http_client(&app).await?;
     let result = run_forge_loop(
         app.clone(),
         runtime_state.config.clone(),
@@ -592,7 +595,7 @@ pub async fn agent_continue_with_answer(
     }
     emit_queue_updated(&app, &state).await;
 
-    let http_client = app.state::<crate::proxy::ProxyState>().client().await;
+    let http_client = build_llm_http_client(&app).await?;
     let result = run_forge_loop(
         app.clone(),
         runtime_state.config.clone(),
