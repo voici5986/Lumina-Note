@@ -41,14 +41,22 @@ impl ProxyState {
     pub async fn client_with_timeout(&self, timeout: Duration) -> Result<Client, String> {
         let config = self.config.read().await;
         build_client_with_timeout(
-            if config.enabled { Some(&config.proxy_url) } else { None },
+            if config.enabled {
+                Some(&config.proxy_url)
+            } else {
+                None
+            },
             timeout,
         )
     }
 
     /// Update proxy config and rebuild the shared client.
     pub async fn set_config(&self, proxy_url: String, enabled: bool) -> Result<(), String> {
-        let proxy = if enabled { Some(proxy_url.as_str()) } else { None };
+        let proxy = if enabled {
+            Some(proxy_url.as_str())
+        } else {
+            None
+        };
         let new_client = build_client(proxy)?;
         {
             let mut cfg = self.config.write().await;
@@ -84,12 +92,14 @@ fn build_client_with_timeout(proxy_url: Option<&str>, timeout: Duration) -> Resu
     let mut builder = Client::builder().timeout(timeout);
     if let Some(url) = proxy_url {
         if !url.is_empty() {
-            let proxy = reqwest::Proxy::all(url)
-                .map_err(|e| format!("Invalid proxy URL: {}", e))?;
+            let proxy =
+                reqwest::Proxy::all(url).map_err(|e| format!("Invalid proxy URL: {}", e))?;
             builder = builder.proxy(proxy);
         }
     }
-    builder.build().map_err(|e| format!("Failed to build HTTP client: {}", e))
+    builder
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {}", e))
 }
 
 // ── Tauri commands ──
@@ -104,18 +114,13 @@ pub async fn set_proxy_config(
 }
 
 #[tauri::command]
-pub async fn get_proxy_config(
-    state: tauri::State<'_, ProxyState>,
-) -> Result<ProxyConfig, String> {
+pub async fn get_proxy_config(state: tauri::State<'_, ProxyState>) -> Result<ProxyConfig, String> {
     Ok(state.get_config().await)
 }
 
 #[tauri::command]
-pub async fn test_proxy_connection(
-    proxy_url: String,
-) -> Result<(), String> {
-    let proxy = reqwest::Proxy::all(&proxy_url)
-        .map_err(|e| format!("Invalid proxy URL: {}", e))?;
+pub async fn test_proxy_connection(proxy_url: String) -> Result<(), String> {
+    let proxy = reqwest::Proxy::all(&proxy_url).map_err(|e| format!("Invalid proxy URL: {}", e))?;
     let client = Client::builder()
         .proxy(proxy)
         .timeout(Duration::from_secs(10))

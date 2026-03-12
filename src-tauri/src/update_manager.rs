@@ -397,8 +397,14 @@ async fn run_update_task(
     )
     .await?;
 
-    let package_bytes =
-        download_with_retries(&app, runtime_state.clone(), &version_dir, &mut persisted, &http_client).await?;
+    let package_bytes = download_with_retries(
+        &app,
+        runtime_state.clone(),
+        &version_dir,
+        &mut persisted,
+        &http_client,
+    )
+    .await?;
 
     ensure_task_not_cancelled(runtime_state.clone(), &persisted.status.task_id).await?;
 

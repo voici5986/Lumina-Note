@@ -19,11 +19,11 @@ mod mcp;
 mod mobile_gateway;
 mod node_runtime;
 mod plugins;
+mod proxy;
 mod typesetting;
 mod update_manager;
 mod vector_db;
 mod webdav;
-mod proxy;
 
 use std::env;
 use tauri::Manager;
