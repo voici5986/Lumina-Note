@@ -83,6 +83,9 @@ export default {
     openClawSearchMemory: 'View memories',
     openClawSearchPlans: 'View plans',
     openClawSearchArtifacts: 'View artifacts',
+    openClawCronJobs: 'Cron jobs',
+    openClawNoCronJobs: 'No cron jobs configured',
+    openClawManageCronJobs: 'Manage cron jobs',
   },
 
   favorites: {

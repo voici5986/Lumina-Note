@@ -83,6 +83,9 @@ export default {
     openClawSearchMemory: 'View memories',
     openClawSearchPlans: 'View plans',
     openClawSearchArtifacts: 'View artifacts',
+    openClawCronJobs: 'Cron ジョブ',
+    openClawNoCronJobs: 'cron ジョブはまだありません',
+    openClawManageCronJobs: 'Cron ジョブを管理',
   },
 
   favorites: {

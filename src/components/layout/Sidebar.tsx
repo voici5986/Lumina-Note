@@ -33,6 +33,7 @@ import {
   Bot,
   Star,
   StarOff,
+  Clock,
 } from "lucide-react";
 import { useVoiceNote } from "@/hooks/useVoiceNote";
 import { useUIStore } from "@/stores/useUIStore";
@@ -40,6 +41,8 @@ import { useSplitStore } from "@/stores/useSplitStore";
 import { useFavoriteStore } from "@/stores/useFavoriteStore";
 import { useOpenClawWorkspaceStore } from "@/stores/useOpenClawWorkspaceStore";
 import { ensureOpenClawTodayMemoryNote } from "@/services/openclaw/workspace";
+import { readOpenClawCronJobs, type OpenClawCronJob } from "@/services/openclaw/cron";
+import { pluginRuntime } from "@/services/plugins/runtime";
 import { reportOperationError } from "@/lib/reportError";
 import { useShallow } from "zustand/react/shallow";
 import { SIDEBAR_SURFACE_CLASSNAME } from "./sidebarSurface";
@@ -642,6 +645,37 @@ export function Sidebar() {
     [openClawSnapshot?.bridgeNotePaths],
   );
 
+  const [openClawCronJobs, setOpenClawCronJobs] = useState<OpenClawCronJob[]>([]);
+  useEffect(() => {
+    if (!openClawAttachment || openClawAttachment.status !== "attached") {
+      setOpenClawCronJobs([]);
+      return;
+    }
+    const ocPath = openClawAttachment.workspacePath;
+    if (!ocPath) return;
+    let cancelled = false;
+    readOpenClawCronJobs(ocPath).then(
+      (jobs) => { if (!cancelled) setOpenClawCronJobs(jobs); },
+      () => { if (!cancelled) setOpenClawCronJobs([]); },
+    );
+    return () => { cancelled = true; };
+  }, [openClawAttachment]);
+
+  const openCronOverview = useCallback(() => {
+    pluginRuntime.executeCommand("plugin-command:openclaw-workspace:manage-cron-jobs")
+      || pluginRuntime.executeCommand("plugin-command:openclaw-workspace:open-overview");
+  }, []);
+
+  const openCronEditor = useCallback((jobId?: string) => {
+    if (jobId) {
+      const actions = pluginRuntime.getTabActions("openclaw-workspace:openclaw-workspace-overview");
+      if (actions["edit-cron-job"]) {
+        void actions["edit-cron-job"]({ jobId });
+        return;
+      }
+    }
+    pluginRuntime.executeCommand("plugin-command:openclaw-workspace:create-cron-job");
+  }, []);
 
   useEffect(() => {
     const handleFocusPath = (event: Event) => {
@@ -1162,6 +1196,41 @@ export function Sidebar() {
               ))}
             </div>
           )}
+
+          <div className="mb-2 space-y-1">
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] font-medium text-muted-foreground">
+                {t.sidebar.openClawCronJobs}
+              </div>
+              {openClawCronJobs.length > 0 && (
+                <button
+                  type="button"
+                  onClick={openCronOverview}
+                  className="text-[10px] text-muted-foreground hover:text-foreground"
+                >
+                  {t.sidebar.openClawManageCronJobs}
+                </button>
+              )}
+            </div>
+            {openClawCronJobs.length === 0 ? (
+              <div className="text-[11px] text-muted-foreground">{t.sidebar.openClawNoCronJobs}</div>
+            ) : (
+              openClawCronJobs.slice(0, 5).map((job) => (
+                <button
+                  key={job.jobId}
+                  type="button"
+                  onClick={() => openCronEditor(job.jobId)}
+                  className="flex w-full items-center justify-between rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent"
+                >
+                  <span className="truncate">
+                    {job.name}
+                    {!job.enabled && <span className="ml-1 opacity-50">(off)</span>}
+                  </span>
+                  <Clock className="h-3 w-3 shrink-0" />
+                </button>
+              ))
+            )}
+          </div>
 
           <div className="flex flex-wrap gap-1">
             {openClawSnapshot.memoryDirectoryPath && (

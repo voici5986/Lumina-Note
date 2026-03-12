@@ -83,6 +83,9 @@ export default {
     openClawSearchMemory: '查看 memories',
     openClawSearchPlans: '查看 plans',
     openClawSearchArtifacts: '查看 artifacts',
+    openClawCronJobs: 'Cron 任務',
+    openClawNoCronJobs: '尚無 cron 任務',
+    openClawManageCronJobs: '管理 cron 任務',
   },
 
   favorites: {
