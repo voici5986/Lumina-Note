@@ -55,7 +55,7 @@ export function UrlCell({ value, onChange, isEditing, onBlur }: UrlCellProps) {
     }
   };
   
-  const handleOpenUrl = (e: React.MouseEvent) => {
+  const handleOpenUrl = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     if (value) {
       window.open(value, '_blank');
@@ -87,10 +87,17 @@ export function UrlCell({ value, onChange, isEditing, onBlur }: UrlCellProps) {
   
   return (
     <div className="h-9 px-2 flex items-center gap-1 text-sm group">
-      <span className="truncate text-slate-500 hover:underline cursor-pointer" onClick={handleOpenUrl}>
-        {value.replace(/^https?:\/\//, '')}
-      </span>
       <button
+        type="button"
+        onClick={handleOpenUrl}
+        className="min-w-0 truncate text-left text-slate-500 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-sm"
+        aria-label={value}
+        title={value}
+      >
+        {value.replace(/^https?:\/\//, '')}
+      </button>
+      <button
+        type="button"
         onClick={handleOpenUrl}
         className="ui-icon-btn h-6 w-6 opacity-0 group-hover:opacity-100"
         aria-label={t.common.open}
