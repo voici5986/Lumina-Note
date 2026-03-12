@@ -23,6 +23,7 @@ mod typesetting;
 mod update_manager;
 mod vector_db;
 mod webdav;
+mod proxy;
 
 use std::env;
 use tauri::Manager;

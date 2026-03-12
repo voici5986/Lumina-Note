@@ -14,6 +14,7 @@ mod node_runtime;
 mod typesetting;
 mod update_manager;
 mod vector_db;
+pub mod proxy;
 
 pub use commands::*;
 pub use error::*;
