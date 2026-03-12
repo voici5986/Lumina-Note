@@ -33,17 +33,20 @@ interface PluginStoreState {
   isolatePluginStyles: () => void;
 }
 
+const APPEARANCE_PERMISSIONS = new Set([
+  "ui:*",
+  "ui:decorate",
+  "ui:theme",
+  "editor:decorate",
+  "workspace:panel",
+  "workspace:tab",
+]);
+
 const isAppearancePlugin = (permissions: string[]) =>
-  permissions.some((perm) =>
-    [
-      "ui:*",
-      "ui:decorate",
-      "ui:theme",
-      "editor:decorate",
-      "workspace:panel",
-      "workspace:tab",
-    ].includes(perm),
-  );
+  permissions.some((perm) => APPEARANCE_PERMISSIONS.has(perm));
+
+const isPurelyAppearancePlugin = (permissions: string[]) =>
+  permissions.length > 0 && permissions.every((perm) => APPEARANCE_PERMISSIONS.has(perm));
 
 const DEFAULT_DISABLED_SAMPLE_PLUGIN_IDS = new Set<string>([
   "hello-lumina",
@@ -85,7 +88,7 @@ const toEffectiveEnabledById = (
     return next;
   }
   for (const plugin of plugins) {
-    if (isAppearancePlugin(plugin.permissions || [])) {
+    if (isPurelyAppearancePlugin(plugin.permissions || [])) {
       next[plugin.id] = false;
     }
   }
