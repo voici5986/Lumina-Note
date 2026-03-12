@@ -9,7 +9,7 @@ use crate::agent::deep_research::{
     DeepResearchRequest, DeepResearchState, ResearchPhase,
 };
 use crate::agent::forge_loop::{
-    build_runtime, run_forge_loop, ForgeRunResult, ForgeRuntime, TauriEventSink,
+    build_runtime_with_client, run_forge_loop, ForgeRunResult, ForgeRuntime, TauriEventSink,
 };
 use crate::agent::skills::{list_skills, read_skill, SkillDetail, SkillInfo};
 use crate::agent::types::*;
@@ -225,7 +225,12 @@ async fn execute_task_inner(
     emit_queue_updated(&app, state).await;
 
     let permissions = build_permission_session(config.auto_approve);
-    let runtime = build_runtime(&initial_state.workspace_path, permissions);
+    let proxy_client = app.state::<crate::proxy::ProxyState>().client().await;
+    let runtime = build_runtime_with_client(
+        &initial_state.workspace_path,
+        permissions,
+        Some(proxy_client),
+    );
     let runtime_state = ForgeRuntimeState {
         config: config.clone(),
         runtime,
@@ -251,6 +256,7 @@ async fn execute_task_inner(
         },
     );
 
+    let http_client = app.state::<crate::proxy::ProxyState>().client().await;
     let result = run_forge_loop(
         app.clone(),
         config,
@@ -260,6 +266,7 @@ async fn execute_task_inner(
         runtime_state.session_id.clone(),
         runtime_state.message_id.clone(),
         runtime_state.cancel.clone(),
+        http_client,
     )
     .await;
 
@@ -496,6 +503,7 @@ pub async fn agent_approve_tool(
         },
     );
 
+    let http_client = app.state::<crate::proxy::ProxyState>().client().await;
     let result = run_forge_loop(
         app.clone(),
         runtime_state.config.clone(),
@@ -505,6 +513,7 @@ pub async fn agent_approve_tool(
         runtime_state.session_id.clone(),
         runtime_state.message_id.clone(),
         runtime_state.cancel.clone(),
+        http_client,
     )
     .await;
 
@@ -579,6 +588,7 @@ pub async fn agent_continue_with_answer(
     }
     emit_queue_updated(&app, &state).await;
 
+    let http_client = app.state::<crate::proxy::ProxyState>().client().await;
     let result = run_forge_loop(
         app.clone(),
         runtime_state.config.clone(),
@@ -588,6 +598,7 @@ pub async fn agent_continue_with_answer(
         runtime_state.session_id.clone(),
         runtime_state.message_id.clone(),
         runtime_state.cancel.clone(),
+        http_client,
     )
     .await;
 
@@ -1101,6 +1112,7 @@ pub async fn deep_research_start(
     let app_clone = app.clone();
     let state_is_running = state.is_running.clone();
     let state_checkpoint = state.checkpoint.clone();
+    let http_client = app.state::<crate::proxy::ProxyState>().client().await;
 
     tokio::spawn(async move {
         let result = run_deep_research_resumable(
@@ -1108,6 +1120,7 @@ pub async fn deep_research_start(
             final_config,
             initial_state,
             state_checkpoint.clone(),
+            http_client,
         )
         .await;
 
@@ -1153,9 +1166,10 @@ async fn run_deep_research_resumable(
     config: DeepResearchConfig,
     initial_state: DeepResearchState,
     _checkpoint_store: Arc<Mutex<Option<Checkpoint<DeepResearchState>>>>,
+    http_client: reqwest::Client,
 ) -> Result<ExecutionResult<DeepResearchState>, String> {
     // 创建执行上下文
-    let ctx = DeepResearchContext::new(app, config.clone());
+    let ctx = DeepResearchContext::new(app, config.clone(), http_client);
 
     // 构建图
     let graph = build_deep_research_graph(ctx)
@@ -1217,10 +1231,11 @@ pub async fn deep_research_resume(
     let app_clone = app.clone();
     let state_is_running = state.is_running.clone();
     let state_checkpoint = state.checkpoint.clone();
+    let http_client = app.state::<crate::proxy::ProxyState>().client().await;
 
     tokio::spawn(async move {
         // 创建执行上下文
-        let ctx = DeepResearchContext::new(app_clone.clone(), config.clone());
+        let ctx = DeepResearchContext::new(app_clone.clone(), config.clone(), http_client);
 
         // 构建图
         let graph = match build_deep_research_graph(ctx) {

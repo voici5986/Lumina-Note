@@ -71,13 +71,17 @@ async fn handle(call: ToolCall, ctx: ToolContext, env: ToolEnvironment) -> Graph
         .timeout
         .unwrap_or(DEFAULT_TIMEOUT_SECS)
         .min(MAX_TIMEOUT_SECS);
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(timeout))
-        .build()
-        .map_err(|err| GraphError::ExecutionError {
-            node: format!("tool:{}", call.tool),
-            message: format!("Failed to create request client: {}", err),
-        })?;
+    let client = if let Some(ref c) = env.http_client {
+        c.clone()
+    } else {
+        reqwest::Client::builder()
+            .timeout(Duration::from_secs(timeout))
+            .build()
+            .map_err(|err| GraphError::ExecutionError {
+                node: format!("tool:{}", call.tool),
+                message: format!("Failed to create request client: {}", err),
+            })?
+    };
 
     let mut metadata = Map::new();
     metadata.insert("url".to_string(), json!(input.url));
