@@ -4,6 +4,7 @@ import { useLocaleStore } from "@/stores/useLocaleStore";
 import { useFavoriteStore } from "@/stores/useFavoriteStore";
 import { useSplitStore } from "@/stores/useSplitStore";
 import { useUIStore } from "@/stores/useUIStore";
+import { useShallow } from "zustand/react/shallow";
 import {
   FileEntry,
   deleteFile,
@@ -60,26 +61,30 @@ export function useSidebarFileOperations() {
     promotePreviewTab,
     moveFileToFolder,
     moveFolderToFolder,
-  } = useFileStore((state) => ({
-    vaultPath: state.vaultPath,
-    fileTree: state.fileTree,
-    currentFile: state.currentFile,
-    openFile: state.openFile,
-    refreshFileTree: state.refreshFileTree,
-    closeFile: state.closeFile,
-    openDatabaseTab: state.openDatabaseTab,
-    openPDFTab: state.openPDFTab,
-    openDiagramTab: state.openDiagramTab,
-    promotePreviewTab: state.promotePreviewTab,
-    moveFileToFolder: state.moveFileToFolder,
-    moveFolderToFolder: state.moveFolderToFolder,
-  }));
+  } = useFileStore(
+    useShallow((state) => ({
+      vaultPath: state.vaultPath,
+      fileTree: state.fileTree,
+      currentFile: state.currentFile,
+      openFile: state.openFile,
+      refreshFileTree: state.refreshFileTree,
+      closeFile: state.closeFile,
+      openDatabaseTab: state.openDatabaseTab,
+      openPDFTab: state.openPDFTab,
+      openDiagramTab: state.openDiagramTab,
+      promotePreviewTab: state.promotePreviewTab,
+      moveFileToFolder: state.moveFileToFolder,
+      moveFolderToFolder: state.moveFolderToFolder,
+    })),
+  );
   const { splitView } = useUIStore();
   const { activePane, openSecondaryFile, openSecondaryPdf } = useSplitStore();
-  const { isFavorite, toggleFavorite } = useFavoriteStore((s) => ({
-    isFavorite: s.isFavorite,
-    toggleFavorite: s.toggleFavorite,
-  }));
+  const { isFavorite, toggleFavorite } = useFavoriteStore(
+    useShallow((state) => ({
+      isFavorite: state.isFavorite,
+      toggleFavorite: state.toggleFavorite,
+    })),
+  );
 
   // ── local state ───────────────────────────────────────────────────────
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
