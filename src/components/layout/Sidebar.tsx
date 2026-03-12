@@ -7,6 +7,8 @@ import { FileEntry, deleteFile, renameFile, createFile, createDir, exists, openN
 import { parseFrontmatter } from "@/services/markdown/frontmatter";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { join } from "@/lib/path";
+import { openFilteredView } from "@/lib/events";
 import { cn, getFileName } from "@/lib/utils";
 import { ContextMenu, MenuItem, menuItems } from "../toolbar/ContextMenu";
 import {
@@ -36,6 +38,7 @@ import { useVoiceNote } from "@/hooks/useVoiceNote";
 import { useUIStore } from "@/stores/useUIStore";
 import { useSplitStore } from "@/stores/useSplitStore";
 import { useFavoriteStore } from "@/stores/useFavoriteStore";
+import { useOpenClawWorkspaceStore } from "@/stores/useOpenClawWorkspaceStore";
 import { reportOperationError } from "@/lib/reportError";
 import { useShallow } from "zustand/react/shallow";
 import { SIDEBAR_SURFACE_CLASSNAME } from "./sidebarSurface";
@@ -134,6 +137,12 @@ export function Sidebar() {
     () => getFavorites(favoriteSortMode),
     [getFavorites, favoriteSortMode, favorites, manualOrder]
   );
+  const openClawSnapshotsByHost = useOpenClawWorkspaceStore((state) => state.snapshotsByHostPath);
+  const openClawAttachmentsByHost = useOpenClawWorkspaceStore((state) => state.attachmentsByHostPath);
+  const openClawIntegrationEnabled = useOpenClawWorkspaceStore((state) => state.integrationEnabled);
+  const openClawMountedTree = useOpenClawWorkspaceStore((state) => state.getMountedFileTree(vaultPath));
+  const openClawSnapshot = openClawIntegrationEnabled && vaultPath ? openClawSnapshotsByHost[vaultPath] ?? null : null;
+  const openClawAttachment = openClawIntegrationEnabled && vaultPath ? openClawAttachmentsByHost[vaultPath] ?? null : null;
   const { 
     isRecording, 
     status: voiceStatus, 
@@ -199,6 +208,7 @@ export function Sidebar() {
   const [renameValue, setRenameValue] = useState("");
   // 展开的文件夹路径集合
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+  const [expandedMountedPaths, setExpandedMountedPaths] = useState<Set<string>>(new Set());
   // 根目录拖拽悬停状态
   const [isRootDragOver, setIsRootDragOver] = useState(false);
   const [isFileTreeScrollActive, setIsFileTreeScrollActive] = useState(false);
@@ -607,6 +617,31 @@ export function Sidebar() {
     });
   }, []);
 
+  const focusTreePath = useCallback((targetPath: string) => {
+    setLeftSidebarOpen(true);
+    expandToPath(targetPath);
+    setSelectedPath(targetPath);
+  }, [expandToPath, setLeftSidebarOpen]);
+
+  const openClawRecentMemoryEntries = useMemo(
+    () => openClawSnapshot?.recentMemoryPaths.slice(0, 4) ?? [],
+    [openClawSnapshot?.recentMemoryPaths],
+  );
+
+  const openClawArtifactDirectories = useMemo(
+    () => openClawSnapshot?.artifactDirectoryPaths ?? [],
+    [openClawSnapshot?.artifactDirectoryPaths],
+  );
+  const openClawPlanEntries = useMemo(
+    () => openClawSnapshot?.planFilePaths.slice(0, 4) ?? [],
+    [openClawSnapshot?.planFilePaths],
+  );
+  const openClawBridgeEntries = useMemo(
+    () => openClawSnapshot?.bridgeNotePaths.slice(0, 2) ?? [],
+    [openClawSnapshot?.bridgeNotePaths],
+  );
+
+
   useEffect(() => {
     const handleFocusPath = (event: Event) => {
       const customEvent = event as CustomEvent<{ path?: string }>;
@@ -780,6 +815,18 @@ export function Sidebar() {
   // 切换文件夹展开状态
   const toggleExpanded = useCallback((path: string) => {
     setExpandedPaths(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleMountedExpanded = useCallback((path: string) => {
+    setExpandedMountedPaths((prev) => {
       const next = new Set(prev);
       if (next.has(path)) {
         next.delete(path);
@@ -1004,6 +1051,190 @@ export function Sidebar() {
           </button>
         )}
       </div>
+
+      {vaultPath && openClawSnapshot && (openClawSnapshot.status === "detected" || openClawAttachment) && (
+        <div className="mx-2 mb-2 rounded-lg border border-border bg-background/70 p-2">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="truncate text-xs font-semibold text-foreground">
+                {t.sidebar.openClawTitle}
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                {openClawAttachment ? t.sidebar.openClawAttached : t.sidebar.openClawDetected}
+              </div>
+            </div>
+            <div className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+              {t.sidebar.openClawArtifacts.replace("{count}", String(openClawSnapshot.artifactFileCount))}
+            </div>
+          </div>
+
+          <div className="mb-2 grid grid-cols-2 gap-1.5">
+            {[
+              { label: "AGENTS.md", path: join(openClawSnapshot.workspacePath, "AGENTS.md") },
+              { label: "SOUL.md", path: join(openClawSnapshot.workspacePath, "SOUL.md") },
+              { label: "USER.md", path: join(openClawSnapshot.workspacePath, "USER.md") },
+              { label: t.sidebar.openClawTodayMemory, path: openClawSnapshot.todayMemoryPath },
+            ].map((entry) => (
+              <button
+                key={entry.label}
+                type="button"
+                onClick={() => void openFile(entry.path)}
+                className="truncate rounded-md border border-border bg-background/60 px-2 py-1 text-left text-[11px] text-foreground hover:bg-accent"
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="mb-2 space-y-1">
+            <div className="text-[11px] font-medium text-muted-foreground">
+              {t.sidebar.openClawRecentMemory}
+            </div>
+            {openClawRecentMemoryEntries.length === 0 ? (
+              <div className="text-[11px] text-muted-foreground">{t.sidebar.openClawNoRecentMemory}</div>
+            ) : (
+              openClawRecentMemoryEntries.map((path) => (
+                <button
+                  key={path}
+                  type="button"
+                  onClick={() => void openFile(path)}
+                  className={cn(
+                    "flex w-full items-center justify-between rounded-md px-2 py-1 text-[11px] hover:bg-accent",
+                    currentFile === path ? "bg-accent text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  <span className="truncate">{getFileName(path).replace(/\.md$/i, "")}</span>
+                  <FileText className="h-3 w-3 shrink-0" />
+                </button>
+              ))
+            )}
+          </div>
+
+          <div className="mb-2 space-y-1">
+            <div className="text-[11px] font-medium text-muted-foreground">
+              {t.sidebar.openClawPlans}
+            </div>
+            {openClawPlanEntries.length === 0 ? (
+              <div className="text-[11px] text-muted-foreground">{t.sidebar.openClawNoPlans}</div>
+            ) : (
+              openClawPlanEntries.map((path) => (
+                <button
+                  key={path}
+                  type="button"
+                  onClick={() => void openFile(path)}
+                  className={cn(
+                    "flex w-full items-center justify-between rounded-md px-2 py-1 text-[11px] hover:bg-accent",
+                    currentFile === path ? "bg-accent text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  <span className="truncate">{getFileName(path)}</span>
+                  <FileText className="h-3 w-3 shrink-0" />
+                </button>
+              ))
+            )}
+          </div>
+
+          {openClawBridgeEntries.length > 0 && (
+            <div className="mb-2 space-y-1">
+              <div className="text-[11px] font-medium text-muted-foreground">
+                {t.sidebar.openClawBridgeNotes}
+              </div>
+              {openClawBridgeEntries.map((path) => (
+                <button
+                  key={path}
+                  type="button"
+                  onClick={() => void openFile(path)}
+                  className={cn(
+                    "flex w-full items-center justify-between rounded-md px-2 py-1 text-[11px] hover:bg-accent",
+                    currentFile === path ? "bg-accent text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  <span className="truncate">{getFileName(path)}</span>
+                  <FileText className="h-3 w-3 shrink-0" />
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-1">
+            {openClawSnapshot.memoryDirectoryPath && (
+              <button
+                type="button"
+                onClick={() => focusTreePath(openClawSnapshot.memoryDirectoryPath as string)}
+                className="rounded-md border border-border bg-background/60 px-2 py-1 text-[10px] text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                {t.sidebar.openClawMemoryFolder}
+              </button>
+            )}
+            {openClawArtifactDirectories.map((path) => (
+              <button
+                key={path}
+                type="button"
+                onClick={() => focusTreePath(path)}
+                className="rounded-md border border-border bg-background/60 px-2 py-1 text-[10px] text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                {getFileName(path)}
+              </button>
+            ))}
+            {openClawSnapshot.memoryDirectoryPath && (
+              <button
+                type="button"
+                onClick={() =>
+                  openFilteredView(t.sidebar.openClawSearchMemory, [
+                    openClawSnapshot.memoryDirectoryPath as string,
+                  ])
+                }
+                className="rounded-md border border-border bg-background/60 px-2 py-1 text-[10px] text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                {t.sidebar.openClawSearchMemory}
+              </button>
+            )}
+            {openClawSnapshot.planDirectoryPaths.length > 0 && (
+              <button
+                type="button"
+                onClick={() =>
+                  openFilteredView(t.sidebar.openClawSearchPlans, openClawSnapshot.planDirectoryPaths)
+                }
+                className="rounded-md border border-border bg-background/60 px-2 py-1 text-[10px] text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                {t.sidebar.openClawSearchPlans}
+              </button>
+            )}
+            {openClawArtifactDirectories.length > 0 && (
+              <button
+                type="button"
+                onClick={() =>
+                  openFilteredView(t.sidebar.openClawSearchArtifacts, openClawArtifactDirectories)
+                }
+                className="rounded-md border border-border bg-background/60 px-2 py-1 text-[10px] text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                {t.sidebar.openClawSearchArtifacts}
+              </button>
+            )}
+          </div>
+
+          {openClawMountedTree.length > 0 && (
+            <div className="mt-3 rounded-md border border-border/70 bg-background/40">
+              <div className="border-b border-border/70 px-2 py-1.5 text-[11px] font-medium text-muted-foreground">
+                {openClawAttachment?.workspacePath.split(/[/\\]/).pop() || t.sidebar.openClawTitle}
+              </div>
+              <div className="max-h-56 overflow-y-auto py-1">
+                {openClawMountedTree.map((entry) => (
+                  <MountedWorkspaceTreeItem
+                    key={entry.path}
+                    entry={entry}
+                    level={0}
+                    currentFile={currentFile}
+                    expandedPaths={expandedMountedPaths}
+                    toggleExpanded={toggleMountedExpanded}
+                    onOpen={(path) => void openFile(path)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Favorites */}
       <div className="px-2 mb-2">
@@ -1399,6 +1630,74 @@ interface FileTreeItemProps {
   onCreateSubmit: () => void;
   onCreateCancel: () => void;
   vaultPath: string | null;
+}
+
+interface MountedWorkspaceTreeItemProps {
+  entry: FileEntry;
+  level: number;
+  currentFile: string | null;
+  expandedPaths: Set<string>;
+  toggleExpanded: (path: string) => void;
+  onOpen: (path: string) => void;
+}
+
+function MountedWorkspaceTreeItem({
+  entry,
+  level,
+  currentFile,
+  expandedPaths,
+  toggleExpanded,
+  onOpen,
+}: MountedWorkspaceTreeItemProps) {
+  const paddingLeft = 12 + level * 14;
+  const isExpanded = expandedPaths.has(entry.path);
+
+  if (entry.is_dir) {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => toggleExpanded(entry.path)}
+          className="flex w-full items-center gap-1.5 py-1 pr-2 text-left text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
+          style={{ paddingLeft }}
+        >
+          {isExpanded ? <ChevronDown className="h-3 w-3 shrink-0" /> : <ChevronRight className="h-3 w-3 shrink-0" />}
+          <Folder className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{entry.name}</span>
+        </button>
+        {isExpanded && Array.isArray(entry.children) && (
+          <div>
+            {entry.children.map((child) => (
+              <MountedWorkspaceTreeItem
+                key={child.path}
+                entry={child}
+                level={level + 1}
+                currentFile={currentFile}
+                expandedPaths={expandedPaths}
+                toggleExpanded={toggleExpanded}
+                onOpen={onOpen}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(entry.path)}
+      className={cn(
+        "flex w-full items-center gap-1.5 py-1 pr-2 text-left text-[11px] hover:bg-accent",
+        currentFile === entry.path ? "bg-accent text-foreground" : "text-muted-foreground",
+      )}
+      style={{ paddingLeft }}
+    >
+      <File className="h-3.5 w-3.5 shrink-0" />
+      <span className="truncate">{entry.name}</span>
+    </button>
+  );
 }
 
 function FileTreeItem({ 

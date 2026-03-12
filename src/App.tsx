@@ -50,6 +50,7 @@ import { ProfilePreview } from "@/components/profile/ProfilePreview";
 import { DevProfiler } from "@/perf/DevProfiler";
 import type { FsChangePayload } from "@/lib/fsChange";
 import { usePluginStore } from "@/stores/usePluginStore";
+import { useOpenClawWorkspaceStore } from "@/stores/useOpenClawWorkspaceStore";
 import { pluginRuntime } from "@/services/plugins/runtime";
 import { applyTheme, getThemeById } from "@/config/themePlugin";
 import { PluginViewPane } from "@/components/plugins/PluginViewPane";
@@ -204,8 +205,15 @@ interface BrowserNewTabEventPayload {
   url: string;
 }
 
+interface GlobalSearchRequest {
+  query?: string;
+  pathPrefixes?: string[];
+  scopeLabel?: string;
+}
+
 // 避免在 React 严格模式和 HMR 下重复注册浏览器新标签事件监听
 let browserNewTabListenerRegistered = false;
+const watchedPaths = new Set<string>();
 
 function App() {
   if (IS_TYPESETTING_HARNESS) {
@@ -250,12 +258,16 @@ function App() {
   const loadPlugins = usePluginStore((state) => state.loadPlugins);
   const setAppearanceSafeMode = usePluginStore((state) => state.setAppearanceSafeMode);
   const setCurrentUpdateVersion = useUpdateStore((state) => state.setCurrentVersion);
+  const mountedOpenClawWorkspacePath = useOpenClawWorkspaceStore((state) =>
+    state.getMountedWorkspacePath(vaultPath),
+  );
 
   // Get active tab
   const activeTab = activeTabIndex >= 0 ? tabs[activeTabIndex] : null;
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteMode, setPaletteMode] = useState<PaletteMode>("command");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchRequest, setSearchRequest] = useState<GlobalSearchRequest | null>(null);
   const [isLoadingVault, setIsLoadingVault] = useState(false);
   const [createDbOpen, setCreateDbOpen] = useState(false);
   const [evalPanelOpen, setEvalPanelOpen] = useState(false);
@@ -367,12 +379,16 @@ function App() {
 
     const setupWatcher = async () => {
       try {
-        const { handleFsChangeEvent } = await import("@/lib/fsChange");
+        const { getFsChangePath, handleFsChangeEvent } = await import("@/lib/fsChange");
         const { reloadFileIfOpen } = useFileStore.getState();
         const { reloadSecondaryIfOpen } = (await import("@/stores/useSplitStore")).useSplitStore.getState();
 
-        // 启动后端文件监听
+        // 启动后端文件监听（去重，避免重复创建 watcher 线程）
         await startFileWatcher(vaultPath);
+        if (mountedOpenClawWorkspacePath && mountedOpenClawWorkspacePath !== vaultPath && !watchedPaths.has(mountedOpenClawWorkspacePath)) {
+          watchedPaths.add(mountedOpenClawWorkspacePath);
+          await startFileWatcher(mountedOpenClawWorkspacePath);
+        }
         console.log("[FileWatcher] Started watching:", vaultPath);
 
         // 监听文件变化事件（带防抖）
@@ -384,6 +400,55 @@ function App() {
           // 防抖：500ms 内多次变化只刷新一次
           if (debounceTimer) clearTimeout(debounceTimer);
           debounceTimer = setTimeout(() => {
+            const changedPath = getFsChangePath(event.payload);
+            if (changedPath) {
+              const fileStore = useFileStore.getState();
+              const dirtyPaths = fileStore.tabs
+                .filter((tab) => tab.type === "file" && tab.isDirty)
+                .map((tab) => tab.path);
+              if (fileStore.currentFile && fileStore.isDirty) {
+                dirtyPaths.push(fileStore.currentFile);
+              }
+              const normalize = (path: string) => path.replace(/\\/g, "/");
+              const vaultPrefix = `${normalize(vaultPath).replace(/\/+$/, "")}/`;
+              const mountedPrefix = mountedOpenClawWorkspacePath
+                ? `${normalize(mountedOpenClawWorkspacePath).replace(/\/+$/, "")}/`
+                : null;
+              const normalizedChangedPath = normalize(changedPath);
+              useOpenClawWorkspaceStore.getState().recordExternalChange(
+                vaultPath,
+                [changedPath],
+                dirtyPaths,
+              );
+              if (
+                mountedPrefix &&
+                normalizedChangedPath.startsWith(mountedPrefix) &&
+                mountedOpenClawWorkspacePath !== vaultPath
+              ) {
+                void useOpenClawWorkspaceStore
+                  .getState()
+                  .refreshMountedFileTree(
+                    vaultPath,
+                    mountedOpenClawWorkspacePath ?? undefined,
+                  )
+                  .then((tree) =>
+                    useOpenClawWorkspaceStore
+                      .getState()
+                      .refreshAttachmentScan(
+                        vaultPath,
+                        tree,
+                        mountedOpenClawWorkspacePath ?? undefined,
+                      ),
+                  );
+              }
+              if (!normalizedChangedPath.startsWith(vaultPrefix)) {
+                handleFsChangeEvent(event.payload, (path) => {
+                  reloadFileIfOpen(path, { skipIfDirty: true });
+                  reloadSecondaryIfOpen(path, { skipIfDirty: true });
+                });
+                return;
+              }
+            }
             refreshFileTree();
             handleFsChangeEvent(event.payload, (path) => {
               reloadFileIfOpen(path, { skipIfDirty: true });
@@ -408,7 +473,7 @@ function App() {
       if (unlisten) unlisten();
       if (debounceTimer) clearTimeout(debounceTimer);
     };
-  }, [vaultPath, refreshFileTree]);
+  }, [vaultPath, mountedOpenClawWorkspacePath, refreshFileTree]);
 
   // 监听后端触发的浏览器新标签事件（window.open）
   useEffect(() => {
@@ -703,6 +768,7 @@ function App() {
       // Ctrl+Shift+F: Global search
       if (isCtrl && e.shiftKey && e.key === "F") {
         e.preventDefault();
+        setSearchRequest(null);
         setSearchOpen(true);
         return;
       }
@@ -762,7 +828,11 @@ function App() {
   // Listen for window-level entry actions dispatched from top-level chrome
   useEffect(() => {
     const onOpenVault = () => handleOpenVault();
-    const onOpenSearch = () => setSearchOpen(true);
+    const onOpenSearch = (event: Event) => {
+      const customEvent = event as CustomEvent<GlobalSearchRequest | undefined>;
+      setSearchRequest(customEvent.detail ?? null);
+      setSearchOpen(true);
+    };
     const onOpenCommandPalette = () => setPaletteOpen(true);
     const onOpenCreateDb = () => setCreateDbOpen(true);
     window.addEventListener("open-vault", onOpenVault);
@@ -1073,6 +1143,7 @@ function App() {
       <GlobalSearch
         isOpen={searchOpen}
         onClose={() => setSearchOpen(false)}
+        request={searchRequest}
       />
 
       {/* Create Database Dialog */}

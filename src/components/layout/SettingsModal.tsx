@@ -25,6 +25,7 @@ import { MobileGatewaySection } from "../settings/MobileGatewaySection";
 import { CloudRelaySection } from "../settings/CloudRelaySection";
 import { MobileOptionsSection } from "../settings/MobileOptionsSection";
 import { DiagnosticsSection } from "../settings/DiagnosticsSection";
+import { OpenClawWorkspaceSection } from "../settings/OpenClawWorkspaceSection";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -346,6 +347,7 @@ export function SettingsModal({ isOpen, onClose, onOpenUpdateModal }: SettingsMo
 
           <MobileGatewaySection />
           <MobileOptionsSection />
+          <OpenClawWorkspaceSection />
           <CloudRelaySection />
 
           {/* WebDAV 同步设置 */}

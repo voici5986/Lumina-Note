@@ -14,10 +14,10 @@ describe("handleFsChangeEvent", () => {
     expect(onReloadPath).toHaveBeenCalledWith("/tmp/b.md");
   });
 
-  it("does not call onReloadPath for deleted events", () => {
+  it("calls onReloadPath for deleted events", () => {
     const onReloadPath = vi.fn();
     handleFsChangeEvent({ type: "Deleted", path: "/tmp/c.md" }, onReloadPath);
-    expect(onReloadPath).not.toHaveBeenCalled();
+    expect(onReloadPath).toHaveBeenCalledWith("/tmp/c.md");
   });
 
   it("uses new_path for renamed events", () => {

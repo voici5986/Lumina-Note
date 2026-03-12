@@ -14,6 +14,7 @@ export type PluginPermission =
   | "workspace:*"
   | "workspace:read"
   | "workspace:open"
+  | "workspace:integrations"
   | "workspace:panel"
   | "workspace:tab"
   | "editor:*"

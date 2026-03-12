@@ -6,6 +6,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useFavoriteStore } from "@/stores/useFavoriteStore";
 import { useWorkspaceStore } from "@/stores/useWorkspaceStore";
 import { useTypesettingDocStore } from "@/stores/useTypesettingDocStore";
+import { useOpenClawWorkspaceStore } from "@/stores/useOpenClawWorkspaceStore";
 import { getCurrentTranslations } from "@/stores/useLocaleStore";
 import { parseFrontmatter } from "@/services/markdown/frontmatter";
 import { reportOperationError } from "@/lib/reportError";
@@ -356,6 +357,13 @@ export const useFileStore = create<FileState>()(
           }
           const tree = await listDirectory(path);
           set({ fileTree: tree, isLoadingTree: false });
+          const openClawStore = useOpenClawWorkspaceStore.getState();
+          if (
+            !openClawStore.getAttachment(path) ||
+            openClawStore.getMountedWorkspacePath(path) === path
+          ) {
+            openClawStore.refreshAttachmentScan(path, tree, path);
+          }
           await get().syncMobileWorkspace({ path, force: true });
         } catch (error) {
           reportOperationError({
@@ -364,6 +372,7 @@ export const useFileStore = create<FileState>()(
             error,
             context: { path },
           });
+          useOpenClawWorkspaceStore.getState().markUnavailable(path);
           set({ isLoadingTree: false });
         }
       },
@@ -377,6 +386,13 @@ export const useFileStore = create<FileState>()(
         try {
           const tree = await listDirectory(vaultPath);
           set({ fileTree: tree, isLoadingTree: false });
+          const openClawStore = useOpenClawWorkspaceStore.getState();
+          if (
+            !openClawStore.getAttachment(vaultPath) ||
+            openClawStore.getMountedWorkspacePath(vaultPath) === vaultPath
+          ) {
+            openClawStore.refreshAttachmentScan(vaultPath, tree, vaultPath);
+          }
           useFavoriteStore.getState().pruneMissing(tree);
           void get().syncMobileWorkspace();
         } catch (error) {
@@ -386,6 +402,7 @@ export const useFileStore = create<FileState>()(
             error,
             context: { vaultPath },
           });
+          useOpenClawWorkspaceStore.getState().markUnavailable(vaultPath);
           set({ isLoadingTree: false });
         }
       },

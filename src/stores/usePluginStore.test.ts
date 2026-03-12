@@ -41,6 +41,20 @@ const workspaceThemePlugin: PluginInfo = {
   theme: null,
 };
 
+const builtinOpenClawPlugin: PluginInfo = {
+  id: "openclaw-workspace",
+  name: "OpenClaw Workspace",
+  version: "0.1.0",
+  entry: "index.js",
+  permissions: ["commands:register", "ui:decorate", "workspace:open", "workspace:tab"],
+  enabled_by_default: true,
+  source: "builtin",
+  root_path: "/Applications/Lumina/resources/plugins/openclaw-workspace",
+  entry_path: "/Applications/Lumina/resources/plugins/openclaw-workspace/index.js",
+  validation_error: null,
+  theme: null,
+};
+
 describe("usePluginStore", () => {
   beforeEach(() => {
     listPluginsMock.mockReset();
@@ -89,6 +103,20 @@ describe("usePluginStore", () => {
       expect.objectContaining({
         enabledById: expect.objectContaining({
           "theme-oceanic": true,
+        }),
+      }),
+    );
+  });
+
+  it("keeps built-in official workspace plugin enabled by default", async () => {
+    listPluginsMock.mockResolvedValue([builtinOpenClawPlugin]);
+
+    await usePluginStore.getState().loadPlugins("/tmp/workspace");
+
+    expect(syncMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        enabledById: expect.not.objectContaining({
+          "openclaw-workspace": false,
         }),
       }),
     );
