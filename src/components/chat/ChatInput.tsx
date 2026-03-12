@@ -145,7 +145,7 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
   // 处理图片文件
   const processImageFile = useCallback((file: File) => {
     if (!supportsVision) {
-      console.warn('当前模型不支持图片输入');
+      console.warn(t.ai.modelNoVision);
       return;
     }
 
@@ -165,7 +165,7 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
       setAttachedImages(prev => [...prev, newImage]);
     };
     reader.readAsDataURL(file);
-  }, [supportsVision]);
+  }, [supportsVision, t.ai.modelNoVision]);
 
   // 处理图片选择
   const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
