@@ -1247,7 +1247,6 @@ return exported(api, plugin);
           return useOpenClawWorkspaceStore.getState().getAttachment(workspacePath);
         },
         attachOpenClawWorkspace: async (input?: {
-          workspacePath?: string;
           gateway?: Partial<OpenClawWorkspaceAttachment["gateway"]>;
         }) => {
           requirePermission("workspace:integrations");
@@ -1257,7 +1256,7 @@ return exported(api, plugin);
           const store = useOpenClawWorkspaceStore.getState();
           return store.attachWorkspace({
             hostWorkspacePath: workspacePath,
-            workspacePath: input?.workspacePath ?? workspacePath,
+            workspacePath,
             gateway: input?.gateway,
           });
         },

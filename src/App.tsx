@@ -213,6 +213,7 @@ interface GlobalSearchRequest {
 
 // 避免在 React 严格模式和 HMR 下重复注册浏览器新标签事件监听
 let browserNewTabListenerRegistered = false;
+const watchedPaths = new Set<string>();
 
 function App() {
   if (IS_TYPESETTING_HARNESS) {
@@ -382,9 +383,10 @@ function App() {
         const { reloadFileIfOpen } = useFileStore.getState();
         const { reloadSecondaryIfOpen } = (await import("@/stores/useSplitStore")).useSplitStore.getState();
 
-        // 启动后端文件监听
+        // 启动后端文件监听（去重，避免重复创建 watcher 线程）
         await startFileWatcher(vaultPath);
-        if (mountedOpenClawWorkspacePath && mountedOpenClawWorkspacePath !== vaultPath) {
+        if (mountedOpenClawWorkspacePath && mountedOpenClawWorkspacePath !== vaultPath && !watchedPaths.has(mountedOpenClawWorkspacePath)) {
+          watchedPaths.add(mountedOpenClawWorkspacePath);
           await startFileWatcher(mountedOpenClawWorkspacePath);
         }
         console.log("[FileWatcher] Started watching:", vaultPath);

@@ -7,24 +7,21 @@ import { useFileStore } from "@/stores/useFileStore";
 import { useOpenClawWorkspaceStore } from "@/stores/useOpenClawWorkspaceStore";
 import { getFileName } from "@/lib/utils";
 import { join } from "@/lib/path";
+import { openFilteredView } from "@/lib/events";
 
 export function OverviewDashboard() {
   const { t } = useLocaleStore();
   const vaultPath = useFileStore((state) => state.vaultPath);
   const openFile = useFileStore((state) => state.openFile);
-  const snapshot = useOpenClawWorkspaceStore((state) => state.getSnapshot(vaultPath));
-  const attachment = useOpenClawWorkspaceStore((state) => state.getAttachment(vaultPath));
+  const snapshotsByHost = useOpenClawWorkspaceStore((state) => state.snapshotsByHostPath);
+  const attachmentsByHost = useOpenClawWorkspaceStore((state) => state.attachmentsByHostPath);
+  const integrationEnabled = useOpenClawWorkspaceStore((state) => state.integrationEnabled);
+  const snapshot = integrationEnabled && vaultPath ? snapshotsByHost[vaultPath] ?? null : null;
+  const attachment = integrationEnabled && vaultPath ? attachmentsByHost[vaultPath] ?? null : null;
   const visibleRecentMemory = snapshot?.recentMemoryPaths.slice(0, 4) ?? [];
   const visiblePlanFiles = snapshot?.planFilePaths.slice(0, 4) ?? [];
   const visibleArtifactDirectories = snapshot?.artifactDirectoryPaths.slice(0, 3) ?? [];
 
-  const openFilteredView = (scopeLabel: string, pathPrefixes: string[]) => {
-    window.dispatchEvent(
-      new CustomEvent("open-global-search", {
-        detail: { scopeLabel, pathPrefixes },
-      }),
-    );
-  };
 
   return (
     <div className="flex-1 ui-app-bg overflow-auto">

@@ -95,12 +95,13 @@ function normalizeAttachmentRecord(
     | undefined,
 ): Record<string, OpenClawWorkspaceAttachment> {
   if (!attachments) return {};
-  return Object.fromEntries(
-    Object.entries(attachments).map(([hostWorkspacePath, attachment]) => [
+  const entries = Object.entries(attachments)
+    .map(([hostWorkspacePath, attachment]) => [
       hostWorkspacePath,
-      normalizeAttachment(hostWorkspacePath, attachment) as OpenClawWorkspaceAttachment,
-    ]),
-  );
+      normalizeAttachment(hostWorkspacePath, attachment),
+    ] as const)
+    .filter((entry): entry is [string, OpenClawWorkspaceAttachment] => entry[1] !== null);
+  return Object.fromEntries(entries);
 }
 
 async function syncWorkspaceAccessRoots(paths: string[]): Promise<void> {
@@ -166,31 +167,36 @@ export const useOpenClawWorkspaceStore = create<OpenClawWorkspaceState>()(
         );
 
         set({ activeHostWorkspacePath: hostWorkspacePath, isRefreshing: true, lastError: null });
-        const snapshot = options?.fileTree
-          ? inspectOpenClawWorkspaceTree(targetWorkspacePath, options.fileTree)
-          : await inspectOpenClawWorkspace(targetWorkspacePath);
-        set((state) => ({
-          snapshotsByHostPath: {
-            ...state.snapshotsByHostPath,
-            [hostWorkspacePath]: snapshot,
-          },
-          attachmentsByHostPath: state.attachmentsByHostPath[hostWorkspacePath]
-            ? {
-                ...state.attachmentsByHostPath,
-                [hostWorkspacePath]: applySnapshotToAttachment(
-                  normalizeAttachment(
-                    hostWorkspacePath,
-                    state.attachmentsByHostPath[hostWorkspacePath],
-                  ) as OpenClawWorkspaceAttachment,
-                  snapshot,
-                ),
-              }
-            : state.attachmentsByHostPath,
-          activeHostWorkspacePath: hostWorkspacePath,
-          isRefreshing: false,
-          lastError: snapshot.status === "error" ? snapshot.error : null,
-        }));
-        return snapshot;
+        try {
+          const snapshot = options?.fileTree
+            ? inspectOpenClawWorkspaceTree(targetWorkspacePath, options.fileTree)
+            : await inspectOpenClawWorkspace(targetWorkspacePath);
+          set((state) => ({
+            snapshotsByHostPath: {
+              ...state.snapshotsByHostPath,
+              [hostWorkspacePath]: snapshot,
+            },
+            attachmentsByHostPath: state.attachmentsByHostPath[hostWorkspacePath]
+              ? {
+                  ...state.attachmentsByHostPath,
+                  [hostWorkspacePath]: applySnapshotToAttachment(
+                    normalizeAttachment(
+                      hostWorkspacePath,
+                      state.attachmentsByHostPath[hostWorkspacePath],
+                    ) as OpenClawWorkspaceAttachment,
+                    snapshot,
+                  ),
+                }
+              : state.attachmentsByHostPath,
+            activeHostWorkspacePath: hostWorkspacePath,
+            isRefreshing: false,
+            lastError: snapshot.status === "error" ? snapshot.error : null,
+          }));
+          return snapshot;
+        } catch (error) {
+          set({ isRefreshing: false, lastError: error instanceof Error ? error.message : String(error) });
+          return null;
+        }
       },
       refreshMountedFileTree: async (hostWorkspacePath, workspacePath) => {
         const targetWorkspacePath = resolveTargetWorkspacePath(get(), hostWorkspacePath, workspacePath);
@@ -371,8 +377,9 @@ export const useOpenClawWorkspaceStore = create<OpenClawWorkspaceState>()(
         if (!attachment || attachment.status !== "attached") {
           return;
         }
-        const normalizedDirty = new Set(dirtyPaths);
-        const conflictingPaths = paths.filter((path) => normalizedDirty.has(path));
+        const toForwardSlash = (p: string) => p.replace(/\\/g, "/");
+        const normalizedDirty = new Set(dirtyPaths.map(toForwardSlash));
+        const conflictingPaths = paths.filter((p) => normalizedDirty.has(toForwardSlash(p)));
         if (conflictingPaths.length === 0) {
           return;
         }
@@ -450,6 +457,8 @@ export const useOpenClawWorkspaceStore = create<OpenClawWorkspaceState>()(
           conflictsByHostPath,
           activeHostWorkspacePath:
             persisted.activeHostWorkspacePath ?? persisted.activeWorkspacePath ?? null,
+          isRefreshing: false,
+          lastError: null,
         };
       },
       partialize: (state) => ({

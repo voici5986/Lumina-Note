@@ -13,6 +13,7 @@ export function getFsChangePath(payload: FsChangePayload | null | undefined): st
   switch (payload.type) {
     case "Created":
     case "Modified":
+    case "Deleted":
       return isNonEmptyString(payload.path) ? payload.path : null;
     case "Renamed":
       return isNonEmptyString(payload.new_path) ? payload.new_path : null;

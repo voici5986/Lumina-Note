@@ -8,6 +8,7 @@ import { parseFrontmatter } from "@/services/markdown/frontmatter";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { join } from "@/lib/path";
+import { openFilteredView } from "@/lib/events";
 import { cn, getFileName } from "@/lib/utils";
 import { ContextMenu, MenuItem, menuItems } from "../toolbar/ContextMenu";
 import {
@@ -136,13 +137,12 @@ export function Sidebar() {
     () => getFavorites(favoriteSortMode),
     [getFavorites, favoriteSortMode, favorites, manualOrder]
   );
-  const { openClawSnapshot, openClawAttachment } = useOpenClawWorkspaceStore(
-    useShallow((state) => ({
-      openClawSnapshot: state.getSnapshot(vaultPath),
-      openClawAttachment: state.getAttachment(vaultPath),
-    })),
-  );
+  const openClawSnapshotsByHost = useOpenClawWorkspaceStore((state) => state.snapshotsByHostPath);
+  const openClawAttachmentsByHost = useOpenClawWorkspaceStore((state) => state.attachmentsByHostPath);
+  const openClawIntegrationEnabled = useOpenClawWorkspaceStore((state) => state.integrationEnabled);
   const openClawMountedTree = useOpenClawWorkspaceStore((state) => state.getMountedFileTree(vaultPath));
+  const openClawSnapshot = openClawIntegrationEnabled && vaultPath ? openClawSnapshotsByHost[vaultPath] ?? null : null;
+  const openClawAttachment = openClawIntegrationEnabled && vaultPath ? openClawAttachmentsByHost[vaultPath] ?? null : null;
   const { 
     isRecording, 
     status: voiceStatus, 
@@ -641,13 +641,6 @@ export function Sidebar() {
     [openClawSnapshot?.bridgeNotePaths],
   );
 
-  const openFilteredView = useCallback((scopeLabel: string, pathPrefixes: string[]) => {
-    window.dispatchEvent(
-      new CustomEvent("open-global-search", {
-        detail: { scopeLabel, pathPrefixes },
-      }),
-    );
-  }, []);
 
   useEffect(() => {
     const handleFocusPath = (event: Event) => {
@@ -1077,9 +1070,9 @@ export function Sidebar() {
 
           <div className="mb-2 grid grid-cols-2 gap-1.5">
             {[
-              { label: "AGENTS.md", path: join(vaultPath, "AGENTS.md") },
-              { label: "SOUL.md", path: join(vaultPath, "SOUL.md") },
-              { label: "USER.md", path: join(vaultPath, "USER.md") },
+              { label: "AGENTS.md", path: join(openClawSnapshot.workspacePath, "AGENTS.md") },
+              { label: "SOUL.md", path: join(openClawSnapshot.workspacePath, "SOUL.md") },
+              { label: "USER.md", path: join(openClawSnapshot.workspacePath, "USER.md") },
               { label: t.sidebar.openClawTodayMemory, path: openClawSnapshot.todayMemoryPath },
             ].map((entry) => (
               <button

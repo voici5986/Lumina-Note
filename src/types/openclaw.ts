@@ -1,17 +1,3 @@
-export const OPENCLAW_ROOT_MEMORY_FILES = [
-  "AGENTS.md",
-  "SOUL.md",
-  "USER.md",
-  "HEARTBEAT.md",
-  "MEMORY.md",
-] as const;
-
-export const OPENCLAW_ROOT_MEMORY_FOLDERS = [
-  "memory",
-  "output",
-  ".openclaw",
-] as const;
-
 export type OpenClawAttachmentStatus = "attached" | "unavailable";
 
 export interface OpenClawGatewaySettings {
