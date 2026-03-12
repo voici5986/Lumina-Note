@@ -187,7 +187,7 @@ export function SettingsModal({ isOpen, onClose, onOpenUpdateModal }: SettingsMo
                         </button>
                         <button
                           onClick={() => handleDeleteTheme(theme)}
-                          className="p-1 rounded hover:bg-red-500/20 text-red-400"
+                          className="p-1 rounded hover:bg-destructive/20 text-destructive"
                           title={t.common.delete}
                         >
                           <Trash2 size={12} />

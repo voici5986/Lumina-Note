@@ -144,8 +144,8 @@ export function CloudRelaySection() {
         <div>
           {t.settingsModal.cloudRelayStatus}: {isConnected ? t.settingsModal.cloudRelayConnected : t.settingsModal.cloudRelayDisconnected}
         </div>
-        {statusError && <div className="text-red-500">{statusError}</div>}
-        {error && !statusError && <div className="text-red-500">{error}</div>}
+        {statusError && <div className="text-destructive">{statusError}</div>}
+        {error && !statusError && <div className="text-destructive">{error}</div>}
       </div>
 
       <div className="space-y-3">

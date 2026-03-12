@@ -269,7 +269,7 @@ export function OpenClawWorkspaceSection() {
       {integrationEnabled && vaultPath && (
         <div className="space-y-3 rounded-lg border border-border bg-background/70 p-3">
           {visibleError && (
-            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700">
+            <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
               <div className="font-medium">{t.settingsModal.openClawRuntimeErrorTitle}</div>
               <p className="mt-1 break-all">{visibleError}</p>
             </div>
@@ -314,8 +314,8 @@ export function OpenClawWorkspaceSection() {
                 snapshot.status === "detected"
                   ? "bg-emerald-500/15 text-emerald-700"
                   : snapshot.status === "error"
-                    ? "bg-red-500/10 text-red-600"
-                    : "bg-amber-500/15 text-amber-700"
+                    ? "bg-destructive/10 text-destructive"
+                    : "bg-warning/15 text-warning"
               }`}
             >
               {snapshot.status === "detected"
@@ -405,7 +405,7 @@ export function OpenClawWorkspaceSection() {
           )}
 
           {conflictState && conflictState.status === "warning" && (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700">
+            <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
               <div className="mb-1 flex items-center gap-2 font-medium">
                 <AlertTriangle size={14} />
                 {t.settingsModal.openClawConflictTitle}
@@ -418,7 +418,7 @@ export function OpenClawWorkspaceSection() {
                 <button
                   type="button"
                   onClick={() => clearConflictState(vaultPath)}
-                  className="rounded-lg border border-amber-500/30 bg-background/60 px-3 py-1 text-xs text-foreground hover:bg-muted"
+                  className="rounded-lg border border-warning/30 bg-background/60 px-3 py-1 text-xs text-foreground hover:bg-muted"
                 >
                   {t.settingsModal.openClawConflictDismiss}
                 </button>
@@ -464,7 +464,7 @@ export function OpenClawWorkspaceSection() {
             </button>
           </div>
 
-          {snapshot?.error && <p className="text-xs text-red-600">{snapshot.error}</p>}
+          {snapshot?.error && <p className="text-xs text-destructive">{snapshot.error}</p>}
         </div>
       )}
     </section>

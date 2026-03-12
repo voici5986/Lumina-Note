@@ -162,14 +162,14 @@ export function MobileGatewaySection() {
       </div>
 
       {error && (
-        <div className="text-xs text-red-500">{error}</div>
+        <div className="text-xs text-destructive">{error}</div>
       )}
 
       {status && (
         <div className="space-y-2 text-xs text-muted-foreground">
           <div className="flex items-center justify-between">
             <span>{t.settingsModal.mobileGatewayStatus}</span>
-            <span className={isRunning ? "text-green-500" : "text-muted-foreground"}>
+            <span className={isRunning ? "text-success" : "text-muted-foreground"}>
               {isRunning ? t.settingsModal.mobileGatewayRunning : t.settingsModal.mobileGatewayStopped}
             </span>
           </div>
@@ -250,7 +250,7 @@ export function MobileGatewaySection() {
                   <div>Last confirmed: {formatTime(mobileWorkspaceSync.lastConfirmedAt)}</div>
                 )}
                 {mobileWorkspaceSync?.error && (
-                  <div className="text-red-500">Error: {mobileWorkspaceSync.error}</div>
+                  <div className="text-destructive">Error: {mobileWorkspaceSync.error}</div>
                 )}
               </div>
             </>

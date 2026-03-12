@@ -182,7 +182,7 @@ export function WebDAVSettings({ compact = false }: WebDAVSettingsProps) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {isConnected ? (
-            <Cloud size={20} className="text-green-400" />
+            <Cloud size={20} className="text-success" />
           ) : (
             <CloudOff size={20} className="text-muted-foreground" />
           )}
@@ -197,7 +197,7 @@ export function WebDAVSettings({ compact = false }: WebDAVSettingsProps) {
         </div>
         <span
           className={`text-xs px-2 py-1 rounded-full ${
-            isConnected ? 'bg-green-500/20 text-green-400' : 'bg-muted text-muted-foreground'
+            isConnected ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'
           }`}
         >
           {statusText}
@@ -205,11 +205,11 @@ export function WebDAVSettings({ compact = false }: WebDAVSettingsProps) {
       </div>
 
       {combinedError && (
-        <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-          <AlertCircle size={16} className="text-red-400 shrink-0" />
-          <span className="text-sm text-red-400">{combinedError}</span>
-          <button onClick={handleDismissError} className="ml-auto p-1 hover:bg-red-500/20 rounded">
-            <X size={14} className="text-red-400" />
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+          <AlertCircle size={16} className="text-destructive shrink-0" />
+          <span className="text-sm text-destructive">{combinedError}</span>
+          <button onClick={handleDismissError} className="ml-auto p-1 hover:bg-destructive/20 rounded">
+            <X size={14} className="text-destructive" />
           </button>
         </div>
       )}
@@ -418,7 +418,7 @@ export function WebDAVSettings({ compact = false }: WebDAVSettingsProps) {
             {isTesting ? (
               <Loader2 size={14} className="animate-spin mr-2 inline" />
             ) : isConnected ? (
-              <Check size={14} className="text-green-400 mr-2 inline" />
+              <Check size={14} className="text-success mr-2 inline" />
             ) : null}
             Test Connection
           </button>
@@ -457,15 +457,15 @@ export function WebDAVSettings({ compact = false }: WebDAVSettingsProps) {
 
           <div className="flex gap-4 text-xs">
             <span className="flex items-center gap-1">
-              <Upload size={12} className="text-blue-400" />
+              <Upload size={12} className="text-info" />
               {pendingSyncPlan.upload_count} to upload
             </span>
             <span className="flex items-center gap-1">
-              <Download size={12} className="text-green-400" />
+              <Download size={12} className="text-success" />
               {pendingSyncPlan.download_count} to download
             </span>
             {pendingSyncPlan.conflict_count > 0 && (
-              <span className="flex items-center gap-1 text-yellow-400">
+              <span className="flex items-center gap-1 text-warning">
                 <AlertCircle size={12} />
                 {pendingSyncPlan.conflict_count} conflicts
               </span>
@@ -476,11 +476,11 @@ export function WebDAVSettings({ compact = false }: WebDAVSettingsProps) {
             <div className="max-h-40 overflow-y-auto space-y-1">
               {pendingSyncPlan.items.slice(0, 20).map((item, index) => (
                 <div key={`${item.path}-${index}`} className="flex items-center gap-2 text-xs py-1 px-2 rounded bg-white/5">
-                  {item.action === 'Upload' && <Upload size={10} className="text-blue-400" />}
-                  {item.action === 'Download' && <Download size={10} className="text-green-400" />}
-                  {item.action === 'DeleteRemote' && <Trash2 size={10} className="text-red-400" />}
+                  {item.action === 'Upload' && <Upload size={10} className="text-info" />}
+                  {item.action === 'Download' && <Download size={10} className="text-success" />}
+                  {item.action === 'DeleteRemote' && <Trash2 size={10} className="text-destructive" />}
                   {item.action === 'DeleteLocal' && <Trash2 size={10} className="text-orange-400" />}
-                  {item.action === 'Conflict' && <AlertCircle size={10} className="text-yellow-400" />}
+                  {item.action === 'Conflict' && <AlertCircle size={10} className="text-warning" />}
                   <span className="truncate flex-1">{item.path}</span>
                   <span className="text-muted-foreground">{item.reason}</span>
                 </div>
@@ -494,7 +494,7 @@ export function WebDAVSettings({ compact = false }: WebDAVSettingsProps) {
           )}
 
           {pendingSyncPlan.conflict_count > 0 && (
-            <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-3 text-xs text-yellow-200">
+            <div className="rounded-lg border border-warning/20 bg-warning/10 p-3 text-xs text-warning">
               Conflicts stay pending and are skipped during execution. Review the highlighted entries before trusting the sync result.
             </div>
           )}
@@ -521,7 +521,7 @@ export function WebDAVSettings({ compact = false }: WebDAVSettingsProps) {
             {lastSyncResult.uploaded} uploaded, {lastSyncResult.downloaded} downloaded
             {lastSyncResult.conflicts > 0 && `, ${lastSyncResult.conflicts} conflicts`}
           </p>
-          {lastSyncResult.errors.length > 0 && <p className="text-red-400">{lastSyncResult.errors.length} errors occurred</p>}
+          {lastSyncResult.errors.length > 0 && <p className="text-destructive">{lastSyncResult.errors.length} errors occurred</p>}
         </div>
       )}
     </div>

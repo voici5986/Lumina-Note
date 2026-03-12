@@ -145,7 +145,7 @@ export function PublishSettingsSection({ vaultPath, fileTree }: PublishSettingsS
       </div>
 
       {result && <div className="text-xs text-emerald-600">{result}</div>}
-      {error && <div className="text-xs text-red-600">{error}</div>}
+      {error && <div className="text-xs text-destructive">{error}</div>}
     </section>
   );
 }

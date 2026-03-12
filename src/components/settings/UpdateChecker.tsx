@@ -282,7 +282,7 @@ export function UpdateChecker() {
                     {status === "ready" && (
                         <button
                             onClick={handleRelaunch}
-                            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
+                            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-success text-success-foreground hover:bg-success/90 transition-colors"
                         >
                             <RotateCcw className="w-4 h-4" />
                             {t.updateChecker.actionRelaunch}
@@ -327,7 +327,7 @@ export function UpdateChecker() {
 
             {/* 就绪提示 */}
             {status === "ready" && (
-                <div className="flex items-center gap-2 text-sm text-green-600 bg-green-500/10 p-3 rounded-lg">
+                <div className="flex items-center gap-2 text-sm text-success bg-success/10 p-3 rounded-lg">
                     <CheckCircle2 className="w-4 h-4" />
                     <span>{t.updateChecker.readyHint}</span>
                 </div>

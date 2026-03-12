@@ -90,13 +90,13 @@ export function DocToolsSection() {
         </div>
       </div>
 
-      {error && <div className="text-xs text-red-500">{error}</div>}
+      {error && <div className="text-xs text-destructive">{error}</div>}
 
       {status && (
         <div className="space-y-2 text-xs text-muted-foreground">
           <div className="flex items-center justify-between">
             <span>{t.settingsModal.docToolsStatus}</span>
-            <span className={isInstalled ? "text-green-500" : "text-muted-foreground"}>
+            <span className={isInstalled ? "text-success" : "text-muted-foreground"}>
               {isInstalled ? t.settingsModal.docToolsInstalled : t.settingsModal.docToolsNotInstalled}
             </span>
           </div>
@@ -116,7 +116,7 @@ export function DocToolsSection() {
           )}
 
           {status.missing.length > 0 && (
-            <div className="text-[11px] text-amber-500">
+            <div className="text-[11px] text-warning">
               {t.settingsModal.docToolsMissing}: {status.missing.join(", ")}
             </div>
           )}
@@ -128,7 +128,7 @@ export function DocToolsSection() {
                 className="flex items-center justify-between rounded-lg border border-border bg-background/70 px-2 py-1"
               >
                 <span className="text-[11px]">{name}</span>
-                <span className={tool.available ? "text-green-500" : "text-muted-foreground"}>
+                <span className={tool.available ? "text-success" : "text-muted-foreground"}>
                   {tool.available ? (tool.source ?? t.settingsModal.docToolsAvailable) : t.settingsModal.docToolsUnavailable}
                 </span>
               </div>

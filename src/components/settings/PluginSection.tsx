@@ -92,7 +92,7 @@ export function PluginSection() {
           onClick={() => setAppearanceSafeMode(!appearanceSafeMode, vaultPath || undefined)}
           className={`h-9 px-3 rounded-lg text-sm font-medium border ${
             appearanceSafeMode
-              ? "bg-amber-500/20 text-amber-700 border-amber-500/40"
+              ? "bg-warning/20 text-warning border-warning/40"
               : "border-border bg-background/60 hover:bg-muted"
           }`}
         >
@@ -146,7 +146,7 @@ export function PluginSection() {
       )}
 
       {error && (
-        <div className="text-xs text-red-500 bg-red-500/10 border border-red-500/20 rounded-md p-2">{error}</div>
+        <div className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-2">{error}</div>
       )}
 
       {!loading && plugins.length === 0 && (
@@ -262,15 +262,15 @@ export function PluginSection() {
                     )}
 
                     {status?.error && !status?.incompatible && (
-                      <div className="text-xs text-red-500 bg-red-500/10 border border-red-500/20 rounded-md p-2">
+                      <div className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-2">
                         {t.plugins.statusRuntimeError}: {status.error}
                       </div>
                     )}
                     {status?.incompatible && status?.reason && (
-                      <div className="text-xs text-amber-600 bg-amber-500/10 border border-amber-500/30 rounded-md p-2">
+                      <div className="text-xs text-warning bg-warning/10 border border-warning/30 rounded-md p-2">
                         {t.plugins.statusIncompatible}: {status.reason}
                         {status.error_detail?.field ? (
-                          <div className="mt-1 text-[11px] text-amber-700/80">
+                          <div className="mt-1 text-[11px] text-warning/80">
                             {t.plugins.labelField}: <code>{status.error_detail.field}</code>
                           </div>
                         ) : null}
