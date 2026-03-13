@@ -273,7 +273,7 @@ export function Ribbon({ showMacTrafficLightSafeArea = false, flushTopSpacing = 
       <div
         data-testid="ribbon-content"
         className={cn(
-          "w-full min-h-0 flex-1 border-r border-border/60 shadow-[inset_-1px_0_0_hsl(var(--border)/0.6)] flex flex-col items-center pb-2 gap-0.5",
+          "w-full min-h-0 flex-1 border-r border-border/60 flex flex-col items-center pb-2 gap-0.5",
           showMacTrafficLightSafeArea || flushTopSpacing ? "pt-0" : "pt-2",
         )}
       >

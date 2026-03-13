@@ -174,7 +174,7 @@ describe("Ribbon", () => {
 
     expect(screen.getByTestId("mac-ribbon-traffic-lights-safe-area")).not.toHaveClass("border-r");
     expect(screen.getByTestId("mac-ribbon-traffic-lights-safe-area")).toHaveClass("shadow-[0_1px_0_hsl(var(--border)/0.5)]");
-    expect(screen.getByTestId("ribbon-content")).toHaveClass("shadow-[inset_-1px_0_0_hsl(var(--border)/0.6)]");
+    expect(screen.getByTestId("ribbon-content")).not.toHaveClass("shadow-[inset_-1px_0_0_hsl(var(--border)/0.6)]");
   });
 
   it("renders in StrictMode without triggering a zustand selector loop", () => {

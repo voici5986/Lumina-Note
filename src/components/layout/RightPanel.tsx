@@ -121,7 +121,7 @@ function BacklinksView() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="p-2 border-b border-border flex items-center gap-2">
+      <div className="p-2 border-b border-border/60 flex items-center gap-2">
         <Link2 size={12} className="text-muted-foreground" />
         <span className="text-xs text-muted-foreground">
           {backlinks.length} {t.panel.backlinks}
@@ -196,7 +196,7 @@ function TagsView() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="p-2 border-b border-border flex items-center gap-2">
+      <div className="p-2 border-b border-border/60 flex items-center gap-2">
         <Tag size={12} className="text-muted-foreground" />
         <span className="text-xs text-muted-foreground">
           {allTags.length} {t.panel.tags}
@@ -302,7 +302,7 @@ function OutlineView() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="p-2 border-b border-border flex items-center justify-between">
+      <div className="p-2 border-b border-border/60 flex items-center justify-between">
         <span className="text-xs text-muted-foreground flex items-center gap-1">
           <List size={12} />
           {headings.length} {t.panel.headings}
@@ -530,7 +530,7 @@ export function RightPanel() {
   return (
     <aside 
       ref={panelRef}
-      className={`w-full h-full bg-background/55 backdrop-blur-md flex flex-col transition-all duration-200 ${
+      className={`w-full h-full border-l border-border/60 bg-background/55 backdrop-blur-md flex flex-col transition-all duration-200 ${
         isDraggingFileOver ? "ring-2 ring-primary ring-inset bg-primary/5" : ""
       }`}
     >

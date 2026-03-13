@@ -14,7 +14,7 @@ describe('resize handle styles', () => {
     expect(idle).not.toContain('bg-gradient');
     expect(idle).not.toContain('shadow-[0_0_8px');
     expect(idle).toContain('bg-border/55');
-    expect(idle).toContain('opacity-55');
+    expect(idle).toContain('opacity-0');
     expect(idle).toContain('group-hover:bg-border/75');
     expect(idle).toContain('group-hover:opacity-75');
 
