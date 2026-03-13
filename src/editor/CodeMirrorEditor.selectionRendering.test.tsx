@@ -32,13 +32,15 @@ describe('CodeMirror selection rendering in Tauri WebKit path', () => {
     delete window.__cmForceDisableDrawSelection;
   });
 
-  it('keeps selection bridge visible during drag when drawSelection is disabled', () => {
+  it('keeps drawSelection enabled while preserving drag bridge decorations', () => {
     window.__cmForceDisableDrawSelection = true;
     const { container, view } = setupEditor('## Heading');
 
     act(() => {
       view.dispatch({ selection: { anchor: 3, head: 10 } });
     });
+
+    expect(container.querySelector('.cm-selectionLayer')).not.toBeNull();
 
     const before = container.querySelectorAll('.cm-selection-gap, .cm-selection-bridge').length;
     expect(before).toBeGreaterThanOrEqual(1);

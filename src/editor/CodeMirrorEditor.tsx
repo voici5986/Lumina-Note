@@ -3452,7 +3452,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorRef, CodeMirrorEditor
           selectAllDomHandlers,
           markdown({ base: markdownLanguage, extensions: [Table] }),
           EditorView.lineWrapping,
-          ...(disableCustomDrawSelection ? [] : [drawSelection()]),
+          drawSelection(),
           fontSizeCompartment.of(createEditorTheme(editorFontSize)),
           mouseSelectingField,
           selectionStatePlugin,
