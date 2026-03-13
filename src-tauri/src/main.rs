@@ -4,6 +4,8 @@
 )]
 #![allow(dead_code)]
 
+#[cfg(target_os = "macos")]
+mod traffic_lights;
 mod agent;
 mod cloud_relay;
 mod codex_extension;
@@ -208,6 +210,22 @@ fn main() {
                 }
             }
             let window = app.get_webview_window("main").unwrap();
+
+            #[cfg(target_os = "macos")]
+            {
+                traffic_lights::center_in_titlebar(&window);
+
+                let win = window.clone();
+                window.on_window_event(move |event| {
+                    if matches!(
+                        event,
+                        tauri::WindowEvent::Resized(..)
+                            | tauri::WindowEvent::ThemeChanged(..)
+                    ) {
+                        traffic_lights::center_in_titlebar(&win);
+                    }
+                });
+            }
 
             #[cfg(debug_assertions)]
             {
