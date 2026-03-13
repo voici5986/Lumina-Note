@@ -42,11 +42,9 @@ interface RootContextMenuState {
 
 export function Sidebar() {
   const { t } = useLocaleStore();
-  const { isLoadingTree, tabs, activeTabIndex } = useFileStore(
+  const { isLoadingTree } = useFileStore(
     useShallow((state) => ({
       isLoadingTree: state.isLoadingTree,
-      tabs: state.tabs,
-      activeTabIndex: state.activeTabIndex,
     })),
   );
   const { config: ragConfig, isIndexing: ragIsIndexing, indexStatus, rebuildIndex, cancelIndex } = useRAGStore();
@@ -120,7 +118,6 @@ export function Sidebar() {
   const [isFileTreeScrollActive, setIsFileTreeScrollActive] = useState(false);
   const fileTreeScrollFadeTimerRef = useRef<number | null>(null);
 
-  const isAIMainActive = tabs[activeTabIndex]?.type === "ai-chat";
 
   const handleContextMenu = useCallback((e: React.MouseEvent, entry: FileEntry) => {
     e.preventDefault();
@@ -227,7 +224,6 @@ export function Sidebar() {
     <aside className={SIDEBAR_SURFACE_CLASSNAME}>
       {/* Header */}
       <SidebarHeader
-        isAIMainActive={isAIMainActive}
         onNewFile={() => handleNewFile()}
         onNewDiagram={() => handleNewDiagram()}
         onNewFolder={() => handleNewFolder()}
